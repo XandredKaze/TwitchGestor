@@ -1,0 +1,148 @@
+{
+  "queue": {
+    "gapMs": 800,
+    "maxLength": 100
+  },
+  "history": {
+    "maxItems": 500
+  },
+  "overlay": {
+    "position": "top-center",
+    "fontFamily": "'Poppins', 'Segoe UI', sans-serif",
+    "textColor": "#ffffff",
+    "background": "rgba(18, 18, 24, 0.88)"
+  },
+  "chat": {
+    "enabled": false
+  },
+  "types": {
+    "follow": {
+      "label": "Follow",
+      "enabled": true,
+      "alert": true,
+      "duration": 5000,
+      "sound": "chime",
+      "volume": 0.5,
+      "image": "",
+      "color": "#9146ff",
+      "title": "Nuovo follower!",
+      "text": "{user} ora ti segue ❤️",
+      "chatReply": ""
+    },
+    "sub": {
+      "label": "Abbonamento",
+      "enabled": true,
+      "alert": true,
+      "ignoreGifted": true,
+      "duration": 7000,
+      "sound": "fanfare",
+      "volume": 0.6,
+      "image": "",
+      "color": "#f5a623",
+      "title": "Nuovo abbonato!",
+      "text": "{user} si è abbonato (Tier {tier})",
+      "chatReply": "Grazie mille per l'abbonamento {user}! 💜"
+    },
+    "resub": {
+      "label": "Rinnovo abbonamento",
+      "enabled": true,
+      "alert": true,
+      "duration": 8000,
+      "sound": "fanfare",
+      "volume": 0.6,
+      "image": "",
+      "color": "#f5a623",
+      "title": "Rinnovo abbonamento!",
+      "text": "{user} è abbonato da {months} mesi (Tier {tier})",
+      "showMessage": true,
+      "chatReply": "Grazie {user} per i {months} mesi di abbonamento! 💜",
+      "variants": [
+        { "minAmount": 12, "title": "Un anno (o più) insieme! 🎉" }
+      ]
+    },
+    "giftsub": {
+      "label": "Abbonamenti regalati",
+      "enabled": true,
+      "alert": true,
+      "duration": 7000,
+      "sound": "fanfare",
+      "volume": 0.6,
+      "image": "",
+      "color": "#ff4f8b",
+      "title": "Abbonamenti regalati!",
+      "text": "{user} ha regalato {amount} abbonament{amount|o|i} Tier {tier}",
+      "chatReply": "Che generosità {user}! Grazie per {amount} sub regalat{amount|a|e}! 🎁",
+      "variants": [
+        { "minAmount": 10, "title": "PIOGGIA DI ABBONAMENTI! 🎁", "duration": 10000 }
+      ]
+    },
+    "cheer": {
+      "label": "Bits",
+      "enabled": true,
+      "alert": true,
+      "minAmount": 1,
+      "duration": 6000,
+      "sound": "coin",
+      "volume": 0.6,
+      "image": "",
+      "color": "#00c7ac",
+      "title": "Bits!",
+      "text": "{user} ha inviato {amount} bits",
+      "showMessage": true,
+      "chatReply": "",
+      "variants": [
+        { "minAmount": 1000, "title": "PIOGGIA DI BITS! 💎", "duration": 9000 }
+      ]
+    },
+    "raid": {
+      "label": "Raid",
+      "enabled": true,
+      "alert": true,
+      "minAmount": 1,
+      "duration": 8000,
+      "sound": "fanfare",
+      "volume": 0.7,
+      "image": "",
+      "color": "#e91916",
+      "title": "RAID!",
+      "text": "{user} arriva con {amount} spettator{amount|e|i}!",
+      "chatReply": "Benvenuti raiders di {user}! Andate a seguirlo su twitch.tv/{login} 🚀"
+    },
+    "redemption": {
+      "label": "Punti canale",
+      "enabled": true,
+      "alert": true,
+      "duration": 5000,
+      "sound": "pop",
+      "volume": 0.5,
+      "image": "",
+      "color": "#3fa9f5",
+      "title": "{reward}",
+      "text": "{user} ha riscattato {reward} ({cost} punti)",
+      "showMessage": true,
+      "chatReply": "",
+      "ignoreRewards": [],
+      "variants": [
+        { "reward": "Idratati", "title": "💧 Idratati!", "text": "{user} ti ricorda di bere un sorso d'acqua" }
+      ]
+    },
+    "donation": {
+      "label": "Donazione",
+      "enabled": true,
+      "alert": true,
+      "minAmount": 0,
+      "duration": 8000,
+      "sound": "coin",
+      "volume": 0.7,
+      "image": "",
+      "color": "#2ecc71",
+      "title": "Donazione!",
+      "text": "{user} ha donato {amountFormatted}",
+      "showMessage": true,
+      "chatReply": "Grazie infinite {user} per la donazione di {amountFormatted}! 🙏",
+      "variants": [
+        { "minAmount": 50, "title": "SUPER DONAZIONE! 💸", "duration": 12000 }
+      ]
+    }
+  }
+}
