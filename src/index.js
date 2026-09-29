@@ -115,6 +115,12 @@ if (streamelements) {
   streamelements.start();
 }
 
+web.server.on('error', (err) => {
+  if (err.code !== 'EADDRINUSE') throw err;
+  log.warn(`La porta ${port} è già in uso: TwitchGestor è probabilmente già in esecuzione (${publicUrl}/dashboard)`);
+  process.exit(0);
+});
+
 web.server.listen(port, host, async () => {
   log.info(`Dashboard: ${publicUrl}/dashboard${env.DASHBOARD_TOKEN ? '?token=…' : ''}`);
   log.info(`Overlay per OBS: ${publicUrl}/overlay`);

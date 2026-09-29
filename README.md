@@ -56,6 +56,17 @@ Apri <http://localhost:3000/dashboard>, clicca **Accedi con Twitch** e autorizza
 
 > Abbonamenti e bits sono disponibili solo per canali **Affiliate** o **Partner**; se il tuo canale non lo è ancora, la dashboard ti segnala quali eventi non sono attivi.
 
+### Avvio rapido su Windows
+
+Invece di usare il terminale puoi fare **doppio clic su `Avvia.bat`**: la prima volta installa tutto, poi avvia il programma e apre la dashboard. La finestra nera deve restare aperta durante la live (puoi ridurla a icona).
+
+### Avvio automatico insieme a OBS (Windows)
+
+1. In OBS apri **Strumenti → Script**.
+2. Clicca **+** e scegli il file `obs/twitchgestor.lua` dentro la cartella del programma.
+
+Da quel momento TwitchGestor parte da solo (ridotto a icona) quando apri OBS e si chiude quando chiudi OBS. Nel pannello dello script puoi cambiare la cartella, disattivare l'avvio o la chiusura automatica e usare i pulsanti **Avvia ora** / **Ferma**.
+
 ### 3. Aggiungi l'overlay in OBS
 
 1. In OBS: **Fonti → + → Browser**.
