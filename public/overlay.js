@@ -1,13 +1,14 @@
-// Overlay per OBS: aggiungi http://localhost:3000/overlay come "Sorgente browser" (es. 1920x1080)
+// Overlay per OBS: aggiungi http://localhost:3000/overlay come "Sorgente browser" (1920x1080)
 // e spunta "Controlla l'audio tramite OBS" per gestire il volume dal mixer.
+// Con ?preview la pagina non si collega al programma e mostra gli alert inviati dalla dashboard (anteprima).
 (function () {
   const stage = document.getElementById('stage');
+  const preview = new URLSearchParams(location.search).has('preview');
   let current = null;
   let hideTimer = null;
 
-  function isVideo(src) {
-    return /\.(webm|mp4)$/i.test(src);
-  }
+  const isVideo = (src) => /\.(webm|mp4)$/i.test(src);
+  const mediaSrc = (src) => (/^https?:\/\//.test(src) || src.startsWith('/') ? src : `/${src}`);
 
   function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -16,21 +17,36 @@
     return node;
   }
 
-  function mediaSrc(src) {
-    return src.startsWith('http') || src.startsWith('/') ? src : `/${src}`;
+  function hexToRgba(hex, alpha) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    if (!m) return `rgba(18, 18, 24, ${alpha})`;
+    const n = parseInt(m[1], 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
   }
 
   function hide(node) {
     if (!node) return;
     node.classList.add('leaving');
-    node.addEventListener('animationend', () => node.remove(), { once: true });
+    node.addEventListener('animationend', (e) => {
+      if (e.target === node && node.classList.contains('leaving')) node.remove();
+    });
+    setTimeout(() => node.remove(), 1500);
   }
 
-  function show(alert) {
+  function show(alert, { silent = false } = {}) {
     clearTimeout(hideTimer);
     hide(current);
-    const box = el('div', 'alert');
+
+    window.loadFont(alert.font);
+    const box = el('div', `alert anim-${alert.animation || 'pop'}`);
+    const opacity = alert.backgroundOpacity ?? 0.88;
     box.style.setProperty('--accent', alert.color);
+    box.style.setProperty('--text', alert.textColor || '#fff');
+    box.style.setProperty('--bg', hexToRgba(alert.background, opacity));
+    box.style.setProperty('--size', `${alert.fontSize || 26}px`);
+    box.style.fontFamily = window.fontStack(alert.font);
+    if (opacity === 0) box.classList.add('no-box');
+
     if (alert.image) {
       const media = el(isVideo(alert.image) ? 'video' : 'img');
       media.src = mediaSrc(alert.image);
@@ -43,7 +59,7 @@
     box.dataset.id = alert.id;
     stage.append(box);
     current = box;
-    window.playSound(alert.sound, alert.volume);
+    if (!silent) window.playSound(alert.sound, alert.volume);
     hideTimer = setTimeout(() => {
       hide(box);
       if (current === box) current = null;
@@ -52,10 +68,16 @@
 
   function applySettings(o = {}) {
     stage.className = `pos-${o.position || 'top-center'}`;
-    const root = document.documentElement.style;
-    if (o.fontFamily) root.setProperty('--font', o.fontFamily);
-    if (o.textColor) root.setProperty('--text', o.textColor);
-    if (o.background) root.setProperty('--bg', o.background);
+  }
+
+  if (preview) {
+    // Messaggi dalla dashboard: { type: 'alert', alert, overlay, silent }
+    window.addEventListener('message', (e) => {
+      if (e.origin !== location.origin || e.data?.type !== 'alert') return;
+      applySettings(e.data.overlay);
+      show(e.data.alert, { silent: e.data.silent });
+    });
+    return;
   }
 
   function connect() {

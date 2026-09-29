@@ -17,13 +17,15 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 **Funzioni principali**
 
 - **Coda degli alert**: le notifiche vengono mostrate una alla volta, mai sovrapposte. Dalla dashboard puoi mettere in pausa, saltare, svuotare la coda o **riproporre** un alert passato.
+- **Editor degli alert nella dashboard** con anteprima dal vivo: testi, suoni, font, colori, sfondo, immagini e animazioni.
 - **Overlay per OBS** con animazioni, colori per tipo, immagini/GIF/video e suoni (4 suoni integrati o i tuoi file).
 - **Varianti**: alert diversi in base all'importo (es. donazioni sopra i 50 €, bits sopra i 1000, 10+ sub regalate) o alla ricompensa dei punti canale.
 - **Filtri**: disattiva un tipo, imposta un minimo, ignora ricompense specifiche. Le sub regalate non generano un doppio alert.
 - **Storico e statistiche** della sessione: conteggi, bits totali, donazioni per valuta, top donatori. Lo storico viene salvato su disco.
 - **Ringraziamenti automatici in chat** (facoltativi) con testi personalizzabili.
 - **Anti-duplicati**, riconnessione automatica a Twitch, rinnovo automatico del token.
-- La configurazione si **ricarica da sola** quando la salvi, anche durante la live.
+- Le modifiche valgono **subito**, anche durante la live.
+- Funziona **senza finestre** e può partire e spegnersi insieme a OBS.
 
 ## Requisiti
 
@@ -56,16 +58,19 @@ Apri <http://localhost:3000/dashboard>, clicca **Accedi con Twitch** e autorizza
 
 > Abbonamenti e bits sono disponibili solo per canali **Affiliate** o **Partner**; se il tuo canale non lo è ancora, la dashboard ti segnala quali eventi non sono attivi.
 
-### Avvio rapido su Windows
+### Avvio senza finestre (Windows)
 
-Invece di usare il terminale puoi fare **doppio clic su `Avvia.bat`**: la prima volta installa tutto, poi avvia il programma e apre la dashboard. La finestra nera deve restare aperta durante la live (puoi ridurla a icona).
+- **`Avvia TwitchGestor.vbs`** (doppio clic): avvia il programma in background, **senza nessuna finestra**, e apre la dashboard. La prima volta mostra una finestra solo per l'installazione.
+- **`Avvia.bat`**: stessa cosa ma con la finestra dei messaggi visibile (utile se qualcosa non va).
+- Per **spegnerlo**: pulsante **⏻ Spegni** in alto a destra nella dashboard, oppure chiudi OBS se usi lo script qui sotto.
+- I messaggi del programma sono nella dashboard (scheda Live → **Registro del programma**) e nel file `data/twitchgestor.log`.
 
 ### Avvio automatico insieme a OBS (Windows)
 
 1. In OBS apri **Strumenti → Script**.
 2. Clicca **+** e scegli il file `obs/twitchgestor.lua` dentro la cartella del programma.
 
-Da quel momento TwitchGestor parte da solo (ridotto a icona) quando apri OBS e si chiude quando chiudi OBS. Nel pannello dello script puoi cambiare la cartella, disattivare l'avvio o la chiusura automatica e usare i pulsanti **Avvia ora**, **Ricarica overlay** e **Ferma**. Dopo l'avvio lo script ricarica da solo l'overlay, così si collega anche se OBS lo ha aperto prima che il programma fosse pronto.
+Da quel momento TwitchGestor parte da solo, senza finestre, quando apri OBS e si spegne quando chiudi OBS. Dopo l'avvio lo script ricarica l'overlay, così si collega anche se OBS lo ha aperto prima che il programma fosse pronto. Nel pannello dello script puoi cambiare la cartella, mostrare la finestra dei messaggi e usare i pulsanti **Avvia ora**, **Ricarica overlay** e **Spegni**.
 
 ### 3. Aggiungi l'overlay in OBS
 
@@ -98,14 +103,23 @@ curl -X POST http://localhost:3000/webhooks/donation \
 
 ## Personalizzazione
 
+### Dalla dashboard (consigliato)
+
+Apri la scheda **🎨 Personalizza alert**: per ogni tipo di notifica puoi cambiare testi, **suono** (7 integrati o i tuoi MP3/OGG/WAV), **font** (Google Fonts o di sistema), dimensione, **colori**, **sfondo** e trasparenza, **immagine/GIF/video**, **animazione** (10 tipi), durata, messaggio in chat e **alert speciali per importo o ricompensa**.
+L'anteprima si aggiorna mentre modifichi; **Prova in OBS** manda l'alert all'overlay anche prima di salvare. In **Impostazioni generali** scegli posizione sullo schermo e stile comune a tutti gli alert.
+
+I file che carichi finiscono in `data/media/`. Le impostazioni vengono salvate in `config/config.json`: quando aggiorni il programma copia le cartelle `data` e `config/config.json` insieme al file `.env`.
+
+### A mano
+
 I valori predefiniti sono in `config/default.json`. **Non modificarlo**: crea `config/config.json` e scrivi solo quello che vuoi cambiare. Esempio (vedi anche `config/config.example.json`):
 
 ```json
 {
-  "overlay": { "position": "bottom-right" },
+  "overlay": { "position": "bottom-right", "font": "Bangers" },
   "chat": { "enabled": true },
   "types": {
-    "follow": { "sound": "sounds/follow.mp3", "image": "images/follow.gif" },
+    "follow": { "sound": "media/sounds/follow.mp3", "image": "media/images/follow.gif", "animation": "bounce" },
     "cheer": { "minAmount": 100 },
     "redemption": { "ignoreRewards": ["Evidenzia il mio messaggio"] },
     "donation": {
@@ -126,10 +140,13 @@ I valori predefiniti sono in `config/default.json`. **Non modificarlo**: crea `c
 | `alert` | `false` = registra nello storico ma non mostra l'alert |
 | `minAmount` | importo minimo per mostrare l'alert (bits, spettatori del raid, importo donazione…) |
 | `duration` | durata dell'alert in millisecondi |
-| `sound` | `chime`, `coin`, `pop`, `fanfare`, un file in `public/sounds/` (es. `sounds/wow.mp3`) o un URL; vuoto = nessun suono |
+| `sound` | `chime`, `coin`, `pop`, `fanfare`, `bell`, `levelup`, `laser`, un file caricato (`media/sounds/...`) o un URL; vuoto = nessun suono |
 | `volume` | da `0` a `1` |
-| `image` | immagine, GIF o video (`.webm`/`.mp4`) in `public/images/` o URL |
+| `image` | immagine, GIF o video (`.webm`/`.mp4`) caricato (`media/images/...`) o URL |
 | `color` | colore del bordo e del titolo |
+| `textColor`, `background`, `backgroundOpacity` | colore del testo, colore e opacità (0–1) dello sfondo |
+| `font`, `fontSize` | nome del font e dimensione del testo in pixel |
+| `animation` | `pop`, `fade`, `slide-down`, `slide-up`, `slide-left`, `slide-right`, `zoom`, `bounce`, `flip`, `shake` |
 | `title`, `text` | testi dell'alert (vedi segnaposto sotto) |
 | `showMessage` | mostra il messaggio dello spettatore |
 | `chatReply` | messaggio in chat (serve `"chat": { "enabled": true }`); vuoto = nessun messaggio |
@@ -144,7 +161,7 @@ Plurale: `{amount|o|i}` scrive `o` se l'importo è 1, altrimenti `i` (es. `abbon
 
 ## Sicurezza
 
-- Il server ascolta solo su `127.0.0.1` (questo PC). Se lo esponi in rete o su Internet, imposta `DASHBOARD_TOKEN` e apri la dashboard con `/dashboard?token=IL_TUO_TOKEN`.
+- Il server ascolta solo su `127.0.0.1` (questo PC) e rifiuta i comandi che arrivano da altri siti web aperti nel browser. Se lo esponi in rete o su Internet, imposta `DASHBOARD_TOKEN` e apri la dashboard con `/dashboard?token=IL_TUO_TOKEN`.
 - I token Twitch sono salvati in `data/tokens.json`: non condividere quella cartella.
 
 ## Sviluppo

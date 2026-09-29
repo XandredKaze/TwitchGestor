@@ -23,10 +23,28 @@
     coin: (v) => { tone(988, 0, 0.1, v, 'square'); tone(1319, 0.08, 0.45, v, 'square'); },
     pop: (v) => tone(880, 0, 0.18, v, 'triangle'),
     fanfare: (v) => [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, i * 0.13, i === 5 ? 0.9 : 0.2, v, 'sawtooth')),
+    bell: (v) => { tone(1318, 0, 1.4, v); tone(1976, 0, 0.9, v * 0.5); tone(2637, 0, 0.5, v * 0.25); },
+    levelup: (v) => [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.07, i === 4 ? 0.6 : 0.12, v, 'square')),
+    laser: (v) => {
+      const c = audio();
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(1800, c.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(180, c.currentTime + 0.35);
+      gain.gain.setValueAtTime(v, c.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.4);
+      osc.connect(gain).connect(c.destination);
+      osc.start();
+      osc.stop(c.currentTime + 0.45);
+    },
   };
+
+  window.SOUND_PRESETS = Object.keys(presets);
 
   window.playSound = function (sound, volume = 0.5) {
     if (!sound) return;
+    if (ctx?.state === 'suspended') ctx.resume();
     if (presets[sound]) {
       presets[sound](Math.min(Math.max(volume, 0), 1) * 0.3);
       return;

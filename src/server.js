@@ -3,13 +3,22 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
 import { WebSocketServer } from 'ws';
-import { ROOT_DIR } from './config.js';
+import { ROOT_DIR, DATA_DIR } from './config.js';
 import { NOTIFICATION_TYPES, testNotification } from './core/normalize.js';
+import { NotificationManager } from './core/NotificationManager.js';
+import { sanitizeConfig, ANIMATIONS, POSITIONS, SOUND_PRESETS } from './core/schema.js';
+import { recentLogs } from './logger.js';
 import { parseKofi, parseGenericDonation } from './sources/webhooks.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('server');
 const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
+const MEDIA_DIR = path.join(DATA_DIR, 'media');
+const UPLOAD_KINDS = {
+  sounds: ['.mp3', '.ogg', '.wav'],
+  images: ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.webm', '.mp4'],
+};
+const UPLOAD_LIMIT = 30 * 1024 * 1024;
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -32,6 +41,20 @@ function safeEqual(a, b) {
   const x = Buffer.from(String(a ?? ''));
   const y = Buffer.from(String(b ?? ''));
   return x.length === y.length && timingSafeEqual(x, y);
+}
+
+/**
+ * Protezione da siti esterni: il browser può inviare richieste a localhost da qualsiasi pagina web.
+ * Accettiamo solo richieste senza Origin (OBS, curl, webhook) o dalla stessa origine della dashboard.
+ */
+function sameOrigin(req) {
+  const origin = req.headers.origin;
+  if (!origin || origin === 'null') return !origin;
+  try {
+    return new URL(origin).host === req.headers.host;
+  } catch {
+    return false;
+  }
 }
 
 function send(res, status, body, headers = {}) {
@@ -63,13 +86,66 @@ async function readBody(req, limit = 100_000) {
   }
 }
 
-function serveStatic(res, urlPath) {
-  const file = path.normalize(path.join(PUBLIC_DIR, urlPath));
-  if (!file.startsWith(PUBLIC_DIR + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+function serveStatic(res, urlPath, baseDir = PUBLIC_DIR) {
+  let file;
+  try {
+    file = path.normalize(path.join(baseDir, decodeURIComponent(urlPath)));
+  } catch {
+    return send(res, 400, 'Percorso non valido');
+  }
+  if (!file.startsWith(baseDir + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
     return send(res, 404, 'Non trovato');
   }
   res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] ?? 'application/octet-stream' });
   fs.createReadStream(file).pipe(res);
+}
+
+/** Notifica di prova con l'importo o la ricompensa scelti nell'anteprima della dashboard. */
+function sampleNotification(type, sample = {}) {
+  const n = testNotification(type);
+  const amount = Number(sample?.amount);
+  if (sample?.amount !== undefined && sample?.amount !== '' && Number.isFinite(amount) && amount >= 0) {
+    n.amount = amount;
+    if (type === 'resub') n.months = amount;
+  }
+  if (typeof sample?.reward === 'string' && sample.reward.trim() && n.reward) n.reward.title = sample.reward.slice(0, 60);
+  return n;
+}
+
+function listMedia() {
+  const out = {};
+  for (const kind of Object.keys(UPLOAD_KINDS)) {
+    const dir = path.join(MEDIA_DIR, kind);
+    out[kind] = fs.existsSync(dir)
+      ? fs.readdirSync(dir).filter((f) => UPLOAD_KINDS[kind].includes(path.extname(f).toLowerCase())).sort().map((f) => `media/${kind}/${f}`)
+      : [];
+  }
+  return out;
+}
+
+/** Salva un file caricato dalla dashboard in data/media/<tipo>/ con un nome sicuro. */
+async function saveUpload(req, kind, rawName) {
+  if (!UPLOAD_KINDS[kind]) throw Object.assign(new Error('Tipo di file non valido'), { status: 400 });
+  const name = path.basename(String(rawName ?? '')).normalize('NFKD').replace(/[^\w.\-]+/g, '_').replace(/^\.+/, '').slice(-80);
+  const ext = path.extname(name).toLowerCase();
+  if (!name || !UPLOAD_KINDS[kind].includes(ext)) {
+    throw Object.assign(new Error(`Formato non supportato. Usa: ${UPLOAD_KINDS[kind].join(', ')}`), { status: 400 });
+  }
+  const dir = path.join(MEDIA_DIR, kind);
+  fs.mkdirSync(dir, { recursive: true });
+  let final = name;
+  for (let i = 1; fs.existsSync(path.join(dir, final)); i++) final = `${path.basename(name, ext)}-${i}${ext}`;
+
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > UPLOAD_LIMIT) throw Object.assign(new Error('File troppo grande (massimo 30 MB)'), { status: 413 });
+    chunks.push(chunk);
+  }
+  if (!size) throw Object.assign(new Error('File vuoto'), { status: 400 });
+  fs.writeFileSync(path.join(dir, final), Buffer.concat(chunks));
+  return `media/${kind}/${final}`;
 }
 
 /**
@@ -95,7 +171,19 @@ export function createServer(app) {
       app.broadcastState();
     },
     'POST /api/auth/logout': () => app.logout(),
+    'GET /api/logs': () => ({ logs: recentLogs() }),
+    'GET /api/config': () => ({
+      config: app.config.get(),
+      defaults: app.config.defaults(),
+      options: { animations: ANIMATIONS, positions: POSITIONS, sounds: SOUND_PRESETS },
+      media: listMedia(),
+    }),
+    'POST /api/shutdown': () => {
+      setTimeout(() => app.shutdown(), 300);
+      return { ok: true };
+    },
   };
+  const draft = (body) => (body?.config ? sanitizeConfig(body.config, app.config.defaults()) : null);
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -104,6 +192,7 @@ export function createServer(app) {
       if (route === 'GET /') return send(res, 302, '', { Location: '/dashboard' });
       if (route === 'GET /overlay') return serveStatic(res, '/overlay.html');
       if (route === 'GET /dashboard') return serveStatic(res, '/dashboard.html');
+      if (req.method === 'GET' && url.pathname.startsWith('/media/')) return serveStatic(res, url.pathname.slice('/media'.length), MEDIA_DIR);
 
       // --- Accesso Twitch ---
       if (route === 'GET /auth/login') {
@@ -131,12 +220,36 @@ export function createServer(app) {
 
       // --- API dashboard ---
       if (url.pathname.startsWith('/api/')) {
-        if (!isAuthorized(req, url)) return send(res, 401, { error: 'Token dashboard mancante o errato' });
+        // Spegnimento chiesto dallo script di OBS: solo da questo PC e con un'intestazione che una
+        // pagina web non può inviare senza permesso (il server non risponde alle richieste CORS).
+        const localStop = route === 'POST /api/shutdown' && req.headers['x-twitchgestor-stop'] === '1'
+          && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+        if (!localStop && !isAuthorized(req, url)) return send(res, 401, { error: 'Token dashboard mancante o errato' });
+        // Le azioni richiedono un'intestazione che solo la dashboard invia: una pagina di un altro sito
+        // non può aggiungerla senza un permesso (CORS) che questo server non concede mai.
+        if (req.method !== 'GET' && !localStop && (req.headers['x-twitchgestor'] !== '1' || !sameOrigin(req))) {
+          return send(res, 403, { error: 'Richiesta non consentita' });
+        }
         if (req.method === 'POST' && url.pathname.startsWith('/api/test/')) {
           const type = url.pathname.slice('/api/test/'.length);
           if (!NOTIFICATION_TYPES.includes(type)) return send(res, 400, { error: `Tipo sconosciuto: ${type}` });
-          app.manager.test(testNotification(type));
+          const body = await readBody(req, 1_000_000);
+          app.manager.test(sampleNotification(type, body.sample), draft(body));
           return send(res, 200, { ok: true });
+        }
+        if (route === 'POST /api/preview') {
+          const body = await readBody(req, 1_000_000);
+          if (!NOTIFICATION_TYPES.includes(body.type)) return send(res, 400, { error: 'Tipo sconosciuto' });
+          const builder = new NotificationManager({ config: draft(body) ?? app.config.get() });
+          return send(res, 200, { alert: builder.buildAlert(sampleNotification(body.type, body.sample)) });
+        }
+        if (route === 'PUT /api/config') {
+          const config = app.config.save((await readBody(req, 1_000_000)).config);
+          return send(res, 200, { config });
+        }
+        if (route === 'POST /api/upload') {
+          const saved = await saveUpload(req, url.searchParams.get('kind'), req.headers['x-filename'] && decodeURIComponent(req.headers['x-filename']));
+          return send(res, 200, { path: saved, media: listMedia() });
         }
         if (req.method === 'POST' && url.pathname.startsWith('/api/replay/')) {
           const ok = app.manager.replay(decodeURIComponent(url.pathname.slice('/api/replay/'.length)));
@@ -164,7 +277,7 @@ export function createServer(app) {
   server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, 'http://localhost');
     const role = url.searchParams.get('role');
-    if (url.pathname !== '/ws' || !(role in clients) || (role === 'dashboard' && !isAuthorized(req, url))) {
+    if (url.pathname !== '/ws' || !(role in clients) || !sameOrigin(req) || (role === 'dashboard' && !isAuthorized(req, url))) {
       socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
       return socket.destroy();
     }

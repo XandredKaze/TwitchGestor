@@ -1,5 +1,5 @@
 -- TwitchGestor per OBS
--- Avvia TwitchGestor quando apri OBS e lo chiude quando chiudi OBS.
+-- Avvia TwitchGestor (senza finestre) quando apri OBS e lo spegne quando chiudi OBS.
 -- Installazione: OBS > Strumenti > Script > "+" > scegli questo file.
 
 obs = obslua
@@ -7,6 +7,8 @@ obs = obslua
 local project_dir = ""
 local autostart = true
 local stop_on_exit = true
+local show_window = false
+local port = 3000
 
 local function is_windows()
   return package.config:sub(1, 1) == "\\"
@@ -22,20 +24,44 @@ local function win_path(p)
   return (p:gsub("/", "\\"))
 end
 
-local function file_exists(p)
-  local f = io.open(p, "r")
-  if f then
-    f:close()
-    return true
-  end
-  return false
+-- ---------- Avvio di programmi senza finestre (API di Windows tramite LuaJIT FFI) ----------
+
+local ffi_ok, ffi = pcall(require, "ffi")
+local shell32 = nil
+if ffi_ok and is_windows() then
+  pcall(ffi.cdef, [[
+    int MultiByteToWideChar(unsigned int cp, unsigned long flags, const char* str, int len, wchar_t* out, int outlen);
+    void* ShellExecuteW(void* hwnd, const wchar_t* op, const wchar_t* file, const wchar_t* params, const wchar_t* dir, int show);
+  ]])
+  local ok, lib = pcall(ffi.load, "shell32")
+  if ok then shell32 = lib end
 end
 
--- cmd /c toglie la prima e l'ultima virgoletta: ne aggiungiamo un paio esterno
--- così quelle dentro al comando (percorsi con spazi) restano intatte.
-local function run(cmd)
-  os.execute('"' .. cmd .. '"')
+local SW_HIDE = 0
+local SW_SHOWMINNOACTIVE = 7
+
+-- Testo UTF-8 (quello di OBS) -> UTF-16 per Windows: così funzionano anche i percorsi con lettere accentate.
+local function wide(s)
+  if s == nil then return nil end
+  local n = ffi.C.MultiByteToWideChar(65001, 0, s, -1, nil, 0)
+  local buf = ffi.new("wchar_t[?]", n)
+  ffi.C.MultiByteToWideChar(65001, 0, s, -1, buf, n)
+  return buf
 end
+
+-- Avvia un programma senza aspettare. Ritorna true se Windows lo ha avviato.
+local function launch(file, params, dir, show)
+  if shell32 ~= nil then
+    local result = shell32.ShellExecuteW(nil, wide("open"), wide(file), wide(params), wide(dir), show)
+    return tonumber(ffi.cast("intptr_t", result)) > 32
+  end
+  -- Ripiego senza FFI: funziona lo stesso ma può comparire per un attimo una finestrella nera.
+  -- cmd /c toglie la prima e l'ultima virgoletta: ne aggiungiamo un paio esterno.
+  os.execute('"start "" /min "' .. file .. '" ' .. (params or "") .. '"')
+  return true
+end
+
+-- ---------- Ricarica dell'overlay ----------
 
 -- Ricarica le sorgenti Browser che mostrano l'overlay di TwitchGestor.
 -- Serve perché OBS carica la pagina appena si apre, quando il programma magari non è ancora pronto:
@@ -80,44 +106,58 @@ local function schedule_refresh()
   obs.timer_add(refresh_tick, 2000)
 end
 
+-- ---------- Avvio e spegnimento ----------
+
 local function start_program()
   if not is_windows() then
     obs.script_log(obs.LOG_WARNING, "L'avvio automatico è disponibile solo su Windows")
     return
   end
-  local bat = win_path(project_dir) .. "\\Avvia.bat"
-  if not file_exists(bat) then
-    obs.script_log(obs.LOG_WARNING, "Avvia.bat non trovato in \"" .. project_dir .. "\": controlla la cartella nelle impostazioni dello script")
-    return
+  local dir = win_path(project_dir)
+  local ok
+  if show_window then
+    ok = launch(dir .. "\\Avvia.bat", "obs", dir, SW_SHOWMINNOACTIVE)
+  else
+    ok = launch("wscript.exe", '"' .. dir .. '\\Avvia TwitchGestor.vbs" obs', dir, SW_HIDE)
   end
-  -- Finestra ridotta a icona: la trovi nella barra delle applicazioni se vuoi leggere i messaggi.
-  run('start "TwitchGestor" /min "' .. bat .. '" obs')
-  obs.script_log(obs.LOG_INFO, "TwitchGestor avviato")
-  schedule_refresh()
+  if ok then
+    obs.script_log(obs.LOG_INFO, "TwitchGestor avviato" .. (show_window and "" or " (senza finestra)"))
+    schedule_refresh()
+  else
+    obs.script_log(obs.LOG_WARNING, "Impossibile avviare TwitchGestor da \"" .. project_dir .. "\": controlla la cartella nelle impostazioni dello script")
+  end
 end
 
 local function stop_program()
   if not is_windows() then return end
-  run('taskkill /FI "WINDOWTITLE eq TwitchGestor*" /T /F >nul 2>nul')
-  obs.script_log(obs.LOG_INFO, "TwitchGestor chiuso")
+  -- Chiede al programma di spegnersi (salva lo storico prima di uscire). curl è incluso in Windows 10 e 11.
+  launch("curl.exe", "-s -m 5 -X POST -H \"x-twitchgestor-stop: 1\" http://127.0.0.1:" .. port .. "/api/shutdown", nil, SW_HIDE)
+  obs.script_log(obs.LOG_INFO, "Richiesto lo spegnimento di TwitchGestor")
 end
+
+-- ---------- Impostazioni dello script ----------
 
 local function read_settings(settings)
   project_dir = obs.obs_data_get_string(settings, "project_dir")
   if project_dir == "" then project_dir = default_dir() end
   autostart = obs.obs_data_get_bool(settings, "autostart")
   stop_on_exit = obs.obs_data_get_bool(settings, "stop_on_exit")
+  show_window = obs.obs_data_get_bool(settings, "show_window")
+  port = obs.obs_data_get_int(settings, "port")
+  if port <= 0 then port = 3000 end
 end
 
 function script_description()
-  return "<b>TwitchGestor</b><br>Avvia il gestore di notifiche insieme a OBS e lo chiude quando esci."
+  return "<b>TwitchGestor</b><br>Avvia il gestore di notifiche insieme a OBS (senza finestre) e lo spegne quando esci."
 end
 
 function script_properties()
   local props = obs.obs_properties_create()
   obs.obs_properties_add_path(props, "project_dir", "Cartella di TwitchGestor", obs.OBS_PATH_DIRECTORY, "", nil)
   obs.obs_properties_add_bool(props, "autostart", "Avvia TwitchGestor quando apro OBS")
-  obs.obs_properties_add_bool(props, "stop_on_exit", "Chiudi TwitchGestor quando chiudo OBS")
+  obs.obs_properties_add_bool(props, "stop_on_exit", "Spegni TwitchGestor quando chiudo OBS")
+  obs.obs_properties_add_bool(props, "show_window", "Mostra la finestra del programma (per leggere i messaggi)")
+  obs.obs_properties_add_int(props, "port", "Porta (cambiala solo se l'hai cambiata nel file .env)", 1, 65535, 1)
   obs.obs_properties_add_button(props, "start_now", "Avvia ora", function()
     start_program()
     return false
@@ -127,7 +167,7 @@ function script_properties()
     obs.script_log(obs.LOG_INFO, "Overlay ricaricati: " .. n)
     return false
   end)
-  obs.obs_properties_add_button(props, "stop_now", "Ferma", function()
+  obs.obs_properties_add_button(props, "stop_now", "Spegni", function()
     stop_program()
     return false
   end)
@@ -138,6 +178,8 @@ function script_defaults(settings)
   obs.obs_data_set_default_string(settings, "project_dir", default_dir())
   obs.obs_data_set_default_bool(settings, "autostart", true)
   obs.obs_data_set_default_bool(settings, "stop_on_exit", true)
+  obs.obs_data_set_default_bool(settings, "show_window", false)
+  obs.obs_data_set_default_int(settings, "port", 3000)
 end
 
 function script_update(settings)

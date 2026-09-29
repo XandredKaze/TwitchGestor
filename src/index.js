@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { ConfigStore, DATA_DIR, loadEnv } from './config.js';
 import { NotificationManager } from './core/NotificationManager.js';
@@ -67,6 +68,9 @@ const app = {
   logout() {
     auth.logout();
   },
+  shutdown() {
+    shutdown();
+  },
 };
 
 const web = createServer(app);
@@ -83,7 +87,10 @@ manager.on('chat', (text) => {
   if (!auth.user) return;
   helix.sendChatMessage(text).catch((err) => log.warn(`Invio messaggio in chat fallito: ${err.message}`));
 });
-config.on('change', (c) => web.toOverlays({ type: 'hello', overlay: c.overlay }));
+config.on('change', (c) => {
+  web.toOverlays({ type: 'hello', overlay: c.overlay });
+  app.broadcastState();
+});
 
 function startEventSub() {
   eventsub?.stop();
@@ -121,7 +128,12 @@ web.server.on('error', (err) => {
   process.exit(0);
 });
 
+// Numero del processo: serve allo script di OBS per spegnere il programma quando gira nascosto.
+const PID_FILE = path.join(DATA_DIR, 'twitchgestor.pid');
+
 web.server.listen(port, host, async () => {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(PID_FILE, String(process.pid));
   log.info(`Dashboard: ${publicUrl}/dashboard${env.DASHBOARD_TOKEN ? '?token=…' : ''}`);
   log.info(`Overlay per OBS: ${publicUrl}/overlay`);
   if (!auth.configured) {
@@ -145,6 +157,9 @@ function shutdown() {
   eventsub?.stop();
   streamelements?.stop();
   manager.stop();
+  try {
+    if (fs.readFileSync(PID_FILE, 'utf8') === String(process.pid)) fs.rmSync(PID_FILE);
+  } catch { /* già rimosso */ }
   process.exit(0);
 }
 process.on('SIGINT', shutdown);

@@ -86,8 +86,8 @@ export class NotificationManager extends EventEmitter {
   }
 
   /** Sceglie la variante più specifica: prima quelle legate a una ricompensa, poi la soglia più alta. */
-  resolveStyle(n) {
-    const { variants = [], ...cfg } = this.typeConfig(n.type);
+  resolveStyle(n, typeConfig = this.typeConfig(n.type)) {
+    const { variants = [], ...cfg } = typeConfig;
     const amount = n.amount ?? 0;
     const rewardTitle = n.reward?.title?.toLowerCase();
     const matching = variants
@@ -98,8 +98,10 @@ export class NotificationManager extends EventEmitter {
     return { ...cfg, ...(matching.at(-1) ?? {}) };
   }
 
-  buildAlert(n) {
-    const style = this.resolveStyle(n);
+  /** @param typeConfig facoltativo: impostazioni non ancora salvate (anteprima e prova dalla dashboard). */
+  buildAlert(n, typeConfig) {
+    const style = this.resolveStyle(n, typeConfig);
+    const overlay = this.#config.overlay ?? {};
     const vars = templateVars(n);
     return {
       id: n.id,
@@ -112,6 +114,12 @@ export class NotificationManager extends EventEmitter {
       volume: style.volume ?? 0.5,
       image: style.image ?? '',
       color: style.color ?? '#9146ff',
+      font: style.font || overlay.font || 'Poppins',
+      fontSize: style.fontSize ?? overlay.fontSize ?? 26,
+      textColor: style.textColor ?? overlay.textColor ?? '#ffffff',
+      background: style.background ?? overlay.background ?? '#121218',
+      backgroundOpacity: style.backgroundOpacity ?? overlay.backgroundOpacity ?? 0.88,
+      animation: style.animation || overlay.animation || 'pop',
     };
   }
 
@@ -158,8 +166,10 @@ export class NotificationManager extends EventEmitter {
     return true;
   }
 
-  test(n) {
-    this.#enqueue(this.buildAlert(n));
+  /** @param draftConfig facoltativo: impostazioni non ancora salvate, per provare un alert dalla dashboard. */
+  test(n, draftConfig) {
+    const builder = draftConfig ? new NotificationManager({ config: draftConfig }) : this;
+    this.#enqueue(builder.buildAlert(n));
     this.emit('notification', { ...n, alerted: true });
   }
 

@@ -8,9 +8,12 @@
   },
   "overlay": {
     "position": "top-center",
-    "fontFamily": "'Poppins', 'Segoe UI', sans-serif",
+    "font": "Poppins",
+    "fontSize": 26,
     "textColor": "#ffffff",
-    "background": "rgba(18, 18, 24, 0.88)"
+    "background": "#121218",
+    "backgroundOpacity": 0.88,
+    "animation": "pop"
   },
   "chat": {
     "enabled": false
@@ -57,7 +60,10 @@
       "showMessage": true,
       "chatReply": "Grazie {user} per i {months} mesi di abbonamento! 💜",
       "variants": [
-        { "minAmount": 12, "title": "Un anno (o più) insieme! 🎉" }
+        {
+          "minAmount": 12,
+          "title": "Un anno (o più) insieme! 🎉"
+        }
       ]
     },
     "giftsub": {
@@ -73,7 +79,11 @@
       "text": "{user} ha regalato {amount} abbonament{amount|o|i} Tier {tier}",
       "chatReply": "Che generosità {user}! Grazie per {amount} sub regalat{amount|a|e}! 🎁",
       "variants": [
-        { "minAmount": 10, "title": "PIOGGIA DI ABBONAMENTI! 🎁", "duration": 10000 }
+        {
+          "minAmount": 10,
+          "title": "PIOGGIA DI ABBONAMENTI! 🎁",
+          "duration": 10000
+        }
       ]
     },
     "cheer": {
@@ -91,7 +101,11 @@
       "showMessage": true,
       "chatReply": "",
       "variants": [
-        { "minAmount": 1000, "title": "PIOGGIA DI BITS! 💎", "duration": 9000 }
+        {
+          "minAmount": 1000,
+          "title": "PIOGGIA DI BITS! 💎",
+          "duration": 9000
+        }
       ]
     },
     "raid": {
@@ -123,7 +137,11 @@
       "chatReply": "",
       "ignoreRewards": [],
       "variants": [
-        { "reward": "Idratati", "title": "💧 Idratati!", "text": "{user} ti ricorda di bere un sorso d'acqua" }
+        {
+          "reward": "Idratati",
+          "title": "💧 Idratati!",
+          "text": "{user} ti ricorda di bere un sorso d'acqua"
+        }
       ]
     },
     "donation": {
@@ -141,7 +159,11 @@
       "showMessage": true,
       "chatReply": "Grazie infinite {user} per la donazione di {amountFormatted}! 🙏",
       "variants": [
-        { "minAmount": 50, "title": "SUPER DONAZIONE! 💸", "duration": 12000 }
+        {
+          "minAmount": 50,
+          "title": "SUPER DONAZIONE! 💸",
+          "duration": 12000
+        }
       ]
     }
   }

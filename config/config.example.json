@@ -1,14 +1,37 @@
 {
-  "overlay": { "position": "bottom-right" },
-  "chat": { "enabled": true },
+  "overlay": {
+    "position": "bottom-right",
+    "font": "Bangers"
+  },
+  "chat": {
+    "enabled": true
+  },
   "types": {
-    "follow": { "sound": "sounds/follow.mp3", "image": "images/follow.gif" },
-    "cheer": { "minAmount": 100 },
-    "redemption": { "ignoreRewards": ["Evidenzia il mio messaggio"] },
+    "follow": {
+      "sound": "media/sounds/follow.mp3",
+      "image": "media/images/follow.gif",
+      "animation": "bounce"
+    },
+    "cheer": {
+      "minAmount": 100
+    },
+    "redemption": {
+      "ignoreRewards": [
+        "Evidenzia il mio messaggio"
+      ]
+    },
     "donation": {
       "variants": [
-        { "minAmount": 20, "title": "Grazie di cuore! 💚" },
-        { "minAmount": 100, "title": "LEGGENDARIO! 👑", "sound": "fanfare", "duration": 15000 }
+        {
+          "minAmount": 20,
+          "title": "Grazie di cuore! 💚"
+        },
+        {
+          "minAmount": 100,
+          "title": "LEGGENDARIO! 👑",
+          "sound": "fanfare",
+          "duration": 15000
+        }
       ]
     }
   }

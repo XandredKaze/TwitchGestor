@@ -3,6 +3,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { createLogger } from './logger.js';
+import { sanitizeConfig, diffConfig } from './core/schema.js';
 
 const log = createLogger('config');
 
@@ -51,6 +52,22 @@ export class ConfigStore extends EventEmitter {
   }
 
   get() {
+    return this.current;
+  }
+
+  defaults() {
+    return readJson(DEFAULT_FILE);
+  }
+
+  /** Salva le impostazioni arrivate dalla dashboard (validate) e le applica subito. */
+  save(input) {
+    const defaults = this.defaults();
+    const next = sanitizeConfig(input, defaults);
+    const diff = diffConfig(next, defaults) ?? {};
+    fs.mkdirSync(path.dirname(USER_FILE), { recursive: true });
+    fs.writeFileSync(USER_FILE, `${JSON.stringify(diff, null, 2)}\n`);
+    this.current = deepMerge(defaults, diff);
+    this.emit('change', this.current);
     return this.current;
   }
 

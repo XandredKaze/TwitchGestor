@@ -13,8 +13,10 @@ if not exist node_modules (
   call npm install || (pause & exit /b 1)
 )
 
-rem Avviato a mano apre anche la dashboard; avviato da OBS ("Avvia.bat obs") no.
+rem Versione con la finestra visibile (utile per leggere i messaggi).
+rem Per avviarlo senza finestra usa "Avvia TwitchGestor.vbs".
+rem Avviato da OBS ("Avvia.bat obs"): non apre la dashboard e non resta in attesa alla chiusura.
 if /i not "%~1"=="obs" start "" cmd /c "timeout /t 3 >nul & start http://localhost:3000/dashboard"
 
 call npm start
-if errorlevel 1 pause
+if /i not "%~1"=="obs" if errorlevel 1 pause

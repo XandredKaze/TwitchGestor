@@ -3,19 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Gestore notifiche</title>
+  <title>TwitchGestor</title>
   <link rel="stylesheet" href="/dashboard.css">
 </head>
 <body>
   <header>
-    <h1>Gestore notifiche</h1>
+    <h1>TwitchGestor</h1>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="live" role="tab">📡 Live</button>
+      <button class="tab" data-tab="editor" role="tab">🎨 Personalizza alert</button>
+    </nav>
     <div id="statuses" class="statuses"></div>
     <div id="account" class="account"></div>
+    <button id="btn-shutdown" class="small-btn danger" title="Spegne il programma TwitchGestor">⏻ Spegni</button>
   </header>
 
   <div id="banners"></div>
 
-  <main>
+  <main id="tab-live" class="live-grid">
     <section class="panel" id="queue-panel">
       <h2>Coda alert</h2>
       <div id="now-playing" class="now-playing">Nessun alert in corso</div>
@@ -53,8 +58,54 @@
       <div id="filters" class="filters"></div>
       <ul id="feed" class="feed"></ul>
     </section>
+
+    <details class="panel logs-panel" id="logs-panel">
+      <summary><h2>Registro del programma</h2></summary>
+      <pre id="logs" class="logs"></pre>
+    </details>
   </main>
 
+  <main id="tab-editor" class="editor" hidden>
+    <aside class="panel editor-nav">
+      <h2>Alert</h2>
+      <div id="type-list" class="type-list"></div>
+      <button id="nav-general" class="type-item general" data-type="__general">⚙️ Impostazioni generali</button>
+    </aside>
+
+    <section class="panel editor-form">
+      <div id="form"></div>
+    </section>
+
+    <aside class="panel editor-preview">
+      <div class="panel-head">
+        <h2>Anteprima</h2>
+        <div class="row">
+          <label class="inline small"><input type="checkbox" id="preview-sound"> Suono</label>
+          <button id="btn-zoom" class="small-btn" title="Ingrandisci l'anteprima">⛶ Ingrandisci</button>
+        </div>
+      </div>
+      <div class="preview-frame">
+        <iframe id="preview" src="/overlay?preview" title="Anteprima alert" tabindex="-1"></iframe>
+      </div>
+      <div id="preview-sample" class="preview-sample"></div>
+      <div class="buttons">
+        <button id="btn-replay">▶ Riproduci</button>
+        <button id="btn-test-obs" title="Invia questo alert all'overlay in OBS, anche senza salvare">📺 Prova in OBS</button>
+      </div>
+      <p class="muted small">L'anteprima si aggiorna mentre modifichi. "Prova in OBS" usa le modifiche anche se non le hai ancora salvate.</p>
+    </aside>
+
+    <div class="save-bar" id="save-bar" hidden>
+      <span>Hai modifiche non salvate</span>
+      <button id="btn-discard">Annulla modifiche</button>
+      <button id="btn-save" class="primary">💾 Salva</button>
+    </div>
+  </main>
+
+  <script src="/common.js"></script>
+  <script src="/sounds.js"></script>
+  <script src="/fonts.js"></script>
   <script src="/dashboard.js"></script>
+  <script src="/editor.js"></script>
 </body>
 </html>

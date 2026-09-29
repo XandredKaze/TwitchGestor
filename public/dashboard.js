@@ -1,49 +1,17 @@
 (function () {
-  // Il token (se DASHBOARD_TOKEN è impostato) si passa una volta con ?token=... e viene ricordato.
-  const params = new URLSearchParams(location.search);
-  let token = params.get('token');
-  try {
-    if (token) localStorage.setItem('dashboardToken', token);
-    else token = localStorage.getItem('dashboardToken');
-  } catch { /* storage non disponibile */ }
-
+  const { el, money, token: getToken } = window.TG;
+  const token = getToken();
+  const api = (path) => window.TG.api(path);
   const $ = (id) => document.getElementById(id);
   let state = null;
   let filter = 'all';
   let search = '';
+  let shuttingDown = false;
 
   const SOURCE_LABELS = {
     twitch: 'Twitch', 'twitch-charity': 'Twitch Beneficenza', streamelements: 'StreamElements',
     kofi: 'Ko-fi', webhook: 'Webhook', test: 'Test',
   };
-
-  async function api(path) {
-    const res = await fetch(path, { method: 'POST', headers: token ? { 'x-dashboard-token': token } : {} });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      alert(data.error ?? `Errore ${res.status}`);
-    }
-  }
-
-  function el(tag, attrs = {}, ...children) {
-    const node = document.createElement(tag);
-    for (const [k, v] of Object.entries(attrs)) {
-      if (k === 'style') for (const [prop, val] of Object.entries(v)) node.style.setProperty(prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`), val ?? '');
-      else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
-      else if (k === 'className') node.className = v;
-      else node.setAttribute(k, v);
-    }
-    node.append(...children.filter((c) => c !== null && c !== undefined && c !== ''));
-    return node;
-  }
-
-  function money(amount, currency) {
-    try {
-      return new Intl.NumberFormat('it-IT', { style: 'currency', currency }).format(amount);
-    } catch {
-      return `${amount} ${currency}`;
-    }
-  }
 
   function describe(n) {
     const who = n.user?.name ?? 'Anonimo';
@@ -190,6 +158,40 @@
     $('btn-copy').textContent = 'Copiato!';
     setTimeout(() => { $('btn-copy').textContent = 'Copia'; }, 1500);
   };
+  $('btn-shutdown').onclick = async () => {
+    if (!confirm('Spegnere TwitchGestor? Gli alert smetteranno di arrivare finché non lo riavvii (o riapri OBS).')) return;
+    if (await api('/api/shutdown')) {
+      shuttingDown = true;
+      document.body.replaceChildren(el('div', { className: 'bye' },
+        el('h1', {}, '⏻ TwitchGestor è spento'),
+        el('p', {}, 'Per riaccenderlo riapri OBS oppure fai doppio clic su "Avvia TwitchGestor".')));
+    }
+  };
+
+  // ---------- Schede ----------
+  function showTab(name) {
+    for (const t of document.querySelectorAll('.tab')) t.classList.toggle('active', t.dataset.tab === name);
+    $('tab-live').hidden = name !== 'live';
+    $('tab-editor').hidden = name !== 'editor';
+    if (name === 'editor') window.dispatchEvent(new Event('editor:open'));
+    try { sessionStorage.setItem('tab', name); } catch { /* ignora */ }
+  }
+  for (const t of document.querySelectorAll('.tab')) t.onclick = () => showTab(t.dataset.tab);
+  try { if (sessionStorage.getItem('tab') === 'editor') showTab('editor'); } catch { /* ignora */ }
+
+  // ---------- Registro ----------
+  async function refreshLogs() {
+    if (!$('logs-panel').open || $('tab-live').hidden) return;
+    const data = await window.TG.api('/api/logs', { method: 'GET', quiet: true });
+    if (!data) return;
+    const box = $('logs');
+    const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+    box.replaceChildren(...data.logs.map((l) => el('div', { className: `log-${l.level}` }, l.line)));
+    if (atBottom) box.scrollTop = box.scrollHeight;
+  }
+  $('logs-panel').addEventListener('toggle', refreshLogs);
+  setInterval(refreshLogs, 4000);
+
   $('search').oninput = (e) => {
     search = e.target.value;
     if (state) renderFeed();
@@ -214,7 +216,8 @@
       }
     };
     ws.onclose = () => {
-      $('statuses').replaceChildren(pill('Server', 'non raggiungibile'));
+      if (shuttingDown) return;
+      $('statuses').replaceChildren(pill('Programma', 'non raggiungibile'));
       setTimeout(connect, 2000);
     };
   }
