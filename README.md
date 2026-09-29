@@ -65,7 +65,7 @@ Invece di usare il terminale puoi fare **doppio clic su `Avvia.bat`**: la prima 
 1. In OBS apri **Strumenti → Script**.
 2. Clicca **+** e scegli il file `obs/twitchgestor.lua` dentro la cartella del programma.
 
-Da quel momento TwitchGestor parte da solo (ridotto a icona) quando apri OBS e si chiude quando chiudi OBS. Nel pannello dello script puoi cambiare la cartella, disattivare l'avvio o la chiusura automatica e usare i pulsanti **Avvia ora** / **Ferma**.
+Da quel momento TwitchGestor parte da solo (ridotto a icona) quando apri OBS e si chiude quando chiudi OBS. Nel pannello dello script puoi cambiare la cartella, disattivare l'avvio o la chiusura automatica e usare i pulsanti **Avvia ora**, **Ricarica overlay** e **Ferma**. Dopo l'avvio lo script ricarica da solo l'overlay, così si collega anche se OBS lo ha aperto prima che il programma fosse pronto.
 
 ### 3. Aggiungi l'overlay in OBS
 
