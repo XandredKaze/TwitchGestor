@@ -84,13 +84,33 @@ button.danger { color: var(--danger); }
 
 .live-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr) minmax(360px, 2fr);
+  grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr) minmax(300px, 1fr);
+  grid-template-areas: "side center chat" "logs logs logs";
   gap: 16px;
   padding: 16px 20px 30px;
 }
+.col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.col-side { grid-area: side; }
+.col-center { grid-area: center; }
+#queue-panel { grid-area: queue; }
+#stats-panel { grid-area: stats; }
+.stream-panel { grid-area: stream; }
+.chat-panel { grid-area: chat; display: flex; flex-direction: column; }
+.feed-panel { grid-area: feed; }
+.logs-panel { grid-area: logs; }
 .live-grid[hidden], .editor[hidden] { display: none; }
-@media (max-width: 1100px) { .live-grid { grid-template-columns: 1fr 1fr; } .feed-panel, .logs-panel { grid-column: 1 / -1; } }
-@media (max-width: 700px) { .live-grid { grid-template-columns: 1fr; padding: 16px; } header { padding: 12px 16px; } }
+@media (max-width: 1300px) {
+  .col { display: contents; }
+  .live-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "stream stream" "queue chat" "stats chat" "feed feed" "logs logs";
+  }
+}
+@media (max-width: 700px) {
+  .live-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "stream" "chat" "queue" "stats" "feed" "logs"; padding: 16px; }
+  .chat-frame { min-height: 420px; }
+  header { padding: 12px 16px; }
+}
 
 .panel {
   min-width: 0;
@@ -163,7 +183,6 @@ button.danger { color: var(--danger); }
 .tabs { display: flex; gap: 4px; }
 .tab { border-radius: 999px; }
 .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-.logs-panel { grid-column: 1 / -1; }
 .logs-panel summary { cursor: pointer; list-style: none; }
 .logs-panel summary h2 { display: inline; margin: 0; }
 .logs-panel summary::before { content: '▸ '; color: var(--muted); }
@@ -318,3 +337,24 @@ button.danger { color: var(--danger); }
 .bot-name { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .steps { margin: 0; padding-left: 20px; font-size: 14px; }
 .section h3 { margin: 16px 0 6px; }
+
+/* ---------- Anteprima live e chat ---------- */
+.stream-frame { position: relative; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #000; }
+.stream-frame iframe, .chat-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.chat-body-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.chat-frame { position: relative; flex: 1; min-height: 560px; border-radius: 10px; overflow: hidden; background: var(--bg); }
+.embed-off { padding: 14px; border-radius: 10px; background: var(--bg); color: var(--muted); font-size: 14px; }
+.channel-form { display: flex; gap: 6px; margin-top: 8px; }
+.channel-form input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 6px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+.stream-panel .panel-head, .chat-panel .panel-head { flex-wrap: wrap; }
+.stream-panel .panel-head .row, .chat-panel .panel-head .row { flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 700px) { #stream-channel { display: none; } }

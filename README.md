@@ -17,6 +17,7 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 **Funzioni principali**
 
 - **Coda degli alert**: le notifiche vengono mostrate una alla volta, mai sovrapposte. Dalla dashboard puoi mettere in pausa, saltare, svuotare la coda o **riproporre** un alert passato.
+- **Anteprima della live e chat di Twitch** direttamente nella dashboard (scheda Live).
 - **Editor degli alert nella dashboard** con anteprima dal vivo: testi, suoni, font, colori, sfondo, immagini e animazioni.
 - **Overlay per OBS** con animazioni, colori per tipo, immagini/GIF/video e suoni (4 suoni integrati o i tuoi file).
 - **Varianti**: alert diversi in base all'importo (es. donazioni sopra i 50 €, bits sopra i 1000, 10+ sub regalate) o alla ricompensa dei punti canale.
@@ -79,6 +80,14 @@ Da quel momento TwitchGestor parte da solo, senza finestre, quando apri OBS e si
 3. Spunta **Controlla l'audio tramite OBS** per regolare il volume degli alert dal mixer.
 
 Usa i pulsanti **Prova gli alert** nella dashboard per vedere subito come appaiono.
+
+## Anteprima della live e chat
+
+Nella scheda **📡 Live** della dashboard trovi il player della tua live (senza audio, per evitare l'eco) e la chat di Twitch, accanto a coda, statistiche e notifiche. Il canale è quello con cui hai fatto l'accesso; se non l'hai ancora fatto puoi scriverne il nome.
+
+- Apri la dashboard da **`http://localhost:3000`**: Twitch mostra player e chat solo su `localhost` (non su `127.0.0.1`).
+- Per scrivere in chat devi essere collegato a twitch.tv nello stesso browser; se il riquadro non te lo permette usa **Finestra ↗**.
+- Con **Nascondi** togli player o chat e risparmi risorse del PC durante la live.
 
 ## Ringraziamenti in chat con un account bot
 

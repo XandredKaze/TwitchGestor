@@ -21,6 +21,7 @@
   <div id="banners"></div>
 
   <main id="tab-live" class="live-grid">
+    <div class="col col-side">
     <section class="panel" id="queue-panel">
       <h2>Coda alert</h2>
       <div id="now-playing" class="now-playing">Nessun alert in corso</div>
@@ -50,6 +51,21 @@
       <ol id="top-donors" class="top-donors"></ol>
     </section>
 
+    </div>
+
+    <div class="col col-center">
+    <section class="panel stream-panel" id="stream-panel">
+      <div class="panel-head">
+        <h2>Anteprima live</h2>
+        <div class="row">
+          <span id="stream-channel" class="muted small"></span>
+          <a id="stream-open" class="btn small-btn" target="_blank" rel="noopener">Apri su Twitch ↗</a>
+          <button id="btn-stream-toggle" class="small-btn"></button>
+        </div>
+      </div>
+      <div id="stream-body"></div>
+    </section>
+
     <section class="panel feed-panel">
       <div class="panel-head">
         <h2>Notifiche</h2>
@@ -57,6 +73,19 @@
       </div>
       <div id="filters" class="filters"></div>
       <ul id="feed" class="feed"></ul>
+    </section>
+
+    </div>
+
+    <section class="panel chat-panel" id="chat-panel">
+      <div class="panel-head">
+        <h2>Chat</h2>
+        <div class="row">
+          <a id="chat-popout" class="btn small-btn" target="_blank" rel="noopener" title="Apri la chat in una finestra separata (per scrivere)">Finestra ↗</a>
+          <button id="btn-chat-toggle" class="small-btn"></button>
+        </div>
+      </div>
+      <div id="chat-body" class="chat-body-wrap"></div>
     </section>
 
     <details class="panel logs-panel" id="logs-panel">

@@ -133,6 +133,93 @@
     }));
   }
 
+  // ---------- Anteprima live e chat (embed ufficiali di Twitch) ----------
+
+  const store = {
+    get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+    set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* ignora */ } },
+  };
+  let embeddedChannel = { stream: null, chat: null };
+
+  function channelLogin() {
+    return state?.twitch.user?.login || store.get('channel') || '';
+  }
+
+  function channelForm() {
+    const input = el('input', { type: 'text', placeholder: 'nome del canale', value: store.get('channel') ?? '' });
+    return el('form', {
+      className: 'channel-form',
+      onsubmit: (e) => {
+        e.preventDefault();
+        store.set('channel', input.value.trim().toLowerCase());
+        renderEmbeds();
+      },
+    }, input, el('button', { type: 'submit' }, 'Mostra'));
+  }
+
+  function embedBlocked() {
+    // Twitch accetta gli embed solo se la pagina è aperta da "localhost" o da un sito https.
+    const host = location.hostname;
+    if (host === 'localhost' || location.protocol === 'https:') return null;
+    const url = `${location.protocol}//localhost:${location.port}${location.pathname}`;
+    return el('div', { className: 'embed-off' }, 'Twitch mostra l\'anteprima solo se apri la dashboard da ',
+      el('a', { href: url }, url), '.');
+  }
+
+  function renderEmbed(kind) {
+    const login = channelLogin();
+    const hidden = store.get(`hide-${kind}`) === '1';
+    const body = $(`${kind}-body`);
+    $(`btn-${kind}-toggle`).textContent = hidden ? 'Mostra' : 'Nascondi';
+    const key = hidden ? 'hidden' : login;
+    if (embeddedChannel[kind] === key) return;
+    embeddedChannel[kind] = key;
+
+    if (hidden) {
+      body.replaceChildren(el('div', { className: 'embed-off' }, kind === 'stream' ? 'Anteprima nascosta.' : 'Chat nascosta.'));
+      return;
+    }
+    if (!login) {
+      body.replaceChildren(el('div', { className: 'embed-off' },
+        'Collega il tuo account Twitch, oppure scrivi il nome del canale:', channelForm()));
+      return;
+    }
+    const blocked = embedBlocked();
+    if (blocked) {
+      body.replaceChildren(blocked);
+      return;
+    }
+    const parent = encodeURIComponent(location.hostname);
+    const dark = window.matchMedia('(prefers-color-scheme: dark)').matches ? '&darkpopout' : '';
+    const src = kind === 'stream'
+      ? `https://player.twitch.tv/?channel=${encodeURIComponent(login)}&parent=${parent}&muted=true&autoplay=true`
+      : `https://www.twitch.tv/embed/${encodeURIComponent(login)}/chat?parent=${parent}${dark}`;
+    body.replaceChildren(
+      el('div', { className: kind === 'stream' ? 'stream-frame' : 'chat-frame' },
+        el('iframe', { src, title: kind === 'stream' ? 'Anteprima della live' : 'Chat di Twitch', allowfullscreen: true, allow: 'autoplay; fullscreen' })),
+      kind === 'stream'
+        ? el('p', { className: 'muted small' }, 'Audio disattivato per non sentire l\'eco: attivalo dal player se ti serve. La live arriva con qualche secondo di ritardo.')
+        : el('p', { className: 'muted small' }, 'Se non riesci a scrivere qui, usa "Finestra ↗".'));
+  }
+
+  function renderEmbeds() {
+    const login = channelLogin();
+    $('stream-channel').textContent = login ? `twitch.tv/${login}` : '';
+    for (const [id, url] of [['stream-open', `https://www.twitch.tv/${login}`], ['chat-popout', `https://www.twitch.tv/popout/${login}/chat?popout=`]]) {
+      $(id).hidden = !login;
+      $(id).href = url;
+    }
+    renderEmbed('stream');
+    renderEmbed('chat');
+  }
+
+  for (const kind of ['stream', 'chat']) {
+    $(`btn-${kind}-toggle`).onclick = () => {
+      store.set(`hide-${kind}`, store.get(`hide-${kind}`) === '1' ? '0' : '1');
+      renderEmbed(kind);
+    };
+  }
+
   function renderAll() {
     renderHeader();
     renderQueue(state.queue);
@@ -140,6 +227,7 @@
     renderFilters();
     renderFeed();
     $('overlay-url').textContent = state.overlayUrl;
+    renderEmbeds();
   }
 
   function renderTestButtons() {
