@@ -101,7 +101,12 @@ Nella scheda **📡 Live** della dashboard trovi il player della tua live (senza
 Titoli di coda animati per la fine della live con **abbonati** (paganti e regalati), **chi ha regalato sub** (con badge dorato al Top Gifter) e **follower**. I nomi li scarica TwitchGestor con l'account del canale: all'avvio, ogni N minuti e poco dopo ogni follow, sub o gift ricevuto in live.
 
 1. In OBS, nella scena dei titoli di coda: **+ → Browser**, URL `http://localhost:3000/credits`, 1920×1080, spunta **Controlla l'audio tramite OBS** (per la musica) e, se vuoi, **Aggiorna il browser quando la scena diventa attiva** (così ripartono dall'inizio).
-2. Si configurano dalla scheda **🎬 Titoli di coda** della dashboard: testi, categorie, velocità, zona di comparsa dei nomi, colori, font, particelle, musica (trascina il brano), nomi da escludere (es. i bot), nomi di prova e anteprima.
+2. Si configurano dalla scheda **🎬 Titoli di coda** della dashboard: testi, categorie, velocità, zona di comparsa dei nomi, colori, font, particelle, musica (trascina il brano), nomi da escludere (es. i bot), nomi di prova e anteprima. In più:
+   - **Sezioni**: ordine con le frecce ↑↓, **sezioni tue** (es. Moderatori, Ringraziamenti speciali) con nomi scritti a mano e testo libero, e per ogni sezione **stile proprio** (colori, font, dimensioni, colonne, allineamento) e un'**icona** accanto ai nomi.
+   - **Immagini e sfondo**: logo in cima, immagine finale, immagine o video di sfondo (opacità, adattamento, sfocatura), particelle con colore, forma (luci, stelle, cuori, neve), quantità e velocità.
+   - **Nomi**: allineamento, spaziatura, spessore, maiuscolo, spaziatura delle lettere ed **effetto di comparsa** (dissolvenza, sale dal basso, zoom, scivola, bagliore).
+   - **Fine dello scorrimento**: ricomincia da capo oppure **si ferma sul testo finale**.
+   - **Font**: qualsiasi font di Google Fonts, scrivendone il nome.
 3. Facoltativo: il pannello si può aggiungere anche come dock di OBS (**Docks → Dock browser personalizzati**, URL `http://localhost:3000/credits?pannello`; se usi `DASHBOARD_TOKEN` aggiungi `&token=IL_TUO_TOKEN`).
 
 L'elenco abbonati è disponibile solo per canali affiliate o partner: se non si scarica, l'errore compare nel pannello e i follower funzionano comunque.

@@ -279,7 +279,8 @@ class DemoBackend {
   #upload(kind, name, blob, done) {
     if (!UPLOAD_KINDS[kind]) return { status: 400, data: { error: 'Tipo di file non valido' } };
     if (!UPLOAD_KINDS[kind].includes(ext(name))) return { status: 400, data: { error: `Formato non supportato. Usa: ${UPLOAD_KINDS[kind].join(', ')}` } };
-    if (!(blob instanceof Blob) || !blob.size) return { status: 400, data: { error: 'File vuoto' } };
+    // il file può arrivare da una pagina interna (es. titoli di coda): instanceof Blob lì non funziona
+    if (!blob || typeof blob.size !== 'number' || typeof blob.slice !== 'function' || !blob.size) return { status: 400, data: { error: 'File vuoto' } };
     const safeName = name.replace(/[^\w.\-]+/g, '_').slice(-80);
     const p = `${URL.createObjectURL(blob)}#${encodeURIComponent(safeName)}`;
     this.media[kind].push(p);

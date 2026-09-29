@@ -26,6 +26,11 @@
   --cr-name-shadow: none;
   --cr-bg: transparent;
   --cr-columns: 1;
+  --cr-name-align: center;               /* allineamento dei nomi */
+  --cr-name-gap: 4px;                    /* spazio verticale tra i nomi */
+  --cr-name-weight: 400;
+  --cr-name-transform: none;             /* uppercase = tutto maiuscolo */
+  --cr-name-spacing: .04em;              /* spaziatura tra le lettere */
   --cr-exit: 0%;                         /* linea di uscita: dove i nomi spariscono (0% = bordo alto) */
   --cr-entry: 100%;                      /* linea di entrata: dove i nomi compaiono (100% = bordo basso) */
 }
@@ -56,8 +61,28 @@ html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
 .cr-title + .cr-subtitle { margin-top: 0; }
 
 /* --- nomi --- */
-.cr-names { list-style: none; margin: 0 auto 8px; padding: 0; display: grid; grid-template-columns: repeat(var(--cr-columns), minmax(0, 1fr)); gap: 4px 1.5em; max-width: calc(var(--cr-columns) * 560px); }
-.cr-name { padding: 8px 0; font-family: var(--cr-font-text); font-size: var(--cr-name-size); font-weight: 400; color: var(--cr-name-color); letter-spacing: .04em; text-shadow: var(--cr-name-shadow); overflow-wrap: anywhere; }
+.cr-names { list-style: none; margin: 0 auto 8px; padding: 0; display: grid; grid-template-columns: repeat(var(--cr-columns), minmax(0, 1fr)); gap: var(--cr-name-gap) 1.5em; max-width: calc(var(--cr-columns) * 560px); }
+.cr-name { padding: 8px 0; font-family: var(--cr-font-text); font-size: var(--cr-name-size); font-weight: var(--cr-name-weight); color: var(--cr-name-color); letter-spacing: var(--cr-name-spacing); text-transform: var(--cr-name-transform); text-align: var(--cr-name-align); text-shadow: var(--cr-name-shadow); overflow-wrap: anywhere; }
+.cr-icon { margin-right: .4em; }
+/* testo libero delle sezioni aggiunte a mano */
+.cr-text { max-width: 900px; margin: 0 auto 16px; font-family: var(--cr-font-text); font-size: calc(var(--cr-name-size) * .75); color: var(--cr-sub-color); white-space: pre-line; line-height: 1.5; }
+
+/* --- immagini: logo in cima e immagine finale --- */
+.cr-logo { display: block; margin: 0 auto 28px; max-width: 90%; height: auto; }
+.cr-footer-img { display: block; margin: 36px auto 0; max-width: 90%; height: auto; }
+
+/* --- sfondo: immagine o video sotto a tutto --- */
+#bg-media { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+
+/* --- effetto di comparsa dei nomi quando superano la linea di entrata --- */
+.fx-fade .cr-name { opacity: 0; transition: opacity .9s ease; }
+.fx-rise .cr-name { opacity: 0; transform: translateY(40px); transition: opacity .8s ease, transform .8s cubic-bezier(.2,1,.3,1); }
+.fx-zoom .cr-name { opacity: 0; transform: scale(.6); transition: opacity .7s ease, transform .7s cubic-bezier(.2,1.4,.4,1); }
+.fx-slide .cr-name { opacity: 0; transform: translateX(-80px); transition: opacity .8s ease, transform .8s cubic-bezier(.2,1,.3,1); }
+.fx-fade .cr-name.in, .fx-rise .cr-name.in, .fx-zoom .cr-name.in, .fx-slide .cr-name.in { opacity: 1; transform: none; }
+.fx-glow .cr-name.in { animation: cr-glow 1.6s ease-out; }
+@keyframes cr-glow { 0% { text-shadow: 0 0 0 transparent; } 30% { text-shadow: 0 0 24px var(--cr-accent), 0 0 8px var(--cr-accent); } 100% { text-shadow: var(--cr-name-shadow); } }
+@media (prefers-reduced-motion: reduce) { .fx-rise .cr-name, .fx-zoom .cr-name, .fx-slide .cr-name { transform: none; } }
 .cr-count { margin-left: .35em; color: var(--cr-sub-color); }
 
 /* --- badge dorato del Top Gifter --- */
@@ -229,6 +254,24 @@ body.offline .p-offline { display: block; }
 .panel .p-excluded button.p-chip { background: transparent; border-color: var(--p-line); color: var(--p-muted); text-decoration: line-through; }
 .panel .p-excluded button.p-chip:hover { background: rgba(98, 224, 166, .12); border-color: rgba(98, 224, 166, .45); color: var(--p-ok); text-decoration: none; }
 
+/* --- menu a tendina --- */
+.panel select { padding: 8px 10px; border-radius: 12px; border: 1px solid var(--p-line); background: var(--p-field); color: var(--p-text); font: inherit; outline: none; max-width: 100%; }
+.panel select:focus-visible { border-color: var(--p-accent); box-shadow: 0 0 0 3px var(--p-accent-soft); }
+.panel .p-row select { flex: 0 1 auto; }
+.p-media { display: flex; gap: 6px; align-items: center; }
+.p-media input[type=text] { flex: 1; min-width: 0; }
+.p-sub { margin: 14px 0 6px; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--p-accent-hi); }
+/* --- elenco e modifica delle sezioni --- */
+.p-sec-list { display: flex; flex-direction: column; gap: 6px; }
+.p-sec { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: var(--p-field); border: 1px solid var(--p-line); }
+.p-sec.sel { border-color: var(--p-accent); box-shadow: 0 0 0 3px var(--p-accent-soft); }
+.panel .p-sec button.arrow { padding: 4px 9px; background: transparent; border: 1px solid var(--p-line); box-shadow: none; color: var(--p-text); }
+.panel .p-sec button.name { flex: 1; min-width: 0; text-align: left; background: transparent; box-shadow: none; padding: 4px 6px; color: var(--p-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p-tag { padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--p-accent-soft); color: #dccbff; white-space: nowrap; }
+.p-sec-editor { margin-top: 14px; padding: 14px; border-radius: 14px; border: 1px dashed rgba(145, 71, 255, .45); }
+.p-sec-editor h3 { margin: 0 0 10px; font-size: 15px; }
+.p-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 18px; }
+
 /* --- anteprima animazione --- */
 .p-preview { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 14px; border: 1px solid var(--p-line); background: #07060a; }
 /* cursore verticale con due pallini accanto all'anteprima:
@@ -273,8 +316,60 @@ const DEFAULTS = {
   fontTitle: "'Cinzel', serif", fontText: "'Inter', sans-serif",
   headerColor: '#ffffff', accentColor: '#9147ff', subColor: '#bf94ff', nameColor: '#e8deff',
   headerSize: 52, titleSize: 22, nameSize: 28, nameShadow: false,
-  particles: true, bgColor: '#000000', bgOpacity: 0
+  particles: true, bgColor: '#000000', bgOpacity: 0,
+  // sezioni: ordine (abbonati, gift, follower e sezioni aggiunte a mano) e sezioni personalizzate
+  order: ['subs', 'gifts', 'followers'], customSections: [],
+  // immagini e sfondo
+  logoImage: '', logoSize: 320, footerImage: '', footerImageSize: 260,
+  bgImage: '', bgImageOpacity: 1, bgFit: 'cover', bgBlur: 0,
+  particleColor: '#a050ff', particleCount: 120, particleShape: 'dots', particleSpeed: 1,
+  // nomi
+  nameAlign: 'center', nameGap: 4, nameWeight: 400, nameUppercase: false, nameSpacing: 0.04, nameEffect: 'none',
+  // alla fine dello scorrimento: 'loop' ricomincia, 'stop' si ferma sul testo finale
+  endMode: 'loop'
 };
+// Le impostazioni di una singola sezione si salvano come 'sec.<sezione>.<campo>', es. 'sec.subs.accent'.
+const SECTION_STYLE = [
+  // campo, variabile CSS, impostazione generale da usare se la sezione non ne ha una sua, unità
+  ['accent', '--cr-accent', 'accentColor', ''],
+  ['sub', '--cr-sub-color', 'subColor', ''],
+  ['name', '--cr-name-color', 'nameColor', ''],
+  ['fontTitle', '--cr-font-title', 'fontTitle', ''],
+  ['fontText', '--cr-font-text', 'fontText', ''],
+  ['titleSize', '--cr-title-size', 'titleSize', 'px'],
+  ['nameSize', '--cr-name-size', 'nameSize', 'px'],
+  ['columns', '--cr-columns', 'columns', ''],
+  ['align', '--cr-name-align', 'nameAlign', ''],
+];
+const BUILTIN_SECTIONS = { subs: 'Abbonati', gifts: 'Gift', followers: 'Follower' };
+const secKey = (id, field) => `sec.${id}.${field}`;
+
+/** Ordine delle sezioni: quello salvato, più le sezioni nuove in fondo. */
+function sectionOrder(s) {
+  const ids = [...Object.keys(BUILTIN_SECTIONS), ...(s.customSections || []).map(c => c.id)];
+  const saved = (s.order || []).filter(id => ids.includes(id));
+  return [...saved, ...ids.filter(id => !saved.includes(id))];
+}
+
+/** Carica da Google Fonts il primo font indicato (se non è un font generico o di sistema). */
+const loadedFonts = new Set();
+const GENERIC_FONTS = ['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'segoe ui', 'arial', 'impact', 'georgia', 'verdana', 'tahoma', 'times new roman', 'courier new', 'comic sans ms'];
+function ensureFont(css) {
+  const name = String(css || '').split(',')[0].replace(/['"]/g, '').trim();
+  if (!name || loadedFonts.has(name) || GENERIC_FONTS.includes(name.toLowerCase())) return;
+  loadedFonts.add(name);
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(name).replace(/%20/g, '+') + '&display=swap';
+  document.head.append(link);
+}
+
+// file caricato (media/...), indirizzo web o file in memoria (demo)
+function mediaSrc(f) {
+  f = String(f || '').trim();
+  if (!f) return '';
+  return /^[a-z][a-z0-9+.-]*:/i.test(f) ? f : '/' + f.replace(/^\/+/, '');
+}
 
 const K = { settings: 'settings', data: 'data', cmd: 'cmd', status: 'status' };
 const params = new URLSearchParams(location.search);
@@ -388,6 +483,14 @@ function buildSections(s, d) {
     const f = (d.followers || []).filter(keep);
     sections.push({ key: 'followers', title: s.titleFollowers, groups: [{ title: '', names: s.maxFollowers > 0 ? f.slice(0, s.maxFollowers) : f }] });
   }
+  // sezioni aggiunte a mano (es. Moderatori): nomi scritti nel pannello e testo libero
+  for (const c of s.customSections || []) {
+    if (c.show === false) continue;
+    const names = String(c.names || '').split('\n').map(n => n.trim()).filter(n => n && keep(n));
+    sections.push({ key: c.id, custom: true, title: c.title || '', text: c.text || '', groups: [{ title: c.subtitle || '', names }] });
+  }
+  const order = sectionOrder(s);
+  sections.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
   return { sections, top: topName };
 }
 
@@ -409,6 +512,28 @@ function demoData() {
    TITOLI DI CODA (sorgente OBS e anteprima)
    ===================================================================== */
 let particlesOn = true;
+let particleCfg = { color: '#a050ff', count: 120, shape: 'dots', speed: 1 };
+
+/** Immagine o video di sfondo, sotto le particelle e i nomi. */
+function applyBackground(s) {
+  const stage = document.getElementById('stage');
+  let media = document.getElementById('bg-media');
+  const src = mediaSrc(s.bgImage);
+  const isVideo = /\.(webm|mp4)(#|$)/i.test(s.bgImage);
+  if (!src) { media?.remove(); return; }
+  if (!media || media.dataset.src !== src || (media.tagName === 'VIDEO') !== isVideo) {
+    media?.remove();
+    media = document.createElement(isVideo ? 'video' : 'img');
+    media.id = 'bg-media';
+    media.dataset.src = src;
+    media.src = src;
+    if (isVideo) Object.assign(media, { muted: true, loop: true, autoplay: true, playsInline: true });
+    stage.prepend(media);
+  }
+  media.style.objectFit = s.bgFit;
+  media.style.opacity = s.bgImageOpacity;
+  media.style.filter = s.bgBlur > 0 ? `blur(${s.bgBlur}px)` : '';
+}
 
 function applyStyle(s) {
   const r = document.documentElement.style;
@@ -426,6 +551,14 @@ function applyStyle(s) {
   r.setProperty('--cr-exit', s.exitLine + '%');
   r.setProperty('--cr-entry', s.entryLine + '%');
   r.setProperty('--cr-name-shadow', s.nameShadow ? '0 3px 10px rgba(0,0,0,.85)' : 'none');
+  r.setProperty('--cr-name-align', s.nameAlign);
+  r.setProperty('--cr-name-gap', (+s.nameGap || 0) + 'px');
+  r.setProperty('--cr-name-weight', s.nameWeight);
+  r.setProperty('--cr-name-transform', s.nameUppercase ? 'uppercase' : 'none');
+  r.setProperty('--cr-name-spacing', (+s.nameSpacing || 0) + 'em');
+  ensureFont(s.fontTitle); ensureFont(s.fontText);
+  applyBackground(s);
+  particleCfg = { color: s.particleColor, count: Math.max(0, Math.min(400, s.particleCount | 0)), shape: s.particleShape, speed: +s.particleSpeed || 1 };
   const hex = s.bgColor.replace('#', '');
   const [R, G, B] = [0, 2, 4].map(i => parseInt(hex.substr(i, 2), 16) || 0);
   r.setProperty('--cr-bg', `rgba(${R},${G},${B},${s.bgOpacity})`);
@@ -435,8 +568,13 @@ function applyStyle(s) {
 function renderRoll(roll, s, d) {
   roll.replaceChildren();
   const subLines = String(s.headerSub || '').split('\n').filter(l => l.trim());
-  if (s.headerText || subLines.length) {
+  if (s.headerText || subLines.length || s.logoImage) {
     const h = el('div', 'cr-header');
+    if (s.logoImage) {
+      const img = el('img', 'cr-logo');
+      img.src = mediaSrc(s.logoImage); img.alt = ''; img.style.width = (+s.logoSize || 320) + 'px';
+      h.append(img);
+    }
     if (s.headerText) h.append(el('h1', null, s.headerText));
     for (const l of subLines) h.append(el('p', null, l));
     roll.append(h);
@@ -444,14 +582,27 @@ function renderRoll(roll, s, d) {
   const { sections, top } = buildSections(s, d);
   for (const sec of sections) {
     const groups = sec.groups.filter(g => g.names.length);
-    if (!groups.length) continue; // le categorie vuote non compaiono
+    if (!groups.length && !sec.text) continue; // le categorie vuote non compaiono
     const box = el('section', 'cr-section cr-' + sec.key);
-    box.append(el('h2', 'cr-title', sec.title));
+    // stile personalizzato della sezione: sovrascrive le variabili CSS solo al suo interno
+    if (s[secKey(sec.key, 'custom')]) {
+      for (const [field, cssVar, , unit] of SECTION_STYLE) {
+        const v = s[secKey(sec.key, field)];
+        if (v === undefined || v === '') continue;
+        box.style.setProperty(cssVar, v + unit);
+        if (field.startsWith('font')) ensureFont(v);
+      }
+    }
+    const icon = s[secKey(sec.key, 'icon')];
+    if (sec.title) box.append(el('h2', 'cr-title', sec.title));
+    if (sec.text) box.append(el('p', 'cr-text', sec.text));
     for (const g of groups) {
       if (g.title) box.append(el('h3', 'cr-subtitle', g.title));
       const list = el('ul', 'cr-names');
       g.names.forEach((n, i) => {
-        const li = el('li', 'cr-name', n);
+        const li = el('li', 'cr-name');
+        if (icon) li.append(el('span', 'cr-icon', icon));
+        li.append(n);
         if (g.counts) li.append(el('span', 'cr-count', '(' + g.counts[i] + ')'));
         if (n === top) li.append(el('span', 'cr-tag', '★ ' + s.topGifterText));
         list.append(li);
@@ -461,31 +612,70 @@ function renderRoll(roll, s, d) {
     roll.append(box);
   }
   if (s.footerText) roll.append(el('div', 'cr-footer', s.footerText));
+  if (s.footerImage) {
+    const img = el('img', 'cr-footer-img');
+    img.src = mediaSrc(s.footerImage); img.alt = ''; img.style.width = (+s.footerImageSize || 260) + 'px';
+    roll.append(img);
+  }
 }
 
 // particelle luminose viola che salgono lentamente (colori nei addColorStop)
+// particelle sullo sfondo: colore, quantità, forma e velocità si scelgono nel pannello
 function startParticles() {
   const canvas = document.getElementById('particles');
   const ctx = canvas.getContext('2d');
   const fit = () => { canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight; };
   fit(); window.addEventListener('resize', fit);
-  const pts = Array.from({ length: 120 }, () => ({
-    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+  const make = (anywhere) => ({
+    x: Math.random() * canvas.width, y: anywhere ? Math.random() * canvas.height : canvas.height + 10,
     r: Math.random() * 2.5 + 0.8, dx: (Math.random() - 0.5) * 0.2, dy: -(Math.random() * 0.35 + 0.08),
-    o: Math.random() * 0.5 + 0.3, pulse: Math.random() * Math.PI * 2
-  }));
+    o: Math.random() * 0.5 + 0.3, pulse: Math.random() * Math.PI * 2, rot: Math.random() * Math.PI
+  });
+  let pts = [];
+  const rgb = hex => { const n = parseInt(String(hex).replace('#', ''), 16) || 0xa050ff; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+
+  function star(x, y, r) {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = Math.PI / 5 * i - Math.PI / 2, rr = i % 2 ? r * 0.45 : r;
+      ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    }
+    ctx.closePath();
+  }
+  function heart(x, y, r) {
+    ctx.beginPath();
+    ctx.moveTo(x, y + r * 0.9);
+    ctx.bezierCurveTo(x - r * 1.6, y - r * 0.2, x - r * 0.6, y - r * 1.4, x, y - r * 0.5);
+    ctx.bezierCurveTo(x + r * 0.6, y - r * 1.4, x + r * 1.6, y - r * 0.2, x, y + r * 0.9);
+    ctx.closePath();
+  }
+
   (function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const cfg = particleCfg;
+    while (pts.length < cfg.count) pts.push(make(true));
+    if (pts.length > cfg.count) pts = pts.slice(0, cfg.count);
+    const [R, G, B] = rgb(cfg.color);
+    const snow = cfg.shape === 'snow';
     if (particlesOn) for (const p of pts) {
       p.pulse += 0.018;
       const ao = p.o * (0.7 + 0.3 * Math.sin(p.pulse));
-      const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 3);
-      grd.addColorStop(0, 'rgba(210,140,255,' + ao.toFixed(2) + ')');
-      grd.addColorStop(0.4, 'rgba(160,80,255,' + (ao * 0.55).toFixed(2) + ')');
-      grd.addColorStop(1, 'rgba(120,40,255,0)');
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 3, 0, Math.PI * 2); ctx.fillStyle = grd; ctx.fill();
-      p.x += p.dx; p.y += p.dy;
+      if (cfg.shape === 'stars' || cfg.shape === 'hearts') {
+        ctx.fillStyle = `rgba(${R},${G},${B},${ao.toFixed(2)})`;
+        ctx.shadowColor = `rgba(${R},${G},${B},${(ao * 0.8).toFixed(2)})`; ctx.shadowBlur = 8;
+        (cfg.shape === 'stars' ? star : heart)(p.x, p.y, p.r * 2.4);
+        ctx.fill(); ctx.shadowBlur = 0;
+      } else {
+        const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 3);
+        grd.addColorStop(0, `rgba(${Math.min(255, R + 60)},${Math.min(255, G + 60)},${Math.min(255, B + 60)},${ao.toFixed(2)})`);
+        grd.addColorStop(0.4, `rgba(${R},${G},${B},${(ao * 0.55).toFixed(2)})`);
+        grd.addColorStop(1, `rgba(${R},${G},${B},0)`);
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 3, 0, Math.PI * 2); ctx.fillStyle = grd; ctx.fill();
+      }
+      // la neve scende, le altre forme salgono
+      p.x += p.dx * cfg.speed; p.y += (snow ? -p.dy * 1.6 : p.dy) * cfg.speed;
       if (p.y < -10) p.y = canvas.height + 10;
+      if (p.y > canvas.height + 10) p.y = -10;
       if (p.x < -10) p.x = canvas.width + 10;
       if (p.x > canvas.width + 10) p.x = -10;
     }
@@ -494,16 +684,12 @@ function startParticles() {
 }
 
 // brano caricato dal pannello (media/music/...) oppure indirizzo web
-function musicSrc(f) {
-  f = String(f || '').trim();
-  if (!f) return '';
-  return /^[a-z][a-z0-9+.-]*:/i.test(f) ? f : '/' + f.replace(/^\/+/, '');
-}
+const musicSrc = mediaSrc;
 
 function startRollPlayer() {
   const stage = document.getElementById('stage');
   const roll = document.getElementById('roll');
-  let anim = null, audio = null, fadeRaf = 0;
+  let anim = null, audio = null, fadeRaf = 0, observer = null;
   let timers = [], musicTimers = [];
 
   function stopMusic() {
@@ -542,11 +728,24 @@ function startRollPlayer() {
     const s = getSettings();
     applyStyle(s);
     renderRoll(roll, s, load(K.data, {}));
+    // effetto di comparsa: ogni nome si anima quando supera la linea di entrata
+    observer?.disconnect();
+    roll.className = s.nameEffect && s.nameEffect !== 'none' ? 'fx-' + s.nameEffect : '';
+    if (roll.className) {
+      observer = new IntersectionObserver(entries => {
+        for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); observer.unobserve(e.target); }
+      }, { root: stage, rootMargin: `0px 0px -${100 - s.entryLine}% 0px` });
+      roll.querySelectorAll('.cr-name').forEach(n => observer.observe(n));
+    }
     requestAnimationFrame(() => {
       const H = stage.clientHeight, h = roll.offsetHeight;
       // i nomi partono dalla linea di entrata e finiscono quando l'ultima riga passa la linea di uscita
       const startY = H * s.entryLine / 100;
-      const endY = H * s.exitLine / 100 - h;
+      let endY = H * s.exitLine / 100 - h;
+      // "fermati sul testo finale": l'ultimo elemento si ferma al centro dello schermo
+      const last = roll.lastElementChild;
+      const stop = s.endMode === 'stop' && last;
+      if (stop) endY = H / 2 - (last.offsetTop + last.offsetHeight / 2);
       const dur = (startY - endY) / Math.max(5, s.speed) * 1000;
       window.crDuration = dur; // letto dal pannello per mostrare la durata di un giro
       // attesa prima che arrivino i nomi: solo al primo giro (avvio o "Riavvia"), poi conta la pausa
@@ -554,7 +753,10 @@ function startRollPlayer() {
       if (anim) anim.cancel(); // due riavvii ravvicinati non devono lasciare un'animazione vecchia attiva
       anim = roll.animate([{ transform: `translateY(${startY}px)` }, { transform: `translateY(${endY}px)` }], { duration: dur, delay: wait, easing: 'linear', fill: 'both' });
       startMusic(s, wait + dur);
-      anim.onfinish = () => { stopMusic(); timers.push(setTimeout(() => cycle(false), Math.max(0, s.gap) * 1000)); };
+      anim.onfinish = () => {
+        if (stop) { if (!(s.musicFade > 0)) stopMusic(); return; } // resta fermo finché non si riavvia
+        stopMusic(); timers.push(setTimeout(() => cycle(false), Math.max(0, s.gap) * 1000));
+      };
     });
   }
 
@@ -637,6 +839,14 @@ function panelHTML() {
       </div>
     </section>
 
+    <section class="p-card full">
+      <h2>Sezioni</h2>
+      <p class="p-hint p-hint-top">Cambia l'ordine con le frecce, aggiungi sezioni tue (es. Moderatori, Ringraziamenti speciali) e dai a ogni sezione uno stile diverso.</p>
+      <div class="p-sec-list" id="sec-list"></div>
+      <div class="p-btns"><button class="sec" id="btn-add-section">＋ Aggiungi sezione</button></div>
+      <div class="p-sec-editor" id="sec-editor"></div>
+    </section>
+
     <section class="p-card wide">
       <h2>Nomi in arrivo</h2>
       <p class="p-hint p-hint-top">Clicca un nome per toglierlo dai titoli di coda.</p>
@@ -655,6 +865,7 @@ function panelHTML() {
         <p class="p-hint" id="speed-hint"></p>
       </div>
       <div class="p-row"><label>Attesa prima che arrivino i nomi (s)</label><input type="number" min="0" step="0.5" data-k="startDelay"></div>
+      <div class="p-row"><label>Alla fine dello scorrimento</label><select data-k="endMode"><option value="loop">Ricomincia da capo</option><option value="stop">Fermati sul testo finale</option></select></div>
       <div class="p-row"><label>Pausa prima di ricominciare (s)</label><input type="number" min="0" step="1" data-k="gap"></div>
       <p class="p-hint">L'attesa vale quando la sorgente parte e con "Riavvia". La musica conta i secondi dal momento in cui parte la sorgente, non da quando arrivano i nomi.</p>
       <div class="p-row"><label>Colonne di nomi</label><input type="number" min="1" max="4" step="1" data-k="columns"></div>
@@ -692,9 +903,9 @@ function panelHTML() {
       <h2>Stile</h2>
       <div class="p-cols">
         <div>
-          <div class="p-field"><label>Font titoli</label><input type="text" data-k="fontTitle"></div>
-          <div class="p-field"><label>Font nomi e testi</label><input type="text" data-k="fontText"></div>
-          <p class="p-hint">Cinzel e Inter sono già inclusi. Altri font devono essere installati sul PC.</p>
+          <div class="p-field"><label>Font titoli</label><input type="text" data-k="fontTitle" list="cr-fonts"></div>
+          <div class="p-field"><label>Font nomi e testi</label><input type="text" data-k="fontText" list="cr-fonts"></div>
+          <p class="p-hint">Scrivi il nome di qualsiasi font di Google Fonts (es. Bebas Neue, Orbitron, Pacifico): viene caricato da solo.</p>
           <div class="p-row"><label>Dimensione titolo iniziale</label><input type="number" min="10" step="2" data-k="headerSize"></div>
           <div class="p-row"><label>Dimensione titoli sezione</label><input type="number" min="10" step="2" data-k="titleSize"></div>
           <div class="p-row"><label>Dimensione nomi</label><input type="number" min="10" step="2" data-k="nameSize"></div>
@@ -711,6 +922,45 @@ function panelHTML() {
         </div>
       </div>
       <div class="p-btns"><button class="danger" id="btn-reset">Ripristina impostazioni</button></div>
+    </section>
+
+    <section class="p-card">
+      <h2>Nomi</h2>
+      <div class="p-row"><label>Allineamento</label><select data-k="nameAlign"><option value="center">Al centro</option><option value="left">A sinistra</option><option value="right">A destra</option></select></div>
+      <div class="p-row"><label>Spazio tra i nomi (px)</label><input type="number" min="0" max="80" step="2" data-k="nameGap"></div>
+      <div class="p-row"><label>Spessore</label><select data-k="nameWeight"><option value="300">Sottile</option><option value="400">Normale</option><option value="600">Semi-grassetto</option><option value="700">Grassetto</option><option value="800">Extra grassetto</option></select></div>
+      <div class="p-row"><label>Tutto maiuscolo</label><input type="checkbox" data-k="nameUppercase"></div>
+      <div class="p-row"><label>Spaziatura lettere</label><input type="range" min="0" max="0.4" step="0.02" data-k="nameSpacing"></div>
+      <div class="p-row"><label>Effetto di comparsa</label><select data-k="nameEffect"><option value="none">Nessuno</option><option value="fade">Dissolvenza</option><option value="rise">Sale dal basso</option><option value="zoom">Zoom</option><option value="slide">Scivola da sinistra</option><option value="glow">Bagliore</option></select></div>
+      <p class="p-hint">L'effetto parte quando il nome supera la linea di comparsa.</p>
+    </section>
+
+    <section class="p-card wide">
+      <h2>Immagini e sfondo</h2>
+      <div class="p-cols">
+        <div>
+          <div class="p-sub">Logo in cima</div>
+          <div class="p-media"><input type="text" data-k="logoImage" placeholder="carica un'immagine o incolla un indirizzo"><button class="sec" data-upload="logoImage">Carica</button><button class="sec" data-clear="logoImage" title="Togli">✕</button></div>
+          <div class="p-row"><label>Larghezza (px)</label><input type="number" min="40" max="1600" step="20" data-k="logoSize"></div>
+          <div class="p-sub">Immagine finale</div>
+          <div class="p-media"><input type="text" data-k="footerImage" placeholder="compare dopo il testo finale"><button class="sec" data-upload="footerImage">Carica</button><button class="sec" data-clear="footerImage" title="Togli">✕</button></div>
+          <div class="p-row"><label>Larghezza (px)</label><input type="number" min="40" max="1600" step="20" data-k="footerImageSize"></div>
+        </div>
+        <div>
+          <div class="p-sub">Sfondo (immagine o video)</div>
+          <div class="p-media"><input type="text" data-k="bgImage" placeholder="PNG, JPG, GIF, WEBP, WEBM o MP4"><button class="sec" data-upload="bgImage">Carica</button><button class="sec" data-clear="bgImage" title="Togli">✕</button></div>
+          <div class="p-row"><label>Opacità</label><input type="range" min="0" max="1" step="0.05" data-k="bgImageOpacity"></div>
+          <div class="p-row"><label>Adattamento</label><select data-k="bgFit"><option value="cover">Riempi lo schermo</option><option value="contain">Intera, senza tagli</option></select></div>
+          <div class="p-row"><label>Sfocatura (px)</label><input type="number" min="0" max="40" step="1" data-k="bgBlur"></div>
+          <div class="p-sub">Particelle</div>
+          <div class="p-row"><label>Colore</label><input type="color" data-k="particleColor"></div>
+          <div class="p-row"><label>Forma</label><select data-k="particleShape"><option value="dots">Luci</option><option value="stars">Stelle</option><option value="hearts">Cuori</option><option value="snow">Neve (scende)</option></select></div>
+          <div class="p-row"><label>Quantità</label><input type="number" min="0" max="400" step="10" data-k="particleCount"></div>
+          <div class="p-row"><label>Velocità</label><input type="range" min="0.2" max="4" step="0.1" data-k="particleSpeed"></div>
+        </div>
+      </div>
+      <input type="file" id="image-input" accept="image/*,video/webm,video/mp4,.png,.jpg,.jpeg,.gif,.webp,.webm,.mp4" hidden>
+      <div class="p-status" id="image-status"></div>
     </section>
 
     <section class="p-card">
@@ -732,7 +982,12 @@ function panelHTML() {
       <p class="p-hint">Formati: mp3, ogg, wav, m4a, flac. In alternativa incolla l'indirizzo web di un brano.</p>
     </section>
   </div>
-</div>`;
+</div>
+<datalist id="cr-fonts">
+  <option value="'Cinzel', serif"><option value="'Inter', sans-serif"><option value="'Bebas Neue', sans-serif"><option value="'Montserrat', sans-serif">
+  <option value="'Poppins', sans-serif"><option value="'Orbitron', sans-serif"><option value="'Oswald', sans-serif"><option value="'Playfair Display', serif">
+  <option value="'Press Start 2P', monospace"><option value="'Pacifico', cursive"><option value="'Permanent Marker', cursive"><option value="'Righteous', sans-serif">
+</datalist>`;
 }
 
 function startPanel() {
@@ -743,24 +998,177 @@ function startPanel() {
   const setStatus = (node, msg, kind) => { node.textContent = msg || ''; node.className = 'p-status' + (kind ? ' ' + kind : ''); };
 
   // --- impostazioni collegate ai campi
-  const inputs = [...document.querySelectorAll('[data-k]')];
+  const inputs = () => [...document.querySelectorAll('[data-k]')];
+  // data-fallback: se il campo non ha un valore suo mostra quello generale (stile delle singole sezioni)
   function fillInputs() {
     const s = getSettings();
-    for (const i of inputs) { const v = s[i.dataset.k]; if (i.type === 'checkbox') i.checked = !!v; else i.value = v; }
+    for (const i of inputs()) {
+      let v = s[i.dataset.k];
+      if ((v === undefined || v === '') && i.dataset.fallback) v = s[i.dataset.fallback];
+      if (i.type === 'checkbox') i.checked = !!v; else i.value = v ?? '';
+    }
   }
-  for (const i of inputs) {
-    i.addEventListener(i.type === 'checkbox' ? 'change' : 'input', () => {
-      const s = load(K.settings, {});
-      const k = i.dataset.k;
-      if (i.type === 'checkbox') s[k] = i.checked;
-      else if (i.type === 'number' || i.type === 'range') { const n = parseFloat(i.value); if (isNaN(n)) return; s[k] = n; }
-      else s[k] = i.value;
-      save(K.settings, s);
-      renderCategories();
-    });
+  function bindInputs() {
+    for (const i of inputs()) {
+      if (i.dataset.bound) continue;
+      i.dataset.bound = '1';
+      i.addEventListener(i.type === 'checkbox' ? 'change' : 'input', () => {
+        const s = load(K.settings, {});
+        const k = i.dataset.k;
+        if (i.type === 'checkbox') s[k] = i.checked;
+        else if (i.type === 'number' || i.type === 'range') { const n = parseFloat(i.value); if (isNaN(n)) return; s[k] = n; }
+        else s[k] = i.value;
+        save(K.settings, s);
+        renderCategories();
+        if (k.startsWith('sec.') || k.startsWith('title') || k.startsWith('show')) renderSections();
+        if (k.endsWith('.custom')) fillInputs();
+      });
+    }
   }
+  bindInputs();
   fillInputs();
-  $('btn-reset').onclick = () => { if (confirm('Ripristinare tutte le impostazioni predefinite?')) { save(K.settings, {}); fillInputs(); renderCategories(); showLines(readLines()); } };
+
+  // --- immagini: caricate in TwitchGestor (data/media/images) o indirizzo web
+  let uploadTarget = null;
+  for (const b of document.querySelectorAll('[data-upload]')) b.onclick = () => { uploadTarget = b.dataset.upload; $('image-input').click(); };
+  for (const b of document.querySelectorAll('[data-clear]')) b.onclick = () => { const st = load(K.settings, {}); st[b.dataset.clear] = ''; save(K.settings, st); fillInputs(); };
+  $('image-input').onchange = async e => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (!file || !uploadTarget) return;
+    setStatus($('image-status'), 'Carico ' + file.name + '…');
+    try {
+      const r = await fetch('/api/upload?kind=images', { method: 'POST', body: file, headers: { 'x-twitchgestor': '1', 'x-filename': encodeURIComponent(file.name), ...(TOKEN ? { 'x-dashboard-token': TOKEN } : {}) } });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || 'errore ' + r.status);
+      const st = load(K.settings, {}); st[uploadTarget] = j.path; save(K.settings, st); fillInputs();
+      setStatus($('image-status'), 'Immagine pronta: ' + file.name, 'ok');
+    } catch (err) {
+      setStatus($('image-status'), 'Caricamento non riuscito: ' + err.message, 'err');
+    }
+  };
+
+  // --- sezioni: ordine, sezioni aggiunte a mano e stile di ogni sezione
+  const SHOW_KEY = { subs: 'showSubs', gifts: 'showGifts', followers: 'showFollowers' };
+  const TITLE_KEY = { subs: 'titleSubs', gifts: 'titleGifts', followers: 'titleFollowers' };
+  let selectedSec = 'subs';
+  const customOf = (s, id) => (s.customSections || []).find(c => c.id === id);
+  const secLabel = (s, id) => { const c = customOf(s, id); return c ? (c.title || 'Sezione senza titolo') : (s[TITLE_KEY[id]] || BUILTIN_SECTIONS[id]); };
+  function updateSettings(fn) { const st = { ...load(K.settings, {}) }; fn(st, { ...DEFAULTS, ...st }); save(K.settings, st); renderCategories(); renderSections(); }
+
+  function renderSections() {
+    const s = getSettings();
+    const order = sectionOrder(s);
+    if (!order.includes(selectedSec)) selectedSec = order[0];
+    $('sec-list').replaceChildren(...order.map((id, idx) => {
+      const c = customOf(s, id);
+      const row = el('div', 'p-sec' + (id === selectedSec ? ' sel' : ''));
+      const arrow = (txt, dir, label) => {
+        const b = el('button', 'arrow', txt); b.type = 'button'; b.title = label;
+        b.disabled = dir < 0 ? idx === 0 : idx === order.length - 1;
+        b.onclick = () => updateSettings((st, full) => {
+          const o = sectionOrder(full); const j = idx + dir;
+          [o[idx], o[j]] = [o[j], o[idx]]; st.order = o;
+        });
+        return b;
+      };
+      const name = el('button', 'name', secLabel(s, id)); name.type = 'button';
+      name.onclick = () => { selectedSec = id; renderSections(); renderSectionEditor(); };
+      const show = el('input'); show.type = 'checkbox'; show.setAttribute('aria-label', 'Mostra la sezione');
+      show.checked = c ? c.show !== false : !!s[SHOW_KEY[id]];
+      show.onchange = () => updateSettings(st => {
+        if (c) st.customSections = (st.customSections || []).map(x => x.id === id ? { ...x, show: show.checked } : x);
+        else st[SHOW_KEY[id]] = show.checked;
+      });
+      row.append(arrow('↑', -1, 'Sposta su'), arrow('↓', 1, 'Sposta giù'), name);
+      if (c) row.append(el('span', 'p-tag', 'tua'));
+      if (s[secKey(id, 'custom')]) row.append(el('span', 'p-tag', 'stile proprio'));
+      row.append(show);
+      return row;
+    }));
+  }
+
+  function field(label, input) { const f = el('div', 'p-field'); f.append(el('label', null, label), input); return f; }
+  function rowField(label, input) { const r = el('div', 'p-row'); r.append(el('label', null, label), input); return r; }
+  function inputFor(type, key, attrs = {}) {
+    const i = el(type === 'select' ? 'select' : 'input');
+    if (type !== 'select') i.type = type;
+    i.dataset.k = key;
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'options') for (const [val, txt] of v) { const o = el('option', null, txt); o.value = val; i.append(o); }
+      else if (k === 'fallback') i.dataset.fallback = v;
+      else i.setAttribute(k, v);
+    }
+    return i;
+  }
+
+  function renderSectionEditor() {
+    const s = getSettings();
+    const id = selectedSec;
+    const c = customOf(s, id);
+    const box = $('sec-editor');
+    box.replaceChildren(el('h3', null, 'Modifica: ' + secLabel(s, id)));
+    if (c) {
+      const edit = (prop, node) => {
+        node.value = c[prop] || '';
+        node.oninput = () => {
+          const st = load(K.settings, {});
+          st.customSections = (st.customSections || []).map(x => x.id === id ? { ...x, [prop]: node.value } : x);
+          save(K.settings, st); renderCategories();
+          if (prop === 'title') renderSections();
+        };
+        return node;
+      };
+      const ta = rows => { const t = el('textarea'); t.rows = rows; return t; };
+      const grid = el('div', 'p-grid2');
+      grid.append(field('Titolo', edit('title', el('input'))), field('Sottotitolo (facoltativo)', edit('subtitle', el('input'))));
+      box.append(grid, field('Nomi (uno per riga)', edit('names', ta(5))), field('Testo libero sotto il titolo (facoltativo)', edit('text', ta(3))));
+      const del = el('button', 'danger', 'Elimina questa sezione'); del.type = 'button';
+      del.onclick = () => {
+        if (!confirm('Eliminare la sezione "' + secLabel(s, id) + '"?')) return;
+        updateSettings(st => {
+          st.customSections = (st.customSections || []).filter(x => x.id !== id);
+          st.order = (st.order || []).filter(x => x !== id);
+          for (const k of Object.keys(st)) if (k.startsWith('sec.' + id + '.')) delete st[k];
+        });
+        renderSectionEditor();
+      };
+      box.append(el('div', 'p-btns')); box.lastChild.append(del);
+    } else {
+      box.append(field('Titolo della sezione', inputFor('text', TITLE_KEY[id])));
+    }
+    box.append(el('div', 'p-sub', 'Stile della sezione'));
+    box.append(rowField('Icona prima di ogni nome (es. ⭐ 🛡️ 💜)', inputFor('text', secKey(id, 'icon'), { maxlength: 8, placeholder: 'nessuna', style: 'width:110px;text-align:center' })));
+    box.append(rowField('Stile personalizzato per questa sezione', inputFor('checkbox', secKey(id, 'custom'))));
+    const g = el('div', 'p-grid2');
+    g.append(
+      rowField('Colore titolo e linee', inputFor('color', secKey(id, 'accent'), { fallback: 'accentColor' })),
+      rowField('Colore sottotitoli', inputFor('color', secKey(id, 'sub'), { fallback: 'subColor' })),
+      rowField('Colore nomi', inputFor('color', secKey(id, 'name'), { fallback: 'nameColor' })),
+      rowField('Colonne', inputFor('number', secKey(id, 'columns'), { min: 1, max: 4, step: 1, fallback: 'columns' })),
+      rowField('Dimensione titolo', inputFor('number', secKey(id, 'titleSize'), { min: 10, step: 2, fallback: 'titleSize' })),
+      rowField('Dimensione nomi', inputFor('number', secKey(id, 'nameSize'), { min: 10, step: 2, fallback: 'nameSize' })),
+      rowField('Allineamento', inputFor('select', secKey(id, 'align'), { fallback: 'nameAlign', options: [['center', 'Al centro'], ['left', 'A sinistra'], ['right', 'A destra']] })),
+    );
+    box.append(g,
+      field('Font del titolo', inputFor('text', secKey(id, 'fontTitle'), { list: 'cr-fonts', fallback: 'fontTitle' })),
+      field('Font dei nomi', inputFor('text', secKey(id, 'fontText'), { list: 'cr-fonts', fallback: 'fontText' })));
+    box.append(el('p', 'p-hint', 'Senza "stile personalizzato" la sezione usa i colori e i font generali; l\'icona vale sempre.'));
+    bindInputs();
+    fillInputs();
+  }
+
+  $('btn-add-section').onclick = () => {
+    const id = 'c' + Date.now().toString(36);
+    updateSettings((st, full) => {
+      st.customSections = [...(st.customSections || []), { id, title: 'Moderatori', subtitle: '', names: '', text: '', show: true }];
+      st.order = [...sectionOrder(full), id];
+    });
+    selectedSec = id;
+    renderSections(); renderSectionEditor();
+  };
+  renderSections();
+  renderSectionEditor();
+  $('btn-reset').onclick = () => { if (confirm('Ripristinare tutte le impostazioni predefinite? Vengono tolte anche le sezioni aggiunte a mano.')) { save(K.settings, {}); fillInputs(); renderCategories(); showLines(readLines()); renderSections(); renderSectionEditor(); } };
   // dentro la dashboard di TwitchGestor l'intestazione del pannello è già nella scheda
   if (window.self !== window.top) document.body.classList.add('embedded');
 
@@ -801,8 +1209,11 @@ function startPanel() {
     const { sections, top } = buildSections({ ...s, showSubs: true, showGifts: true, showFollowers: true }, d);
     // una colonna per ogni elenco (Subscribers, Gifted, Sub regalati da, Follower)
     for (const sec of sections) {
-      $('n-' + sec.key).textContent = sec.groups.reduce((n, g) => n + g.names.length, 0);
-      $('tile-' + sec.key).classList.toggle('off', !on[sec.key]);
+      if (sec.custom) on[sec.key] = true;
+      if ($('n-' + sec.key)) {
+        $('n-' + sec.key).textContent = sec.groups.reduce((n, g) => n + g.names.length, 0);
+        $('tile-' + sec.key).classList.toggle('off', !on[sec.key]);
+      }
       for (const g of sec.groups) {
         const col = el('div', 'p-col' + (on[sec.key] ? '' : ' off'));
         col.append(el('div', 'p-col-sec', [g.title && sec.title, !on[sec.key] && 'nascosta'].filter(Boolean).join(' · ')));
@@ -959,7 +1370,7 @@ function startPanel() {
   onChange(k => {
     if (k === K.data || k === K.status) renderCategories();
     if (k === 'account') renderAccount();
-    if (k === K.settings && !inputs.includes(document.activeElement)) fillInputs();
+    if (k === K.settings && !inputs().includes(document.activeElement)) { fillInputs(); renderSections(); }
   });
 }
 
