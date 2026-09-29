@@ -1,0 +1,223 @@
+(function () {
+  // Il token (se DASHBOARD_TOKEN è impostato) si passa una volta con ?token=... e viene ricordato.
+  const params = new URLSearchParams(location.search);
+  let token = params.get('token');
+  try {
+    if (token) localStorage.setItem('dashboardToken', token);
+    else token = localStorage.getItem('dashboardToken');
+  } catch { /* storage non disponibile */ }
+
+  const $ = (id) => document.getElementById(id);
+  let state = null;
+  let filter = 'all';
+  let search = '';
+
+  const SOURCE_LABELS = {
+    twitch: 'Twitch', 'twitch-charity': 'Twitch Beneficenza', streamelements: 'StreamElements',
+    kofi: 'Ko-fi', webhook: 'Webhook', test: 'Test',
+  };
+
+  async function api(path) {
+    const res = await fetch(path, { method: 'POST', headers: token ? { 'x-dashboard-token': token } : {} });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? `Errore ${res.status}`);
+    }
+  }
+
+  function el(tag, attrs = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'style') for (const [prop, val] of Object.entries(v)) node.style.setProperty(prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`), val ?? '');
+      else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+      else if (k === 'className') node.className = v;
+      else node.setAttribute(k, v);
+    }
+    node.append(...children.filter((c) => c !== null && c !== undefined && c !== ''));
+    return node;
+  }
+
+  function money(amount, currency) {
+    try {
+      return new Intl.NumberFormat('it-IT', { style: 'currency', currency }).format(amount);
+    } catch {
+      return `${amount} ${currency}`;
+    }
+  }
+
+  function describe(n) {
+    const who = n.user?.name ?? 'Anonimo';
+    switch (n.type) {
+      case 'follow': return `${who} ti segue`;
+      case 'sub': return `${who} si è abbonato (Tier ${n.tier})${n.isGift ? ' — regalo' : ''}`;
+      case 'resub': return `${who}: ${n.months} mesi (Tier ${n.tier})${n.streak ? `, serie ${n.streak}` : ''}`;
+      case 'giftsub': return `${who} ha regalato ${n.amount} sub (Tier ${n.tier})`;
+      case 'cheer': return `${who}: ${n.amount} bits`;
+      case 'raid': return `Raid di ${who} con ${n.amount} spettatori`;
+      case 'redemption': return `${who} ha riscattato "${n.reward?.title}" (${n.reward?.cost} punti)`;
+      case 'donation': return `${who} ha donato ${money(n.amount, n.currency)}`;
+      default: return who;
+    }
+  }
+
+  // ---------- Rendering ----------
+
+  function pill(label, status) {
+    const cls = /^(connesso|attivo)$/.test(status) ? 'ok' : /disattivato/.test(status) ? '' : /connessione/.test(status) ? 'warn' : 'err';
+    return el('span', { className: `pill ${cls}`, title: status }, `${label}: ${status}`);
+  }
+
+  function renderHeader() {
+    const { twitch, sources, overlays } = state;
+    $('statuses').replaceChildren(
+      pill('Twitch', twitch.user ? twitch.status : 'non collegato'),
+      pill('StreamElements', sources.streamelements),
+      pill('Ko-fi', sources.kofi),
+      pill('Webhook', sources.webhook),
+      pill('Overlay aperti', overlays > 0 ? 'attivo' : 'nessuno'),
+    );
+    const account = $('account');
+    if (twitch.user) {
+      account.replaceChildren(
+        el('span', {}, `👤 ${twitch.user.login}`),
+        el('button', { className: 'small-btn', onclick: () => confirm('Scollegare l\'account Twitch?') && api('/api/auth/logout') }, 'Esci'),
+      );
+    } else if (twitch.configured) {
+      account.replaceChildren(el('a', { className: 'btn primary', href: '/auth/login' }, 'Accedi con Twitch'));
+    } else {
+      account.replaceChildren();
+    }
+
+    const banners = [];
+    if (!twitch.configured) banners.push('Imposta TWITCH_CLIENT_ID e TWITCH_CLIENT_SECRET nel file .env e riavvia il programma.');
+    else if (!twitch.user) banners.push('Collega il tuo account Twitch con il pulsante "Accedi con Twitch" in alto a destra.');
+    if (twitch.missingScopes.length) banners.push(`Mancano dei permessi Twitch (${twitch.missingScopes.join(', ')}): esci e accedi di nuovo.`);
+    for (const f of twitch.failedSubscriptions) banners.push(`Evento Twitch non attivo: ${f.type} — ${f.error}`);
+    $('banners').replaceChildren(...banners.map((b) => el('div', { className: 'banner' }, b)));
+  }
+
+  function renderQueue(queue) {
+    const now = $('now-playing');
+    if (queue.current) {
+      now.style.borderLeftColor = queue.current.color;
+      now.replaceChildren(el('strong', {}, queue.current.title), el('div', {}, queue.current.text));
+    } else {
+      now.style.borderLeftColor = '';
+      now.textContent = queue.paused ? 'Coda in pausa' : 'Nessun alert in corso';
+    }
+    $('pending').textContent = queue.pending.length ? `${queue.pending.length} in attesa` : '';
+    $('btn-pause').textContent = queue.paused ? '▶ Riprendi' : '⏸ Pausa';
+  }
+
+  function renderStats() {
+    const { stats, types } = state;
+    const c = stats.counts;
+    const donations = Object.entries(stats.donations).map(([cur, v]) => money(v, cur)).join(' + ') || money(0, 'EUR');
+    const cards = [
+      ['follow', c.follow ?? 0, 'Follow'],
+      ['sub', c.sub ?? 0, 'Nuovi abbonati'],
+      ['resub', c.resub ?? 0, 'Rinnovi'],
+      ['giftsub', stats.giftedSubs, 'Sub regalate'],
+      ['cheer', stats.bits, 'Bits'],
+      ['raid', c.raid ?? 0, 'Raid'],
+      ['redemption', c.redemption ?? 0, 'Riscatti punti'],
+      ['donation', donations, 'Donazioni'],
+    ];
+    $('stats').replaceChildren(...cards.map(([type, value, label]) => el('div', { className: 'stat', style: { '--c': types[type]?.color } },
+      el('div', { className: 'value' }, String(value)),
+      el('div', { className: 'label' }, label))));
+
+    const donors = stats.topDonors;
+    $('top-donors').replaceChildren(...(donors.length
+      ? donors.map((d) => el('li', {}, `${d.name} — ${money(d.amount, d.currency)}`))
+      : [el('li', { className: 'muted', style: { listStyle: 'none', marginLeft: '-22px' } }, 'Ancora nessuna donazione')]));
+  }
+
+  function renderFilters() {
+    const entries = [['all', 'Tutte'], ...Object.entries(state.types).map(([k, v]) => [k, v.label])];
+    $('filters').replaceChildren(...entries.map(([key, label]) => el('button', {
+      className: `chip ${filter === key ? 'active' : ''}`,
+      onclick: () => {
+        filter = key;
+        renderFilters();
+        renderFeed();
+      },
+    }, label)));
+  }
+
+  function renderFeed() {
+    const q = search.toLowerCase();
+    const items = state.history.filter((n) => (filter === 'all' || n.type === filter)
+      && (!q || `${n.user?.name ?? ''} ${n.message ?? ''} ${n.reward?.title ?? ''}`.toLowerCase().includes(q)));
+    if (!items.length) {
+      $('feed').replaceChildren(el('li', { className: 'empty', style: { display: 'block' } }, 'Nessuna notifica'));
+      return;
+    }
+    $('feed').replaceChildren(...items.map((n) => {
+      const type = state.types[n.type] ?? { label: n.type };
+      const li = el('li', { className: n.alerted ? '' : 'skipped', style: { '--c': type.color } },
+        el('div', { className: 'what' }, el('span', { className: 'tag' }, type.label), describe(n)),
+        el('div', { className: 'actions' }, el('button', { className: 'small-btn', title: 'Mostra di nuovo sull\'overlay', onclick: () => api(`/api/replay/${encodeURIComponent(n.id)}`) }, '↻')),
+        el('div', { className: 'meta' },
+          `${new Date(n.timestamp).toLocaleString('it-IT')} · ${SOURCE_LABELS[n.source] ?? n.source}${n.skipReason ? ` · non mostrato: ${n.skipReason}` : ''}`),
+        n.message ? el('div', { className: 'msg' }, n.message) : null);
+      return li;
+    }));
+  }
+
+  function renderAll() {
+    renderHeader();
+    renderQueue(state.queue);
+    renderStats();
+    renderFilters();
+    renderFeed();
+    $('overlay-url').textContent = state.overlayUrl;
+  }
+
+  function renderTestButtons() {
+    $('test-buttons').replaceChildren(...Object.entries(state.types).map(([type, t]) =>
+      el('button', { className: 'small-btn', onclick: () => api(`/api/test/${type}`) }, t.label)));
+  }
+
+  // ---------- Azioni ----------
+
+  $('btn-pause').onclick = () => api(state?.queue.paused ? '/api/queue/resume' : '/api/queue/pause');
+  $('btn-skip').onclick = () => api('/api/queue/skip');
+  $('btn-clear').onclick = () => api('/api/queue/clear');
+  $('btn-reset-stats').onclick = () => confirm('Azzerare le statistiche della sessione?') && api('/api/stats/reset');
+  $('btn-copy').onclick = async () => {
+    await navigator.clipboard.writeText(state.overlayUrl);
+    $('btn-copy').textContent = 'Copiato!';
+    setTimeout(() => { $('btn-copy').textContent = 'Copia'; }, 1500);
+  };
+  $('search').oninput = (e) => {
+    search = e.target.value;
+    if (state) renderFeed();
+  };
+
+  // ---------- Tempo reale ----------
+
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${location.host}/ws?role=dashboard${token ? `&token=${encodeURIComponent(token)}` : ''}`);
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'state') {
+        const first = !state;
+        state = msg.state;
+        renderAll();
+        if (first) renderTestButtons();
+      }
+      if (msg.type === 'queue' && state) {
+        state.queue = msg.queue;
+        renderQueue(msg.queue);
+      }
+    };
+    ws.onclose = () => {
+      $('statuses').replaceChildren(pill('Server', 'non raggiungibile'));
+      setTimeout(connect, 2000);
+    };
+  }
+
+  connect();
+})();

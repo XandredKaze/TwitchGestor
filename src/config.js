@@ -56,7 +56,8 @@ export class ConfigStore extends EventEmitter {
 
   watch() {
     let timer;
-    fs.watchFile(USER_FILE, { interval: 1000 }, () => {
+    fs.watchFile(USER_FILE, { interval: 1000 }, (curr, prev) => {
+      if (curr.mtimeMs === prev.mtimeMs) return;
       clearTimeout(timer);
       timer = setTimeout(() => {
         try {
