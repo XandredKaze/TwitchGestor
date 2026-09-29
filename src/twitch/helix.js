@@ -1,7 +1,3 @@
-import { createLogger } from '../logger.js';
-
-const log = createLogger('twitch-api');
-
 export class HelixClient {
   constructor({ auth, baseUrl = 'https://api.twitch.tv/helix', eventSubUrl }) {
     this.auth = auth;
@@ -40,14 +36,16 @@ export class HelixClient {
     });
   }
 
-  async sendChatMessage(message) {
-    const { id } = this.auth.user;
+  /** Scrive in chat nel canale indicato, con l'account di questo client (il tuo o quello del bot). */
+  async sendChatMessage(message, broadcasterId = this.auth.user.id) {
     const data = await this.request('POST', '/chat/messages', {
-      broadcaster_id: id,
-      sender_id: id,
+      broadcaster_id: broadcasterId,
+      sender_id: this.auth.user.id,
       message: message.slice(0, 500),
     });
     const result = data.data?.[0];
-    if (result && !result.is_sent) log.warn(`Messaggio in chat non inviato: ${result.drop_reason?.message ?? 'motivo sconosciuto'}`);
+    if (result && !result.is_sent) {
+      throw new Error(`Twitch ha bloccato il messaggio: ${result.drop_reason?.message ?? 'motivo sconosciuto'}`);
+    }
   }
 }

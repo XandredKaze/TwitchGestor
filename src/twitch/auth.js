@@ -13,8 +13,11 @@ export const SCOPES = [
   'bits:read', // bits
   'channel:read:redemptions', // punti canale
   'channel:read:charity', // donazioni benefiche Twitch
-  'user:write:chat', // ringraziamenti in chat
+  'user:write:chat', // ringraziamenti in chat (se non c'è un account bot)
 ];
+
+/** Permessi dell'account bot: gli serve solo scrivere in chat. */
+export const BOT_SCOPES = ['user:write:chat'];
 
 /**
  * Accesso con il tuo account Twitch (Authorization Code Flow).
@@ -26,8 +29,9 @@ export class TwitchAuth extends EventEmitter {
   #pendingStates = new Set();
   #validateTimer = null;
 
-  constructor({ clientId, clientSecret, redirectUri, tokenFile }) {
+  constructor({ clientId, clientSecret, redirectUri, tokenFile, scopes = SCOPES }) {
     super();
+    this.scopes = scopes;
     this.clientId = clientId;
     this.clientSecret = clientSecret;
     this.redirectUri = redirectUri;
@@ -55,7 +59,7 @@ export class TwitchAuth extends EventEmitter {
 
   get missingScopes() {
     const granted = this.#tokens?.scopes ?? [];
-    return SCOPES.filter((s) => !granted.includes(s));
+    return this.scopes.filter((s) => !granted.includes(s));
   }
 
   authorizeUrl() {
@@ -65,11 +69,16 @@ export class TwitchAuth extends EventEmitter {
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
       response_type: 'code',
-      scope: SCOPES.join(' '),
+      scope: this.scopes.join(' '),
       state,
       force_verify: 'true',
     });
     return `${OAUTH}/authorize?${params}`;
+  }
+
+  /** Vero se questo accesso è stato avviato da qui (serve a distinguere account principale e bot). */
+  ownsState(state) {
+    return Boolean(state) && this.#pendingStates.has(state);
   }
 
   async handleCallback({ code, state, error, error_description: description }) {

@@ -171,12 +171,15 @@ export function createServer(app) {
       app.broadcastState();
     },
     'POST /api/auth/logout': () => app.logout(),
+    'POST /api/auth/bot/logout': () => app.logoutBot(),
     'GET /api/logs': () => ({ logs: recentLogs() }),
     'GET /api/config': () => ({
       config: app.config.get(),
       defaults: app.config.defaults(),
       options: { animations: ANIMATIONS, positions: POSITIONS, sounds: SOUND_PRESETS },
       media: listMedia(),
+      chatAccount: app.chatAccount(),
+      twitchConfigured: app.auth.configured,
     }),
     'POST /api/shutdown': () => {
       setTimeout(() => app.shutdown(), 300);
@@ -199,9 +202,16 @@ export function createServer(app) {
         if (!app.auth.configured) return send(res, 400, 'Imposta TWITCH_CLIENT_ID e TWITCH_CLIENT_SECRET nel file .env');
         return send(res, 302, '', { Location: app.auth.authorizeUrl() });
       }
+      if (route === 'GET /auth/bot/login') {
+        if (!app.botAuth.configured) return send(res, 400, 'Imposta TWITCH_CLIENT_ID e TWITCH_CLIENT_SECRET nel file .env');
+        return send(res, 302, '', { Location: app.botAuth.authorizeUrl() });
+      }
       if (route === 'GET /auth/callback') {
-        await app.auth.handleCallback(Object.fromEntries(url.searchParams));
-        return send(res, 302, '', { Location: '/dashboard' });
+        // Un solo indirizzo di ritorno per entrambi gli accessi: lo "state" dice se era il bot.
+        const params = Object.fromEntries(url.searchParams);
+        const isBot = app.botAuth.ownsState(params.state);
+        await (isBot ? app.botAuth : app.auth).handleCallback(params);
+        return send(res, 302, '', { Location: isBot ? '/dashboard#chat' : '/dashboard' });
       }
 
       // --- Webhook donazioni ---

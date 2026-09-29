@@ -22,7 +22,7 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 - **Varianti**: alert diversi in base all'importo (es. donazioni sopra i 50 €, bits sopra i 1000, 10+ sub regalate) o alla ricompensa dei punti canale.
 - **Filtri**: disattiva un tipo, imposta un minimo, ignora ricompense specifiche. Le sub regalate non generano un doppio alert.
 - **Storico e statistiche** della sessione: conteggi, bits totali, donazioni per valuta, top donatori. Lo storico viene salvato su disco.
-- **Ringraziamenti automatici in chat** (facoltativi) con testi personalizzabili.
+- **Ringraziamenti automatici in chat** (facoltativi) con testi personalizzabili, scritti dal tuo account o da un **account bot** (es. Wolfery).
 - **Anti-duplicati**, riconnessione automatica a Twitch, rinnovo automatico del token.
 - Le modifiche valgono **subito**, anche durante la live.
 - Funziona **senza finestre** e può partire e spegnersi insieme a OBS.
@@ -79,6 +79,14 @@ Da quel momento TwitchGestor parte da solo, senza finestre, quando apri OBS e si
 3. Spunta **Controlla l'audio tramite OBS** per regolare il volume degli alert dal mixer.
 
 Usa i pulsanti **Prova gli alert** nella dashboard per vedere subito come appaiono.
+
+## Ringraziamenti in chat con un account bot
+
+1. Dashboard → **🎨 Personalizza alert → ⚙️ Impostazioni generali → Chat**: attiva i ringraziamenti.
+2. Clicca **🤖 Collega account bot**. Su Twitch, se compare il tuo account, clicca **"Non sei tu?"** e accedi con l'account del bot (oppure apri il link in una finestra in incognito).
+3. Consigliato: rendi il bot moderatore scrivendo in chat `/mod NomeDelBot`.
+
+Il testo del messaggio si imposta in ogni alert (sezione **Messaggio in chat**). Se il bot non è collegato, scrive il tuo account. Gli alert di prova non scrivono in chat.
 
 ## Donazioni
 

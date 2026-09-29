@@ -3,7 +3,7 @@ import path from 'node:path';
 import { ConfigStore, DATA_DIR, loadEnv } from './config.js';
 import { NotificationManager } from './core/NotificationManager.js';
 import { fromEventSub } from './core/normalize.js';
-import { TwitchAuth } from './twitch/auth.js';
+import { TwitchAuth, BOT_SCOPES } from './twitch/auth.js';
 import { HelixClient } from './twitch/helix.js';
 import { EventSubClient } from './twitch/eventsub.js';
 import { StreamElementsSource } from './sources/streamelements.js';
@@ -31,6 +31,23 @@ const auth = new TwitchAuth({
 });
 const helix = new HelixClient({ auth, eventSubUrl: env.EVENTSUB_API_URL });
 
+// Account bot facoltativo (es. "Wolfery") che scrive i ringraziamenti in chat al posto tuo.
+const botAuth = new TwitchAuth({
+  clientId: env.TWITCH_CLIENT_ID,
+  clientSecret: env.TWITCH_CLIENT_SECRET,
+  redirectUri: `${publicUrl}/auth/callback`,
+  tokenFile: path.join(DATA_DIR, 'bot-tokens.json'),
+  scopes: BOT_SCOPES,
+});
+const botHelix = new HelixClient({ auth: botAuth });
+
+/** Chi scrive in chat: il bot se collegato, altrimenti il tuo account. */
+function chatAccount() {
+  if (botAuth.user) return { kind: 'bot', user: botAuth.user, sameAsChannel: botAuth.user.id === auth.user?.id };
+  if (auth.user) return { kind: 'channel', user: auth.user };
+  return null;
+}
+
 let eventsub = null;
 const streamelements = env.STREAMELEMENTS_JWT ? new StreamElementsSource({ jwt: env.STREAMELEMENTS_JWT }) : null;
 
@@ -39,6 +56,8 @@ const app = {
   config,
   manager,
   auth,
+  botAuth,
+  chatAccount,
   getState() {
     return {
       twitch: {
@@ -55,6 +74,7 @@ const app = {
       },
       overlays: web?.clients.overlay.size ?? 0,
       chatReplies: Boolean(config.get().chat?.enabled),
+      chatAccount: chatAccount(),
       overlayUrl: `${publicUrl}/overlay`,
       types: Object.fromEntries(Object.entries(config.get().types).map(([k, v]) => [k, { label: v.label ?? k, color: v.color }])),
       queue: manager.queueState(),
@@ -67,6 +87,11 @@ const app = {
   },
   logout() {
     auth.logout();
+  },
+  logoutBot() {
+    botAuth.logout();
+    log.info('Account bot scollegato: i messaggi in chat useranno il tuo account');
+    app.broadcastState();
   },
   shutdown() {
     shutdown();
@@ -85,7 +110,10 @@ manager.on('queue', (queue) => web.toDashboards({ type: 'queue', queue }));
 manager.on('notification', () => app.broadcastState());
 manager.on('chat', (text) => {
   if (!auth.user) return;
-  helix.sendChatMessage(text).catch((err) => log.warn(`Invio messaggio in chat fallito: ${err.message}`));
+  const client = botAuth.user ? botHelix : helix;
+  client.sendChatMessage(text, auth.user.id)
+    .then(() => log.info(`Chat (${client.auth.user.login}): ${text}`))
+    .catch((err) => log.warn(`Invio messaggio in chat fallito (${client.auth.user.login}): ${err.message}`));
 });
 config.on('change', (c) => {
   web.toOverlays({ type: 'hello', overlay: c.overlay });
@@ -110,6 +138,13 @@ auth.on('authorized', (user) => {
   auth.startPeriodicValidation();
   app.broadcastState();
 });
+botAuth.on('authorized', (user) => {
+  if (user.id === auth.user?.id) log.warn(`Hai collegato come bot lo stesso account del canale (${user.login}): per usare Wolfery accedi con il suo account`);
+  else log.info(`Account bot collegato: ${user.login}. I ringraziamenti in chat li scriverà lui`);
+  botAuth.startPeriodicValidation();
+  app.broadcastState();
+});
+
 auth.on('unauthorized', () => {
   eventsub?.stop();
   eventsub = null;
@@ -150,6 +185,12 @@ web.server.listen(port, host, async () => {
     log.error(`Impossibile verificare il token Twitch: ${err.message}`);
   }
   auth.startPeriodicValidation();
+  if (botAuth.user) {
+    botAuth.validate()
+      .then((ok) => { if (ok) log.info(`Account bot: ${botAuth.user.login}`); })
+      .catch((err) => log.warn(`Impossibile verificare l'account bot: ${err.message}`));
+    botAuth.startPeriodicValidation();
+  }
 });
 
 function shutdown() {

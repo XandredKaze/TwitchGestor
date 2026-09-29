@@ -177,7 +177,9 @@
     try { sessionStorage.setItem('tab', name); } catch { /* ignora */ }
   }
   for (const t of document.querySelectorAll('.tab')) t.onclick = () => showTab(t.dataset.tab);
-  try { if (sessionStorage.getItem('tab') === 'editor') showTab('editor'); } catch { /* ignora */ }
+  try {
+    if (location.hash === '#chat' || sessionStorage.getItem('tab') === 'editor') showTab('editor');
+  } catch { /* ignora */ }
 
   // ---------- Registro ----------
   async function refreshLogs() {

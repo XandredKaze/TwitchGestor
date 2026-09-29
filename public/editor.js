@@ -42,6 +42,8 @@
   let draft = null;
   let defaults = null;
   let media = { sounds: [], images: [] };
+  let chatAccount = null;
+  let twitchConfigured = true;
   let selected = 'follow';
   let previewType = 'follow';
   let lastTextField = null;
@@ -59,12 +61,22 @@
     draft = clone(saved);
     defaults = data.defaults;
     media = data.media;
+    chatAccount = data.chatAccount;
+    twitchConfigured = data.twitchConfigured;
     for (const f of window.ALERT_FONTS.google) window.loadFont(f);
     render();
   }
 
-  window.addEventListener('editor:open', () => {
-    if (!draft) load();
+  if (location.hash === '#chat') selected = '__general';
+
+  window.addEventListener('editor:open', async () => {
+    if (!draft) {
+      await load();
+      if (location.hash === '#chat') {
+        document.getElementById('chat-section')?.scrollIntoView({ block: 'center' });
+        history.replaceState(null, '', location.pathname + location.search);
+      }
+    }
     else schedulePreview();
   });
   window.addEventListener('beforeunload', (e) => {
@@ -300,7 +312,9 @@
         field('Volume', range(t, 'volume', { min: 0, max: 100, step: 5, scale: 0.01, fallback: 0.5, format: (v) => `${Math.round(v * 100)}%` }), { onReset: reset('volume') })),
 
       section('Messaggio in chat',
-        draft.chat.enabled ? null : el('p', { className: 'notice' }, 'I messaggi in chat sono disattivati: attivali in "Impostazioni generali".'),
+        draft.chat.enabled
+          ? el('p', { className: 'hint' }, `Scrive: ${chatWho()}. Si cambia in "Impostazioni generali".`)
+          : el('p', { className: 'notice' }, 'I messaggi in chat sono disattivati: attivali in "Impostazioni generali".'),
         field('Messaggio (vuoto = nessun messaggio)', textInput(t, 'chatReply', { multiline: true }), { onReset: reset('chatReply') })),
 
       ['follow', 'sub'].includes(type) ? null : renderVariants(type, t),
@@ -360,6 +374,51 @@
       }, isReward ? '＋ Aggiungi ricompensa' : '＋ Aggiungi soglia'));
   }
 
+  // ---------- Account che scrive in chat ----------
+
+  function chatWho() {
+    if (!chatAccount) return 'nessuno (collega prima il tuo account Twitch)';
+    if (chatAccount.kind === 'bot' && !chatAccount.sameAsChannel) return `🤖 ${chatAccount.user.login} (bot)`;
+    return `il tuo account (${chatAccount.user.login})`;
+  }
+
+  function botBox() {
+    if (!twitchConfigured) return el('p', { className: 'notice' }, 'Prima imposta TWITCH_CLIENT_ID e TWITCH_CLIENT_SECRET nel file .env.');
+    const bot = chatAccount?.kind === 'bot' ? chatAccount : null;
+    const disconnect = el('button', {
+      type: 'button', className: 'small-btn danger',
+      onclick: async () => {
+        if (!confirm(`Scollegare l'account bot ${bot.user.login}? I messaggi torneranno a essere scritti dal tuo account.`)) return;
+        if (await api('/api/auth/bot/logout')) {
+          chatAccount = (await api('/api/config', { method: 'GET' }))?.chatAccount ?? null;
+          renderForm();
+        }
+      },
+    }, 'Scollega bot');
+
+    if (bot && bot.sameAsChannel) {
+      return el('div', { className: 'bot-box' },
+        el('p', { className: 'notice' }, `Come bot hai collegato lo stesso account del canale (${bot.user.login}). Scollegalo e ricollegalo accedendo con l'account del bot.`),
+        disconnect);
+    }
+    if (bot) {
+      return el('div', { className: 'bot-box' },
+        el('div', { className: 'bot-name' }, el('span', { className: 'pill ok' }, `🤖 ${bot.user.login}`), el('span', {}, 'scrive i ringraziamenti in chat')),
+        el('p', { className: 'hint' }, `Consiglio: rendilo moderatore del tuo canale scrivendo in chat /mod ${bot.user.login}, così non viene bloccato da modalità follower, slow mode o limiti di messaggi.`),
+        disconnect);
+    }
+    return el('div', { className: 'bot-box' },
+      el('p', {}, chatAccount
+        ? `Ora i messaggi li scrive ${chatWho()}. Per farli scrivere a un account bot (es. Wolfery):`
+        : 'Collega prima il tuo account Twitch (in alto a destra). Per far scrivere i messaggi a un account bot (es. Wolfery):'),
+      el('ol', { className: 'steps' },
+        el('li', {}, 'Clicca "Collega account bot": si apre la pagina di Twitch.'),
+        el('li', {}, 'Se Twitch mostra il tuo account, clicca "Non sei tu?" (o "Not you?") e accedi con l\'account del bot.'),
+        el('li', {}, 'Autorizza: servirà solo a scrivere in chat.')),
+      el('p', { className: 'hint' }, 'In alternativa apri il link in una finestra in incognito, dove sei già collegato con l\'account del bot.'),
+      el('a', { className: 'btn primary', href: '/auth/bot/login' }, '🤖 Collega account bot'));
+  }
+
   // ---------- Impostazioni generali ----------
 
   function renderGeneralForm() {
@@ -380,8 +439,10 @@
           field('Opacità dello sfondo', range(o, 'backgroundOpacity', { min: 0, max: 100, step: 5, scale: 0.01, fallback: 0.88, format: (v) => `${Math.round(v * 100)}%` }), { onReset: reset('backgroundOpacity') }))),
       section('Coda',
         field('Pausa tra un alert e l\'altro', range(draft.queue, 'gapMs', { min: 0, max: 5, step: 0.1, scale: 1000, fallback: 800, format: (v) => `${(v / 1000).toFixed(1)} s` }))),
-      section('Chat',
-        checkbox(draft.chat, 'enabled', 'Scrivi un ringraziamento in chat per ogni notifica (il testo si imposta in ogni alert)')),
+      el('div', { id: 'chat-section' }, section('Chat',
+        checkbox(draft.chat, 'enabled', 'Scrivi un ringraziamento in chat per ogni notifica (il testo si imposta in ogni alert)'),
+        el('h3', {}, 'Account che scrive in chat'),
+        botBox())),
       section('Ripristino',
         el('button', {
           type: 'button', className: 'danger',
@@ -516,4 +577,7 @@
     document.body.append(toast);
     setTimeout(() => toast.remove(), 3000);
   };
+
+  // La scheda può essere già aperta al caricamento della pagina (ricarica o ritorno dal login del bot).
+  if (!$('tab-editor').hidden) window.dispatchEvent(new Event('editor:open'));
 })();
