@@ -196,7 +196,7 @@
     input.click();
   }
 
-  const fileName = (p) => decodeURIComponent(p.split('/').pop());
+  const fileName = (p) => decodeURIComponent(p.includes('#') ? p.split('#').pop() : p.split('/').pop());
 
   function soundPicker(obj, key, { inheritLabel } = {}) {
     const current = obj[key];
@@ -222,7 +222,7 @@
     ];
     const sel = select(obj, key, options, { inheritLabel, onchange: () => {} });
     if (!inheritLabel && !current) sel.value = '';
-    const src = current ? (/^https?:/.test(current) ? current : `/${current.replace(/^\//, '')}`) : '';
+    const src = current ? (/^[a-z][a-z0-9+.-]*:/i.test(current) ? current : `/${current.replace(/^\//, '')}`) : '';
     const thumb = !current ? null : /\.(webm|mp4)$/i.test(current)
       ? el('video', { className: 'thumb', src, muted: true, autoplay: true, loop: true })
       : el('img', { className: 'thumb', src, alt: '' });

@@ -29,6 +29,12 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 - Le modifiche valgono **subito**, anche durante la live.
 - Funziona **senza finestre** e può partire e spegnersi insieme a OBS.
 
+## Provarlo senza installare nulla
+
+C'è una **versione demo** che gira interamente nel browser: dashboard, editor degli alert con anteprima, overlay, titoli di coda con nomi di prova, alert di prova e una **live simulata** (eventi e chat finti). Non si collega a Twitch e le impostazioni restano solo nel browser che la apre.
+
+La demo si ricostruisce dal codice con `npm run build:demo` (i file finiscono in `dist-demo/`).
+
 ## Requisiti
 
 - [Node.js](https://nodejs.org/) 20.12 o superiore
@@ -197,8 +203,9 @@ Plurale: `{amount|o|i}` scrive `o` se l'importo è 1, altrimenti `i` (es. `abbon
 ## Sviluppo
 
 ```bash
-npm test          # test automatici
-npm run dev       # riavvio automatico quando modifichi il codice
+npm test            # test automatici
+npm run dev         # riavvio automatico quando modifichi il codice
+npm run build:demo  # versione demo per il browser, in dist-demo/
 ```
 
 Per simulare eventi Twitch reali puoi usare la [Twitch CLI](https://dev.twitch.tv/docs/cli/): avvia `twitch event websocket start-server` e imposta `EVENTSUB_WS_URL` / `EVENTSUB_API_URL` nel `.env`.
@@ -215,4 +222,5 @@ src/
   sources/                     StreamElements, Ko-fi, webhook generico
   credits.js                   titoli di coda: stato condiviso e download da Twitch
 public/                        overlay, dashboard e titoli di coda (credits.html)
+demo/                          "server finto" della versione demo (usa il codice vero di src/core)
 ```

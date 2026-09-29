@@ -31,6 +31,7 @@ export function isSafeMedia(v) {
   if (typeof v !== 'string' || v.length > 400) return false;
   if (SOUND_PRESETS.includes(v)) return true;
   if (/^https?:\/\/[^\s"'<>]+$/i.test(v)) return true;
+  if (/^blob:https?:\/\/[^\s"'<>]+$/i.test(v)) return true; // file caricato nella versione demo
   return /^\/?(sounds|images|media)\/[^\s"'<>\\]+$/.test(v) && !v.includes('..');
 }
 const media = (v) => (isSafeMedia(v) ? v : undefined);

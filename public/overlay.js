@@ -8,7 +8,7 @@
   let hideTimer = null;
 
   const isVideo = (src) => /\.(webm|mp4)$/i.test(src);
-  const mediaSrc = (src) => (/^https?:\/\//.test(src) || src.startsWith('/') ? src : `/${src}`);
+  const mediaSrc = (src) => (/^[a-z][a-z0-9+.-]*:/i.test(src) || src.startsWith('/') ? src : `/${src}`);
 
   function el(tag, className, text) {
     const node = document.createElement(tag);

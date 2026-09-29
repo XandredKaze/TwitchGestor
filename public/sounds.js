@@ -49,7 +49,7 @@
       presets[sound](Math.min(Math.max(volume, 0), 1) * 0.3);
       return;
     }
-    const el = new Audio(sound.startsWith('http') || sound.startsWith('/') ? sound : `/${sound}`);
+    const el = new Audio(/^[a-z][a-z0-9+.-]*:/i.test(sound) || sound.startsWith('/') ? sound : `/${sound}`);
     el.volume = Math.min(Math.max(volume, 0), 1);
     el.play().catch((err) => console.warn('Audio non riprodotto:', err.message));
   };

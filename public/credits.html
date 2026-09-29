@@ -497,7 +497,7 @@ function startParticles() {
 function musicSrc(f) {
   f = String(f || '').trim();
   if (!f) return '';
-  return /^https?:\/\//i.test(f) ? f : '/' + f.replace(/^\/+/, '');
+  return /^[a-z][a-z0-9+.-]*:/i.test(f) ? f : '/' + f.replace(/^\/+/, '');
 }
 
 function startRollPlayer() {

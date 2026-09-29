@@ -1,0 +1,387 @@
+/**
+ * TwitchGestor – versione demo che gira interamente nel browser.
+ *
+ * Questo file sostituisce il server: intercetta le chiamate della pagina (fetch verso /api/... e
+ * WebSocket verso /ws) e le gestisce qui, riusando lo stesso codice del programma vero
+ * (coda degli alert, filtri, varianti, testi, validazione delle impostazioni).
+ * Non si collega a Twitch: gli eventi sono simulati. Le impostazioni restano solo in questo browser.
+ *
+ * Si compila con: npm run build:demo  (vedi scripts/build-demo.mjs)
+ */
+import defaults from '../config/default.json';
+import { NotificationManager } from '../src/core/NotificationManager.js';
+import { NOTIFICATION_TYPES, testNotification } from '../src/core/normalize.js';
+import { sanitizeConfig, diffConfig, ANIMATIONS, POSITIONS, SOUND_PRESETS } from '../src/core/schema.js';
+import { recentLogs, createLogger } from '../src/logger.js';
+
+const CHANNEL = { id: '0', login: 'canale_demo' };
+const BOT = { id: '1', login: 'Wolfery' };
+const UPLOAD_KINDS = {
+  sounds: ['.mp3', '.ogg', '.wav'],
+  images: ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.webm', '.mp4'],
+  music: ['.mp3', '.ogg', '.wav', '.m4a', '.flac'],
+};
+
+const storage = {
+  get(key, fallback) {
+    try {
+      const v = localStorage.getItem(key);
+      return v ? JSON.parse(v) : fallback;
+    } catch {
+      return fallback;
+    }
+  },
+  set(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage non disponibile */ }
+  },
+};
+
+function isObject(v) {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+function deepMerge(base, override) {
+  if (!isObject(base) || !isObject(override)) return override === undefined ? base : override;
+  const out = { ...base };
+  for (const [k, v] of Object.entries(override)) out[k] = isObject(v) && isObject(base[k]) ? deepMerge(base[k], v) : v;
+  return out;
+}
+
+function ext(name) {
+  return (/\.[^./]+$/.exec(name) || [''])[0].toLowerCase();
+}
+
+function sampleNotification(type, sample = {}) {
+  const n = testNotification(type);
+  const amount = Number(sample?.amount);
+  if (sample?.amount !== undefined && sample?.amount !== '' && Number.isFinite(amount) && amount >= 0) {
+    n.amount = amount;
+    if (type === 'resub') n.months = amount;
+  }
+  if (typeof sample?.reward === 'string' && sample.reward.trim() && n.reward) n.reward.title = sample.reward.slice(0, 60);
+  return n;
+}
+
+// Nomi di prova per i titoli di coda (come il pulsante "Nomi di prova" del pannello).
+function demoCreditsData() {
+  const a = ['Luna', 'Drago', 'Pixel', 'Neve', 'Volpe', 'Ombra', 'Razzo', 'Gatto', 'Nebbia', 'Fulmine', 'Orso', 'Tempesta'];
+  const b = ['Rossa', '_TV', '92', 'Gamer', 'Nera', 'Lampo', 'XD', 'Zeta', 'Plays', '_it'];
+  const nm = (i) => a[i % a.length] + b[(i * 7) % b.length] + (i > 20 ? i : '');
+  const gifters = ['GeneroSO', 'ZioSub', 'Mecenate_', ''];
+  const subs = [];
+  for (let i = 0; i < 26; i++) {
+    const gift = i % 4 === 0;
+    subs.push({ name: nm(i), gift, gifter: gift ? gifters[(i / 4) % 4] : '', tier: '1000' });
+  }
+  subs.push({ name: 'GeneroSO', gift: false, gifter: '', tier: '1000' });
+  return { fetchedAt: 0, demo: true, subs, followers: Array.from({ length: 40 }, (_, i) => nm(i + 50)) };
+}
+
+const VIEWER_CHAT = ['ciao a tutti!', 'che bella live 🔥', 'GG', 'ahahah', 'forza!', 'da dove stai giocando?', 'quel salto era perfetto', 'LUL', 'buonasera chat', '💜💜💜'];
+const VIEWERS = ['PizzaConAnanas', 'LupoSolitario', 'GattoNinja', 'CaffèCorretto', 'MarioRossi92', 'SuperNonna', 'VolpeRossa', 'NebbiaZeta'];
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+class DemoBackend {
+  constructor() {
+    this.log = createLogger('demo');
+    this.defaults = defaults;
+    this.config = sanitizeConfig(deepMerge(defaults, storage.get('tg-demo-config', {})), defaults);
+    this.manager = new NotificationManager({ config: this.config });
+    this.clients = { overlay: new Set(), dashboard: new Set() };
+    this.media = { sounds: [], images: [], music: [] };
+    this.chat = [];
+    this.bot = { ...BOT };
+    this.simulation = null;
+    this.credits = {
+      rev: Date.now(),
+      state: storage.get('tg-demo-credits', null) ?? { data: demoCreditsData() },
+    };
+
+    this.manager.on('alert', (alert) => {
+      this.#send('overlay', { type: 'alert', alert });
+      this.#send('dashboard', { type: 'alert', alert });
+    });
+    this.manager.on('skip', (alert) => this.#send('overlay', { type: 'skip', id: alert.id }));
+    this.manager.on('queue', (queue) => this.#send('dashboard', { type: 'queue', queue }));
+    this.manager.on('notification', () => this.broadcastState());
+    this.manager.on('chat', (text) => {
+      this.#chat(this.bot ? this.bot.login : CHANNEL.login, text, true);
+      this.log.info(`Chat (${this.bot ? this.bot.login : CHANNEL.login}): ${text}`);
+    });
+    this.log.info('Demo avviata: nessun collegamento a Twitch, gli eventi sono simulati');
+  }
+
+  // ---------- Canale in tempo reale (sostituisce il WebSocket) ----------
+
+  connect(socket) {
+    const role = socket.role in this.clients ? socket.role : 'dashboard';
+    this.clients[role].add(socket);
+    socket.deliver(role === 'overlay' ? { type: 'hello', overlay: this.config.overlay } : { type: 'state', state: this.getState() });
+    this.broadcastState();
+  }
+
+  disconnect(socket) {
+    for (const set of Object.values(this.clients)) set.delete(socket);
+    this.broadcastState();
+  }
+
+  #send(role, message) {
+    for (const socket of [...this.clients[role]]) {
+      try {
+        socket.deliver(message);
+      } catch {
+        this.clients[role].delete(socket); // pagina chiusa (es. anteprima ricaricata)
+      }
+    }
+  }
+
+  broadcastState() {
+    clearTimeout(this.stateTimer);
+    this.stateTimer = setTimeout(() => this.#send('dashboard', { type: 'state', state: this.getState() }), 30);
+  }
+
+  #chat(user, text, fromBot = false) {
+    this.chat.push({ user, text, bot: fromBot, at: Date.now() });
+    if (this.chat.length > 60) this.chat.shift();
+    this.broadcastState();
+  }
+
+  chatAccount() {
+    return this.bot ? { kind: 'bot', user: this.bot, sameAsChannel: false } : { kind: 'channel', user: CHANNEL };
+  }
+
+  getState() {
+    const m = this.manager;
+    return {
+      twitch: { configured: true, user: CHANNEL, status: 'simulato', missingScopes: [], failedSubscriptions: [] },
+      sources: { streamelements: 'disattivato', kofi: 'disattivato', webhook: 'disattivato' },
+      overlays: this.clients.overlay.size,
+      chatReplies: Boolean(this.config.chat?.enabled),
+      chatAccount: this.chatAccount(),
+      overlayUrl: 'overlay.html',
+      types: Object.fromEntries(Object.entries(this.config.types).map(([k, v]) => [k, { label: v.label ?? k, color: v.color }])),
+      queue: m.queueState(),
+      stats: { ...m.stats, donors: undefined, topDonors: m.topDonors() },
+      history: m.history.slice(0, 200),
+      demo: { simulating: Boolean(this.simulation), chat: this.chat.slice(-40) },
+    };
+  }
+
+  // ---------- Eventi simulati ----------
+
+  setSimulation(on) {
+    clearTimeout(this.simulation);
+    clearTimeout(this.chatTimer);
+    this.simulation = null;
+    if (!on) {
+      this.log.info('Simulazione fermata');
+      return;
+    }
+    this.log.info('Simulazione avviata: arriveranno eventi finti ogni pochi secondi');
+    const weights = [['follow', 30], ['cheer', 12], ['sub', 10], ['resub', 10], ['giftsub', 6], ['redemption', 14], ['donation', 10], ['raid', 4]];
+    const total = weights.reduce((s, [, w]) => s + w, 0);
+    const next = () => {
+      let r = Math.random() * total;
+      const type = weights.find(([, w]) => (r -= w) < 0)[0];
+      const n = { ...testNotification(type), test: false, source: 'demo' };
+      this.manager.ingest(n);
+      this.simulation = setTimeout(next, 5000 + Math.random() * 7000);
+    };
+    const talk = () => {
+      this.#chat(pick(VIEWERS), pick(VIEWER_CHAT));
+      this.chatTimer = setTimeout(talk, 2500 + Math.random() * 3500);
+    };
+    this.simulation = setTimeout(next, 800);
+    this.chatTimer = setTimeout(talk, 1500);
+  }
+
+  // ---------- API (sostituisce le richieste al server) ----------
+
+  async handle(method, url, body, headers) {
+    const route = `${method} ${url.pathname}`;
+    const ok = (data = { ok: true }) => ({ status: 200, data });
+    const fail = (status, error) => ({ status, data: { error } });
+    const draft = (b) => (b?.config ? sanitizeConfig(b.config, this.defaults) : null);
+    const m = this.manager;
+
+    switch (route) {
+      case 'GET /api/state': return ok(this.getState());
+      case 'GET /api/logs': return ok({ logs: recentLogs() });
+      case 'GET /api/config':
+        return ok({
+          config: this.config, defaults: this.defaults,
+          options: { animations: ANIMATIONS, positions: POSITIONS, sounds: SOUND_PRESETS },
+          media: this.media, chatAccount: this.chatAccount(), twitchConfigured: true,
+        });
+      case 'PUT /api/config': {
+        this.config = sanitizeConfig(body?.config, this.defaults);
+        storage.set('tg-demo-config', diffConfig(this.config, this.defaults) ?? {});
+        m.setConfig(this.config);
+        this.#send('overlay', { type: 'hello', overlay: this.config.overlay });
+        this.broadcastState();
+        this.log.info('Impostazioni salvate (solo in questo browser)');
+        return ok({ config: this.config });
+      }
+      case 'POST /api/preview': {
+        if (!NOTIFICATION_TYPES.includes(body?.type)) return fail(400, 'Tipo sconosciuto');
+        const builder = new NotificationManager({ config: draft(body) ?? this.config });
+        return ok({ alert: builder.buildAlert(sampleNotification(body.type, body.sample)) });
+      }
+      case 'POST /api/queue/pause': m.pause(); return ok();
+      case 'POST /api/queue/resume': m.resume(); return ok();
+      case 'POST /api/queue/skip': m.skip(); return ok();
+      case 'POST /api/queue/clear': m.clearQueue(); return ok();
+      case 'POST /api/stats/reset': m.resetStats(); this.broadcastState(); return ok();
+      case 'POST /api/auth/logout': return fail(400, 'Nella demo l\'account del canale è simulato e non si può scollegare.');
+      case 'POST /api/auth/bot/logout': this.bot = null; this.broadcastState(); return ok();
+      case 'POST /api/shutdown': return fail(400, 'Nella demo il programma non si spegne: chiudi semplicemente la pagina.');
+      case 'POST /api/demo/simulate': this.setSimulation(Boolean(body?.on)); this.broadcastState(); return ok();
+      case 'POST /api/upload': {
+        const kind = url.searchParams.get('kind');
+        return this.#upload(kind, decodeURIComponent(headers['x-filename'] ?? ''), body, (p) => ok({ path: p, media: this.media }));
+      }
+      // --- titoli di coda ---
+      case 'GET /api/credits/state': {
+        const rev = Number(url.searchParams.get('rev'));
+        const snap = rev === this.credits.rev ? { rev } : { rev: this.credits.rev, state: this.credits.state };
+        return ok({ ...snap, account: CHANNEL.login, configured: true });
+      }
+      case 'POST /api/credits/fetch':
+        return fail(409, 'Nella demo non c\'è un collegamento a Twitch: usa "Nomi di prova".');
+      default:
+        break;
+    }
+
+    if (method === 'POST' && url.pathname.startsWith('/api/test/')) {
+      const type = url.pathname.slice('/api/test/'.length);
+      if (!NOTIFICATION_TYPES.includes(type)) return fail(400, `Tipo sconosciuto: ${type}`);
+      m.test(sampleNotification(type, body?.sample), draft(body));
+      return ok();
+    }
+    if (method === 'POST' && url.pathname.startsWith('/api/replay/')) {
+      return m.replay(decodeURIComponent(url.pathname.slice('/api/replay/'.length))) ? ok() : fail(404, 'Notifica non trovata');
+    }
+    if (method === 'PUT' && url.pathname.startsWith('/api/credits/state/')) {
+      const key = decodeURIComponent(url.pathname.slice('/api/credits/state/'.length));
+      if (!['settings', 'data', 'cmd', 'status'].includes(key)) return fail(400, 'Chiave non consentita');
+      if (body === null || body === undefined) delete this.credits.state[key];
+      else this.credits.state[key] = body;
+      this.credits.rev += 1;
+      storage.set('tg-demo-credits', { settings: this.credits.state.settings, data: this.credits.state.data });
+      return ok({ rev: this.credits.rev });
+    }
+    if (method === 'PUT' && url.pathname.startsWith('/api/credits/upload/')) {
+      return this.#upload('music', decodeURIComponent(url.pathname.slice('/api/credits/upload/'.length)), body, (p) => ok({ name: p }));
+    }
+    return fail(404, 'Non trovato');
+  }
+
+  /** I file caricati restano nella memoria della pagina (spariscono ricaricandola). */
+  #upload(kind, name, blob, done) {
+    if (!UPLOAD_KINDS[kind]) return { status: 400, data: { error: 'Tipo di file non valido' } };
+    if (!UPLOAD_KINDS[kind].includes(ext(name))) return { status: 400, data: { error: `Formato non supportato. Usa: ${UPLOAD_KINDS[kind].join(', ')}` } };
+    if (!(blob instanceof Blob) || !blob.size) return { status: 400, data: { error: 'File vuoto' } };
+    const safeName = name.replace(/[^\w.\-]+/g, '_').slice(-80);
+    const p = `${URL.createObjectURL(blob)}#${encodeURIComponent(safeName)}`;
+    this.media[kind].push(p);
+    this.log.info(`File caricato nella demo: ${safeName} (resta finché non ricarichi la pagina)`);
+    return done(p);
+  }
+}
+
+// ---------- Collegamento della pagina al backend finto ----------
+
+/** Le pagine dentro la dashboard (overlay, anteprime, titoli di coda) usano il backend della pagina principale. */
+function findBackend() {
+  let w = window;
+  while (w !== w.parent) {
+    try {
+      if (w.parent.__tgDemoBackend) return w.parent.__tgDemoBackend;
+    } catch {
+      break; // pagina esterna (es. il visualizzatore): ci fermiamo
+    }
+    w = w.parent;
+  }
+  window.__tgDemoBackend = new DemoBackend();
+  return window.__tgDemoBackend;
+}
+
+const backend = findBackend();
+
+class DemoSocket {
+  constructor(url) {
+    this.url = String(url);
+    this.readyState = 0;
+    this.role = new URL(this.url, location.href).searchParams.get('role');
+    this.onopen = null;
+    this.onmessage = null;
+    this.onclose = null;
+    this.onerror = null;
+    setTimeout(() => {
+      this.readyState = 1;
+      this.onopen?.({});
+      backend.connect(this);
+    });
+    window.addEventListener('pagehide', () => this.close());
+  }
+
+  deliver(message) {
+    if (this.readyState !== 1) return;
+    const data = JSON.stringify(message);
+    setTimeout(() => this.onmessage?.({ data }));
+  }
+
+  send() { /* le pagine non inviano messaggi */ }
+
+  close() {
+    if (this.readyState === 3) return;
+    this.readyState = 3;
+    backend.disconnect(this);
+  }
+
+  addEventListener(type, fn) {
+    const prev = this[`on${type}`];
+    this[`on${type}`] = (e) => { prev?.(e); fn(e); };
+  }
+}
+DemoSocket.OPEN = 1;
+DemoSocket.prototype.OPEN = 1;
+
+const realWebSocket = window.WebSocket;
+window.WebSocket = function WebSocket(url, protocols) {
+  return new URL(String(url), location.href).pathname.endsWith('/ws') ? new DemoSocket(url) : new realWebSocket(url, protocols);
+};
+
+const realFetch = window.fetch.bind(window);
+window.fetch = async (input, init = {}) => {
+  const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+  const i = url.pathname.indexOf('/api/');
+  if (i === -1) return realFetch(input, init);
+  const apiUrl = new URL(url.pathname.slice(i) + url.search, 'http://demo');
+  const headers = Object.fromEntries(Object.entries(init.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v]));
+  let body = init.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch { body = {}; }
+  }
+  await new Promise((r) => setTimeout(r, 30));
+  const { status, data } = await backend.handle((init.method ?? 'GET').toUpperCase(), apiUrl, body, headers);
+  return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
+};
+
+// Nel visualizzatore di claude.ai le finestre di conferma non esistono: nella demo si procede
+// direttamente e i messaggi compaiono come avviso in basso.
+window.confirm = () => true;
+window.alert = (message) => {
+  const show = () => {
+    const box = document.createElement('div');
+    box.textContent = String(message);
+    box.setAttribute('role', 'status');
+    Object.assign(box.style, {
+      position: 'fixed', left: '50%', bottom: '24px', transform: 'translateX(-50%)', zIndex: 99,
+      maxWidth: 'min(520px, calc(100vw - 32px))', padding: '12px 16px', borderRadius: '10px',
+      background: '#2b2238', color: '#fff', font: '14px/1.4 system-ui, sans-serif', boxShadow: '0 8px 30px rgba(0,0,0,.35)',
+    });
+    document.body.append(box);
+    setTimeout(() => box.remove(), 4500);
+  };
+  if (document.body) show(); else window.addEventListener('DOMContentLoaded', show);
+};

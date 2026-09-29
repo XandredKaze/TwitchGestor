@@ -31,7 +31,7 @@
   // ---------- Rendering ----------
 
   function pill(label, status) {
-    const cls = /^(connesso|attivo)$/.test(status) ? 'ok' : /disattivato/.test(status) ? '' : /connessione/.test(status) ? 'warn' : 'err';
+    const cls = /^(connesso|attivo|simulato)$/.test(status) ? 'ok' : /disattivato/.test(status) ? '' : /connessione/.test(status) ? 'warn' : 'err';
     return el('span', { className: `pill ${cls}`, title: status }, `${label}: ${status}`);
   }
 
@@ -61,6 +61,14 @@
     else if (!twitch.user) banners.push('Collega il tuo account Twitch con il pulsante "Accedi con Twitch" in alto a destra.');
     if (twitch.missingScopes.length) banners.push(`Mancano dei permessi Twitch (${twitch.missingScopes.join(', ')}): esci e accedi di nuovo.`);
     for (const f of twitch.failedSubscriptions) banners.push(`Evento Twitch non attivo: ${f.type} — ${f.error}`);
+    if (state.demo) {
+      banners.unshift(el('div', { className: 'demo-banner' },
+        el('span', {}, el('b', {}, 'Versione demo. '), 'Nessun collegamento a Twitch: gli eventi sono simulati e le impostazioni restano solo in questo browser.'),
+        el('button', {
+          className: state.demo.simulating ? '' : 'primary',
+          onclick: () => window.TG.api('/api/demo/simulate', { body: { on: !state.demo.simulating } }),
+        }, state.demo.simulating ? '⏹ Ferma la simulazione' : '▶ Simula una live')));
+    }
     $('banners').replaceChildren(...banners.map((b) => el('div', { className: 'banner' }, b)));
   }
 
@@ -202,7 +210,35 @@
         : el('p', { className: 'muted small' }, 'Se non riesci a scrivere qui, usa "Finestra ↗".'));
   }
 
+  // Versione demo: al posto di player e chat di Twitch mostra l'overlay e una chat simulata.
+  function renderDemoEmbeds() {
+    $('stream-panel').querySelector('h2').textContent = 'Overlay (come in OBS)';
+    $('chat-panel').querySelector('h2').textContent = 'Chat (simulata)';
+    for (const id of ['stream-open', 'chat-popout', 'btn-stream-toggle', 'btn-chat-toggle', 'stream-channel']) $(id).hidden = true;
+    if (embeddedChannel.stream !== 'demo') {
+      embeddedChannel.stream = 'demo';
+      $('stream-body').replaceChildren(
+        el('div', { className: 'stream-frame demo-overlay' }, el('iframe', { src: state.overlayUrl, title: 'Overlay degli alert' })),
+        el('p', { className: 'muted small' }, 'Qui vedi gli alert come li vedrebbero gli spettatori. Prova i pulsanti "Prova gli alert" o avvia la simulazione.'));
+      new ResizeObserver(([entry]) => {
+        const frame = entry.target.querySelector('iframe');
+        if (frame) frame.style.transform = `scale(${entry.contentRect.width / 1920})`;
+      }).observe($('stream-body').querySelector('.stream-frame'));
+    }
+    const lines = state.demo.chat;
+    $('chat-body').replaceChildren(el('div', { className: 'demo-chat' },
+      lines.length
+        ? lines.map((m) => el('div', { className: m.bot ? 'bot' : '' }, el('b', {}, `${m.user}: `), m.text))
+        : el('p', { className: 'muted small' }, 'Qui compaiono i messaggi della chat e i ringraziamenti del bot (attivali in "Personalizza alert → Impostazioni generali → Chat").')));
+    const box = $('chat-body').firstChild;
+    box.scrollTop = box.scrollHeight;
+  }
+
   function renderEmbeds() {
+    if (state.demo) {
+      renderDemoEmbeds();
+      return;
+    }
     const login = channelLogin();
     $('stream-channel').textContent = login ? `twitch.tv/${login}` : '';
     for (const [id, url] of [['stream-open', `https://www.twitch.tv/${login}`], ['chat-popout', `https://www.twitch.tv/popout/${login}/chat?popout=`]]) {
