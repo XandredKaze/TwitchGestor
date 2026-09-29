@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Titoli di coda</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   STILE DEI TITOLI DI CODA
+   Le variabili qui sotto sono i valori predefiniti: colori, font e
+   dimensioni principali si cambiano anche dal pannello.
+   Per modifiche più profonde lavora sulle regole .cr-... più in basso.
+   ===================================================================== */
+:root {
+  --cr-font-title: 'Cinzel', serif;      /* titolo iniziale, sezioni, sottotitoli, badge */
+  --cr-font-text: 'Inter', sans-serif;   /* nomi e testi descrittivi */
+  --cr-header-color: #ffffff;            /* titolo iniziale e testo finale */
+  --cr-accent: #9147ff;                  /* titoli di sezione e linee laterali */
+  --cr-glow: #9147ff99;                  /* bagliore del titolo iniziale (accento + trasparenza) */
+  --cr-sub-color: #bf94ff;               /* sottotitoli (Subscribers, Gifted) e testo sotto il titolo */
+  --cr-name-color: #e8deff;
+  --cr-header-size: 52px;
+  --cr-title-size: 22px;
+  --cr-name-size: 28px;
+  --cr-name-shadow: none;
+  --cr-bg: transparent;
+  --cr-columns: 1;
+  --cr-exit: 0%;                         /* linea di uscita: dove i nomi spariscono (0% = bordo alto) */
+  --cr-entry: 100%;                      /* linea di entrata: dove i nomi compaiono (100% = bordo basso) */
+}
+html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+
+/* --- contenitore e scorrimento --- */
+#stage { position: fixed; inset: 0; overflow: hidden; background: var(--cr-bg); }
+/* i nomi sono visibili solo tra la linea di uscita (in alto) e quella di entrata (in basso), con 40px di dissolvenza su entrambe */
+#roll-mask { position: absolute; inset: 0; z-index: 1; overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent var(--cr-exit), #000 calc(var(--cr-exit) + 40px), #000 calc(var(--cr-entry) - 40px), transparent var(--cr-entry));
+          mask-image: linear-gradient(to bottom, transparent var(--cr-exit), #000 calc(var(--cr-exit) + 40px), #000 calc(var(--cr-entry) - 40px), transparent var(--cr-entry)); }
+#roll { position: absolute; left: 0; right: 0; top: 0; z-index: 1; text-align: center; padding: 0 60px; will-change: transform; transform: translateY(100vh); }
+
+/* --- decorazioni: particelle luminose sullo sfondo --- */
+#particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+
+/* --- testo iniziale --- */
+.cr-header { margin-bottom: 60px; }
+.cr-header h1 { margin: 0 0 16px; font-family: var(--cr-font-title); font-size: var(--cr-header-size); font-weight: 700; line-height: 1.2; color: var(--cr-header-color); letter-spacing: .12em; text-transform: uppercase; text-shadow: 0 0 40px var(--cr-glow); }
+.cr-header p { margin: 0; font-family: var(--cr-font-text); font-size: calc(var(--cr-name-size) * .64); font-weight: 300; color: var(--cr-sub-color); letter-spacing: .06em; }
+
+/* --- sezione (Iscritti, Gift, Follower) --- */
+.cr-section { margin: 0 auto 80px; }
+.cr-title { margin: 0 0 16px; font-family: var(--cr-font-title); font-size: var(--cr-title-size); font-weight: 600; color: var(--cr-accent); letter-spacing: .18em; text-transform: uppercase; display: flex; align-items: center; justify-content: center; gap: 20px; }
+.cr-title::before, .cr-title::after { content: ''; flex: 1; height: 2px; border-radius: 2px; background: linear-gradient(to right, transparent, var(--cr-accent)); }
+.cr-title::after { background: linear-gradient(to left, transparent, var(--cr-accent)); }
+.cr-subtitle { margin: 28px 0 14px; font-family: var(--cr-font-title); font-size: calc(var(--cr-title-size) * 1.1); font-weight: 600; color: var(--cr-sub-color); letter-spacing: .16em; text-transform: uppercase; }
+.cr-title + .cr-subtitle { margin-top: 0; }
+
+/* --- nomi --- */
+.cr-names { list-style: none; margin: 0 auto 8px; padding: 0; display: grid; grid-template-columns: repeat(var(--cr-columns), minmax(0, 1fr)); gap: 4px 1.5em; max-width: calc(var(--cr-columns) * 560px); }
+.cr-name { padding: 8px 0; font-family: var(--cr-font-text); font-size: var(--cr-name-size); font-weight: 400; color: var(--cr-name-color); letter-spacing: .04em; text-shadow: var(--cr-name-shadow); overflow-wrap: anywhere; }
+.cr-count { margin-left: .35em; color: var(--cr-sub-color); }
+
+/* --- badge dorato del Top Gifter --- */
+.cr-tag { display: inline-block; margin-left: 12px; padding: 3px 10px; vertical-align: middle; font-family: var(--cr-font-title); font-size: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #2a1a00; background: linear-gradient(135deg, #fff3c4, #d4af37 40%, #a6791f 80%); border-radius: 20px; box-shadow: 0 0 12px rgba(212,175,55,.7); text-shadow: none; }
+
+/* --- testo finale --- */
+.cr-footer { margin-top: 20px; font-family: var(--cr-font-title); font-size: calc(var(--cr-header-size) * .7); font-weight: 700; color: var(--cr-header-color); letter-spacing: .12em; text-transform: uppercase; text-shadow: 0 0 40px var(--cr-glow); }
+
+/* =====================================================================
+   PANNELLO DI CONTROLLO (non va in live)
+   Tema scuro a riquadri. I colori del pannello sono le variabili --p-...
+   ===================================================================== */
+body.panel {
+  --p-bg: #0c0a11;
+  --p-card: #15121c;
+  --p-card-hi: #1b1724;
+  --p-field: #0f0d15;
+  --p-line: #29233a;
+  --p-text: #eeeaf6;
+  --p-muted: #9790aa;
+  --p-accent: #9147ff;
+  --p-accent-hi: #ab74ff;
+  --p-accent-soft: rgba(145, 71, 255, .16);
+  --p-ok: #62e0a6;
+  --p-err: #ff7b93;
+  --p-radius: 20px;
+  /* html resta overflow:hidden per l'overlay: nel pannello scorre il body */
+  height: 100vh; overflow-y: auto;
+  background: radial-gradient(900px 500px at 0% 0%, rgba(145, 71, 255, .13), transparent 60%), var(--p-bg);
+  color: var(--p-text);
+  font: 14px/1.5 'Nunito', system-ui, sans-serif;
+  scrollbar-width: thin; scrollbar-color: #3a3050 transparent;
+}
+.panel #stage { display: none; }
+body.embedded { background: var(--p-bg); }
+.panel * { box-sizing: border-box; }
+
+.p-wait, .p-offline { margin: 16px; padding: 12px 16px; border-radius: 14px; background: rgba(255, 123, 147, .12); border: 1px solid rgba(255, 123, 147, .35); color: #ffd0da; }
+.p-offline { display: none; position: sticky; top: 8px; z-index: 9; }
+body.offline .p-offline { display: block; }
+
+/* --- intestazione --- */
+.p-wrap { max-width: 1280px; margin: 0 auto; padding: 16px; }
+.p-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 2px 16px; }
+.p-brand { display: flex; align-items: center; gap: 12px; }
+.p-logo { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; font-size: 20px; color: #fff; background: linear-gradient(135deg, var(--p-accent-hi), #6a2bd9); box-shadow: 0 8px 24px -8px var(--p-accent); }
+.p-brand h1 { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: .01em; }
+.p-brand p { margin: 0; font-size: 12.5px; color: var(--p-muted); }
+.p-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.p-pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px; background: var(--p-card); border: 1px solid var(--p-line); font-size: 12.5px; color: var(--p-muted); }
+.p-pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #5d5670; }
+.p-pill.ok::before { background: var(--p-ok); box-shadow: 0 0 8px var(--p-ok); }
+.p-pill.err::before { background: var(--p-err); box-shadow: 0 0 8px var(--p-err); }
+
+/* --- griglia a riquadri: 1 colonna nel dock stretto, 2 o 3 quando è largo --- */
+.p-grid { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); grid-auto-flow: dense; }
+@media (min-width: 720px) {
+  .p-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .p-card.wide, .p-card.full { grid-column: 1 / -1; }
+}
+@media (min-width: 1100px) {
+  .p-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .p-card.wide { grid-column: span 2; }
+  .p-card.tall { grid-row: span 2; }
+}
+.p-card { min-width: 0; padding: 18px; border-radius: var(--p-radius); background: linear-gradient(180deg, var(--p-card-hi), var(--p-card)); border: 1px solid var(--p-line); }
+.p-card h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 12px; font-size: 12.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--p-muted); }
+.p-card h2::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--p-accent); box-shadow: 0 0 10px var(--p-accent); }
+.p-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0 24px; }
+
+/* --- riquadri numerici delle categorie --- */
+.p-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.p-tile { padding: 14px; border-radius: 16px; background: var(--p-field); border: 1px solid var(--p-line); transition: opacity .2s, border-color .2s; }
+.p-tile:not(.off) { border-color: rgba(145, 71, 255, .35); }
+.p-tile.off { opacity: .45; }
+.p-tile-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; font-weight: 700; }
+.p-tile-num { margin-top: 6px; font-size: 32px; font-weight: 800; line-height: 1.1; background: linear-gradient(135deg, #fff, var(--p-accent-hi)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.p-tile-sub { font-size: 12px; color: var(--p-muted); }
+
+/* --- campi --- */
+.p-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.p-row + .p-row { border-top: 1px solid rgba(255, 255, 255, .04); }
+.p-row label { flex: 1 1 auto; }
+.p-field { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
+.p-field label { font-size: 12.5px; font-weight: 700; color: var(--p-muted); }
+.p-speed { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--p-muted); }
+.panel .p-speed input[type=range] { flex: 1 1 auto; width: auto; }
+.panel input[type=text], .panel input[type=number], .panel textarea {
+  width: 100%; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--p-line);
+  background: var(--p-field); color: var(--p-text); font: inherit; outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.panel textarea { min-height: 84px; resize: vertical; }
+.panel input[type=number] { width: 92px; flex: 0 0 auto; text-align: center; }
+.panel input:focus-visible, .panel textarea:focus-visible, .panel button:focus-visible { border-color: var(--p-accent); box-shadow: 0 0 0 3px var(--p-accent-soft); outline: none; }
+.panel input[type=range] { width: 150px; flex: 0 1 auto; accent-color: var(--p-accent); }
+
+/* interruttori al posto delle caselle */
+.panel input[type=checkbox] { appearance: none; -webkit-appearance: none; position: relative; flex: 0 0 auto; width: 40px; height: 23px; margin: 0; border-radius: 999px; background: #2c263c; cursor: pointer; transition: background .2s; }
+.panel input[type=checkbox]::after { content: ''; position: absolute; top: 3px; left: 3px; width: 17px; height: 17px; border-radius: 50%; background: #bdb4d3; transition: transform .2s, background .2s; }
+.panel input[type=checkbox]:checked { background: var(--p-accent); }
+.panel input[type=checkbox]:checked::after { transform: translateX(17px); background: #fff; }
+.panel input[type=checkbox]:focus-visible { box-shadow: 0 0 0 3px var(--p-accent-soft); outline: none; }
+
+/* colori come pallini */
+.panel input[type=color] { flex: 0 0 auto; width: 32px; height: 32px; padding: 0; border: 2px solid var(--p-line); border-radius: 50%; background: none; cursor: pointer; }
+.panel input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+.panel input[type=color]::-webkit-color-swatch { border: 0; border-radius: 50%; }
+
+/* --- pulsanti --- */
+.p-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.panel button { padding: 9px 15px; border: 0; border-radius: 12px; background: linear-gradient(135deg, var(--p-accent-hi), var(--p-accent)); color: #fff; font: inherit; font-weight: 700; cursor: pointer; box-shadow: 0 8px 20px -10px var(--p-accent); transition: filter .15s, transform .1s; }
+.panel button:hover { filter: brightness(1.1); }
+.panel button:active { transform: translateY(1px); }
+.panel button.sec { background: var(--p-field); border: 1px solid var(--p-line); color: var(--p-text); box-shadow: none; }
+.panel button.danger { background: transparent; border: 1px solid rgba(255, 123, 147, .4); color: var(--p-err); box-shadow: none; }
+.panel button:disabled { opacity: .5; cursor: default; filter: none; }
+
+/* --- testi di stato --- */
+.p-hint { margin: 6px 0 0; font-size: 12.5px; color: var(--p-muted); }
+.p-status { margin-top: 10px; font-size: 13px; color: var(--p-muted); }
+.p-status:empty { display: none; }
+.p-status.err { color: var(--p-err); }
+.p-status.ok { color: var(--p-ok); }
+.p-account { display: flex; align-items: center; gap: 12px; }
+.p-avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; background: var(--p-accent-soft); color: var(--p-accent-hi); text-transform: uppercase; }
+.p-code-box { margin-top: 12px; padding: 14px; border-radius: 14px; background: var(--p-field); border: 1px dashed rgba(145, 71, 255, .5); }
+.p-code-box a { color: var(--p-accent-hi); word-break: break-all; }
+.p-code { margin: 6px 0 10px; font-size: 28px; font-weight: 800; letter-spacing: .18em; color: #fff; text-shadow: 0 0 18px var(--p-accent); user-select: all; }
+
+/* --- elenco nomi --- */
+.p-cat + .p-cat { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .05); }
+.p-cat-head { display: flex; justify-content: space-between; font-weight: 700; }
+.p-cat-head .off { color: var(--p-muted); font-weight: 400; }
+.p-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; max-height: 132px; overflow: auto; }
+.p-chip { padding: 3px 10px; border-radius: 999px; background: var(--p-accent-soft); color: #dccbff; font-size: 12.5px; }
+.p-chip.top { background: linear-gradient(135deg, #fff3c4, #d4af37); color: #2a1a00; font-weight: 700; }
+.p-chip.grp { padding-left: 2px; background: none; color: var(--p-accent-hi); font-weight: 800; }
+.p-hint-top { margin: -4px 0 12px; }
+/* zona di trascinamento del brano */
+.p-drop { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; padding: 12px; border-radius: 14px; border: 1.5px dashed rgba(145, 71, 255, .45); background: rgba(145, 71, 255, .07); transition: background .15s, border-color .15s; }
+.p-drop.over { border-color: var(--p-accent-hi); background: rgba(145, 71, 255, .25); }
+.p-drop-icon { flex: 0 0 auto; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; background: linear-gradient(135deg, var(--p-accent-hi), var(--p-accent)); color: #fff; font-size: 18px; }
+.p-drop-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.p-drop-text span { font-size: 12px; color: var(--p-muted); }
+/* colonne dei nomi in arrivo */
+.p-names { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.p-col { display: flex; flex-direction: column; min-width: 0; padding: 10px; border-radius: 14px; background: var(--p-field); border: 1px solid var(--p-line); transition: opacity .2s; }
+.p-col.off { opacity: .5; }
+.p-col-sec { min-height: 16px; font-size: 10.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--p-muted); }
+.p-col-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 2px 0 8px; padding: 0 4px 8px; border-bottom: 1px solid var(--p-line); }
+.p-col-title { font-weight: 800; color: var(--p-accent-hi); }
+.p-col-count { padding: 1px 8px; border-radius: 999px; background: var(--p-accent-soft); color: #dccbff; font-size: 12px; font-weight: 700; }
+.p-list { display: flex; flex-direction: column; gap: 1px; max-height: 240px; overflow-y: auto; }
+.p-empty { padding: 5px 8px; font-size: 12.5px; color: var(--p-muted); }
+.panel button.p-item { display: flex; align-items: center; gap: 6px; width: 100%; padding: 5px 8px; border: 0; border-radius: 8px; background: transparent; box-shadow: none; color: var(--p-text); font-weight: 400; text-align: left; }
+.p-item .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p-item .c { font-size: 12px; font-weight: 700; color: var(--p-accent-hi); }
+.p-item .x { font-size: 11px; color: var(--p-err); opacity: 0; }
+.p-item.top .n { color: #f3d27a; font-weight: 700; }
+.panel button.p-item:hover { filter: none; background: rgba(255, 123, 147, .1); }
+.panel button.p-item:hover .n { color: #ffd0da; text-decoration: line-through; }
+.panel button.p-item:hover .x, .panel button.p-item:focus-visible .x { opacity: 1; }
+.p-excluded { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .05); }
+/* nomi cliccabili: al passaggio del mouse mostrano che verranno esclusi */
+.panel button.p-chip { border: 1px solid transparent; box-shadow: none; font-weight: 400; line-height: 1.5; background: var(--p-accent-soft); color: #dccbff; }
+.panel button.p-chip.top { background: linear-gradient(135deg, #fff3c4, #d4af37); color: #2a1a00; font-weight: 700; }
+.panel button.p-chip:hover { filter: none; background: rgba(255, 123, 147, .14); border-color: rgba(255, 123, 147, .45); color: #ffd0da; text-decoration: line-through; }
+.panel .p-excluded button.p-chip { background: transparent; border-color: var(--p-line); color: var(--p-muted); text-decoration: line-through; }
+.panel .p-excluded button.p-chip:hover { background: rgba(98, 224, 166, .12); border-color: rgba(98, 224, 166, .45); color: var(--p-ok); text-decoration: none; }
+
+/* --- anteprima animazione --- */
+.p-preview { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 14px; border: 1px solid var(--p-line); background: #07060a; }
+/* cursore verticale con due pallini accanto all'anteprima:
+   in alto la linea di uscita (i nomi spariscono), in basso quella di entrata (i nomi compaiono) */
+.p-preview-wrap { display: flex; gap: 10px; align-items: stretch; }
+.p-preview-wrap .p-preview { flex: 1; min-width: 0; }
+.p-vslider { position: relative; flex: 0 0 22px; border-radius: 999px; background: var(--p-field); border: 1px solid var(--p-line); cursor: ns-resize; touch-action: none; }
+.p-vslider::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: rgba(145, 71, 255, .15); }
+.p-vrange { position: absolute; left: 50%; width: 4px; transform: translateX(-50%); border-radius: 2px; background: var(--p-accent); box-shadow: 0 0 8px var(--p-accent); pointer-events: none; }
+.p-vthumb { position: absolute; left: 50%; width: 18px; height: 18px; border-radius: 50%; transform: translate(-50%, -50%); background: #fff; border: 3px solid var(--p-accent); box-shadow: 0 0 12px var(--p-accent); outline: none; }
+.p-vthumb:focus-visible { box-shadow: 0 0 0 4px var(--p-accent-soft), 0 0 12px var(--p-accent); }
+.p-guide { position: absolute; left: 0; right: 0; height: 0; border-top: 2px dashed var(--p-accent-hi); pointer-events: none; z-index: 2; }
+.p-guide span { position: absolute; right: 6px; padding: 1px 7px; border-radius: 999px; background: rgba(145, 71, 255, .85); color: #fff; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+#exit-guide span { top: 2px; }
+#entry-guide span { bottom: 2px; }
+.p-preview iframe { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; background: transparent; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="particles"></canvas>
+  <div id="roll-mask"><div id="roll"></div></div>
+</div>
+
+<script>
+/* =====================================================================
+   IMPOSTAZIONI PREDEFINITE
+   ===================================================================== */
+const DEFAULTS = {
+  showSubs: true, showGifts: true, showFollowers: true,
+  titleSubs: 'Iscritti', titleSubsPaid: 'Subscribers', titleSubsGifted: 'Gifted',
+  titleGifts: 'Sub regalati da', titleFollowers: 'Follower',
+  headerText: 'La stream è terminata',
+  headerSub: 'Un ringraziamento a tutti gli spettatori che sono passati dal canale,\na chi ha seguito e commentato i miei video su YouTube e,\nin particolare, a chi ha supportato attivamente il canale con sub e gift. ♥',
+  footerText: '',
+  splitSubs: true, includeGiftedInSubs: true, showGiftCount: true, maxFollowers: 200,
+  topGifterTag: true, topGifterText: 'Top Gifter',
+  excluded: [], // nomi da non mostrare mai (bot, account secondari…)
+  speed: 80, startDelay: 0, gap: 3, exitLine: 0, entryLine: 100, columns: 1,
+  fetchOnStart: true, fetchEvery: 30,
+  musicOn: false, musicFile: '', musicDelay: 2, musicVolume: 0.6, musicLoop: true, musicFade: 3,
+  fontTitle: "'Cinzel', serif", fontText: "'Inter', sans-serif",
+  headerColor: '#ffffff', accentColor: '#9147ff', subColor: '#bf94ff', nameColor: '#e8deff',
+  headerSize: 52, titleSize: 22, nameSize: 28, nameShadow: false,
+  particles: true, bgColor: '#000000', bgOpacity: 0
+};
+
+const K = { settings: 'settings', data: 'data', cmd: 'cmd', status: 'status' };
+const params = new URLSearchParams(location.search);
+const MODE = params.has('pannello') ? 'panel' : params.has('anteprima') ? 'preview' : 'live';
+const PREVIEW_AUDIO = params.get('audio') === '1';
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+/* =====================================================================
+   DATI CONDIVISI (server di TwitchGestor, vedi src/credits.js)
+   Dock e sorgente browser di OBS hanno memorie separate: tutto passa dal
+   server. Ogni pagina ne tiene una copia e la riallinea ogni secondo.
+   ===================================================================== */
+const store = {};
+const changeListeners = [];
+let rev = 0, pending = 0, writeQ = Promise.resolve();
+let account = null, twitchConfigured = true; // account Twitch collegato a TwitchGestor
+// Se nella dashboard hai impostato DASHBOARD_TOKEN, aggiungi ?token=... all'indirizzo del dock.
+const TOKEN = params.get('token') || (() => { try { return localStorage.getItem('dashboardToken'); } catch { return null; } })();
+
+function api(path, opts = {}) {
+  return fetch('/api/credits/' + path, { ...opts, headers: { 'x-twitchgestor': '1', ...(TOKEN ? { 'x-dashboard-token': TOKEN } : {}), ...opts.headers } });
+}
+function load(k, def) { const v = store[k]; return v == null ? def : structuredClone(v); }
+function save(k, v) {
+  store[k] = v; pending++;
+  writeQ = writeQ.then(() => api('state/' + k, { method: 'PUT', body: JSON.stringify(v ?? null) })).catch(() => {}).finally(() => pending--);
+  return writeQ;
+}
+function onChange(fn) { changeListeners.push(fn); }
+function getSettings() { return { ...DEFAULTS, ...load(K.settings, {}) }; }
+
+async function sync() {
+  const j = await (await api('state?rev=' + rev)).json();
+  if (j.account !== account || j.configured !== twitchConfigured) {
+    account = j.account; twitchConfigured = j.configured;
+    changeListeners.forEach(fn => fn('account'));
+  }
+  if (!j.state || pending) return; // nulla di nuovo, o una nostra scrittura è ancora in viaggio
+  rev = j.rev;
+  const changed = [];
+  for (const k of new Set([...Object.keys(store), ...Object.keys(j.state)])) {
+    if (JSON.stringify(store[k]) !== JSON.stringify(j.state[k])) { store[k] = j.state[k]; changed.push(k); }
+  }
+  for (const k of changed) changeListeners.forEach(fn => fn(k));
+}
+
+async function boot() {
+  let wait = null;
+  while (true) {
+    try { await sync(); break; }
+    catch {
+      if (MODE === 'panel' && !wait) {
+        document.body.classList.add('panel');
+        wait = el('div', 'p-wait', 'In attesa di TwitchGestor… Controlla che il programma sia acceso e che questa pagina sia aperta da http://localhost:3000/credits?pannello');
+        document.body.append(wait);
+      }
+      await sleep(2000);
+    }
+  }
+  if (wait) wait.remove();
+  setInterval(() => sync().then(() => document.body.classList.remove('offline'), () => document.body.classList.add('offline')), 1000);
+}
+
+/* =====================================================================
+   TWITCH: i dati li scarica TwitchGestor con l'account del canale
+   (all'avvio, ogni N minuti e dopo ogni follow, sub o gift in live).
+   ===================================================================== */
+async function fetchData() {
+  const r = await api('fetch', { method: 'POST' });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Errore ' + r.status);
+  if (j.errors && j.errors.length) throw new Error(j.errors.join(' · '));
+}
+
+/* =====================================================================
+   COSTRUZIONE DELLE CATEGORIE
+   Ogni sezione ha uno o più gruppi (es. Subscribers / Gifted).
+   ===================================================================== */
+const byName = (a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' });
+const ANON = 'Anonimo';
+
+const isExcluded = (s, n) => (s.excluded || []).some(e => e.toLowerCase() === String(n).toLowerCase());
+
+function buildSections(s, d) {
+  const keep = n => !isExcluded(s, n);
+  const subs = (d.subs || []).filter(x => keep(x.name));
+  const gifts = new Map();
+  for (const x of d.subs || []) if (x.gift) { const g = x.gifter || ANON; if (keep(g)) gifts.set(g, (gifts.get(g) || 0) + 1); }
+  const gifters = [...gifts].sort((a, b) => b[1] - a[1] || byName(a[0], b[0]));
+  const top = gifters.find(([n]) => n !== ANON);
+  const topName = s.topGifterTag && top ? top[0] : '';
+  // il Top Gifter (col badge) va in cima alla sua lista, il resto in ordine alfabetico
+  const topFirst = names => names.includes(topName) ? [topName, ...names.filter(n => n !== topName)] : names;
+  const uniq = list => topFirst([...new Set(list.map(x => x.name))].sort(byName));
+
+  const sections = [];
+  if (s.showSubs) {
+    const paid = uniq(subs.filter(x => !x.gift));
+    const gifted = s.includeGiftedInSubs ? uniq(subs.filter(x => x.gift)) : [];
+    const groups = s.splitSubs
+      ? [{ title: s.titleSubsPaid, names: paid }, { title: s.titleSubsGifted, names: gifted }]
+      : [{ title: '', names: topFirst([...new Set([...paid, ...gifted])].sort(byName)) }];
+    sections.push({ key: 'subs', title: s.titleSubs, groups });
+  }
+  if (s.showGifts) {
+    sections.push({ key: 'gifts', title: s.titleGifts, groups: [{ title: '', names: gifters.map(g => g[0]), counts: s.showGiftCount ? gifters.map(g => g[1]) : null }] });
+  }
+  if (s.showFollowers) {
+    const f = (d.followers || []).filter(keep);
+    sections.push({ key: 'followers', title: s.titleFollowers, groups: [{ title: '', names: s.maxFollowers > 0 ? f.slice(0, s.maxFollowers) : f }] });
+  }
+  return { sections, top: topName };
+}
+
+function demoData() {
+  const a = ['Luna', 'Drago', 'Pixel', 'Neve', 'Volpe', 'Ombra', 'Razzo', 'Gatto', 'Nebbia', 'Fulmine', 'Orso', 'Tempesta'];
+  const b = ['Rossa', '_TV', '92', 'Gamer', 'Nera', 'Lampo', 'XD', 'Zeta', 'Plays', '_it'];
+  const nm = i => a[i % a.length] + b[(i * 7) % b.length] + (i > 20 ? i : '');
+  const gifters = ['GeneroSO', 'ZioSub', 'Mecenate_', ''];
+  const subs = [];
+  for (let i = 0; i < 26; i++) {
+    const gift = i % 4 === 0;
+    subs.push({ name: nm(i), gift, gifter: gift ? gifters[(i / 4) % 4] : '', tier: '1000' });
+  }
+  subs.push({ name: 'GeneroSO', gift: false, gifter: '', tier: '1000' });
+  return { fetchedAt: 0, demo: true, subs, followers: Array.from({ length: 40 }, (_, i) => nm(i + 50)) };
+}
+
+/* =====================================================================
+   TITOLI DI CODA (sorgente OBS e anteprima)
+   ===================================================================== */
+let particlesOn = true;
+
+function applyStyle(s) {
+  const r = document.documentElement.style;
+  r.setProperty('--cr-font-title', s.fontTitle);
+  r.setProperty('--cr-font-text', s.fontText);
+  r.setProperty('--cr-header-color', s.headerColor);
+  r.setProperty('--cr-accent', s.accentColor);
+  r.setProperty('--cr-glow', s.accentColor + '99');
+  r.setProperty('--cr-sub-color', s.subColor);
+  r.setProperty('--cr-name-color', s.nameColor);
+  r.setProperty('--cr-header-size', s.headerSize + 'px');
+  r.setProperty('--cr-title-size', s.titleSize + 'px');
+  r.setProperty('--cr-name-size', s.nameSize + 'px');
+  r.setProperty('--cr-columns', Math.max(1, Math.min(4, s.columns | 0)));
+  r.setProperty('--cr-exit', s.exitLine + '%');
+  r.setProperty('--cr-entry', s.entryLine + '%');
+  r.setProperty('--cr-name-shadow', s.nameShadow ? '0 3px 10px rgba(0,0,0,.85)' : 'none');
+  const hex = s.bgColor.replace('#', '');
+  const [R, G, B] = [0, 2, 4].map(i => parseInt(hex.substr(i, 2), 16) || 0);
+  r.setProperty('--cr-bg', `rgba(${R},${G},${B},${s.bgOpacity})`);
+  particlesOn = !!s.particles;
+}
+
+function renderRoll(roll, s, d) {
+  roll.replaceChildren();
+  const subLines = String(s.headerSub || '').split('\n').filter(l => l.trim());
+  if (s.headerText || subLines.length) {
+    const h = el('div', 'cr-header');
+    if (s.headerText) h.append(el('h1', null, s.headerText));
+    for (const l of subLines) h.append(el('p', null, l));
+    roll.append(h);
+  }
+  const { sections, top } = buildSections(s, d);
+  for (const sec of sections) {
+    const groups = sec.groups.filter(g => g.names.length);
+    if (!groups.length) continue; // le categorie vuote non compaiono
+    const box = el('section', 'cr-section cr-' + sec.key);
+    box.append(el('h2', 'cr-title', sec.title));
+    for (const g of groups) {
+      if (g.title) box.append(el('h3', 'cr-subtitle', g.title));
+      const list = el('ul', 'cr-names');
+      g.names.forEach((n, i) => {
+        const li = el('li', 'cr-name', n);
+        if (g.counts) li.append(el('span', 'cr-count', '(' + g.counts[i] + ')'));
+        if (n === top) li.append(el('span', 'cr-tag', '★ ' + s.topGifterText));
+        list.append(li);
+      });
+      box.append(list);
+    }
+    roll.append(box);
+  }
+  if (s.footerText) roll.append(el('div', 'cr-footer', s.footerText));
+}
+
+// particelle luminose viola che salgono lentamente (colori nei addColorStop)
+function startParticles() {
+  const canvas = document.getElementById('particles');
+  const ctx = canvas.getContext('2d');
+  const fit = () => { canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight; };
+  fit(); window.addEventListener('resize', fit);
+  const pts = Array.from({ length: 120 }, () => ({
+    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+    r: Math.random() * 2.5 + 0.8, dx: (Math.random() - 0.5) * 0.2, dy: -(Math.random() * 0.35 + 0.08),
+    o: Math.random() * 0.5 + 0.3, pulse: Math.random() * Math.PI * 2
+  }));
+  (function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (particlesOn) for (const p of pts) {
+      p.pulse += 0.018;
+      const ao = p.o * (0.7 + 0.3 * Math.sin(p.pulse));
+      const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 3);
+      grd.addColorStop(0, 'rgba(210,140,255,' + ao.toFixed(2) + ')');
+      grd.addColorStop(0.4, 'rgba(160,80,255,' + (ao * 0.55).toFixed(2) + ')');
+      grd.addColorStop(1, 'rgba(120,40,255,0)');
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 3, 0, Math.PI * 2); ctx.fillStyle = grd; ctx.fill();
+      p.x += p.dx; p.y += p.dy;
+      if (p.y < -10) p.y = canvas.height + 10;
+      if (p.x < -10) p.x = canvas.width + 10;
+      if (p.x > canvas.width + 10) p.x = -10;
+    }
+    requestAnimationFrame(draw);
+  })();
+}
+
+// brano caricato dal pannello (media/music/...) oppure indirizzo web
+function musicSrc(f) {
+  f = String(f || '').trim();
+  if (!f) return '';
+  return /^https?:\/\//i.test(f) ? f : '/' + f.replace(/^\/+/, '');
+}
+
+function startRollPlayer() {
+  const stage = document.getElementById('stage');
+  const roll = document.getElementById('roll');
+  let anim = null, audio = null, fadeRaf = 0;
+  let timers = [], musicTimers = [];
+
+  function stopMusic() {
+    musicTimers.forEach(clearTimeout); musicTimers = [];
+    cancelAnimationFrame(fadeRaf);
+    if (audio) { audio.pause(); audio.src = ''; audio = null; }
+  }
+  function fadeOut(sec) {
+    if (!audio) return;
+    const a = audio, v0 = a.volume, t0 = performance.now();
+    const step = () => {
+      const k = Math.min(1, (performance.now() - t0) / Math.max(1, sec * 1000));
+      a.volume = v0 * (1 - k);
+      if (k < 1) fadeRaf = requestAnimationFrame(step); else stopMusic();
+    };
+    fadeRaf = requestAnimationFrame(step);
+  }
+  function startMusic(s, dur) {
+    if (!s.musicOn || !s.musicFile) return;
+    if (MODE === 'preview' && !PREVIEW_AUDIO) return;
+    const delay = Math.max(0, s.musicDelay) * 1000;
+    musicTimers.push(setTimeout(() => {
+      audio = new Audio(musicSrc(s.musicFile));
+      audio.loop = !!s.musicLoop;
+      audio.volume = Math.max(0, Math.min(1, s.musicVolume));
+      audio.play().catch(e => console.warn('Musica non avviata:', e));
+      const fadeAt = dur - delay - s.musicFade * 1000;
+      if (s.musicFade > 0 && fadeAt > 0) musicTimers.push(setTimeout(() => fadeOut(s.musicFade), fadeAt));
+    }, delay));
+  }
+
+  function cycle(first) {
+    timers.forEach(clearTimeout); timers = [];
+    stopMusic();
+    if (anim) anim.cancel();
+    const s = getSettings();
+    applyStyle(s);
+    renderRoll(roll, s, load(K.data, {}));
+    requestAnimationFrame(() => {
+      const H = stage.clientHeight, h = roll.offsetHeight;
+      // i nomi partono dalla linea di entrata e finiscono quando l'ultima riga passa la linea di uscita
+      const startY = H * s.entryLine / 100;
+      const endY = H * s.exitLine / 100 - h;
+      const dur = (startY - endY) / Math.max(5, s.speed) * 1000;
+      window.crDuration = dur; // letto dal pannello per mostrare la durata di un giro
+      // attesa prima che arrivino i nomi: solo al primo giro (avvio o "Riavvia"), poi conta la pausa
+      const wait = first ? Math.max(0, s.startDelay) * 1000 : 0;
+      if (anim) anim.cancel(); // due riavvii ravvicinati non devono lasciare un'animazione vecchia attiva
+      anim = roll.animate([{ transform: `translateY(${startY}px)` }, { transform: `translateY(${endY}px)` }], { duration: dur, delay: wait, easing: 'linear', fill: 'both' });
+      startMusic(s, wait + dur);
+      anim.onfinish = () => { stopMusic(); timers.push(setTimeout(() => cycle(false), Math.max(0, s.gap) * 1000)); };
+    });
+  }
+
+  let restartT = 0;
+  const restartSoon = () => { clearTimeout(restartT); restartT = setTimeout(() => cycle(true), 300); };
+
+  onChange(k => {
+    if (k === K.settings) { applyStyle(getSettings()); if (MODE === 'preview') restartSoon(); }
+    if (k === K.data && MODE === 'preview') restartSoon();
+    if (k === K.cmd && load(K.cmd, {}).type === 'restart') restartSoon();
+  });
+
+  startParticles();
+  // i font arrivano da Google Fonts: aspetta che siano pronti prima di misurare l'altezza
+  document.fonts.ready.then(() => cycle(true));
+}
+
+/* =====================================================================
+   PANNELLO DI CONTROLLO
+   ===================================================================== */
+function panelHTML() {
+  return `
+<div class="p-offline">TwitchGestor non raggiungibile: le modifiche non vengono salvate. Il programma è acceso?</div>
+<div class="p-wrap">
+  <header class="p-head">
+    <div class="p-brand">
+      <div class="p-logo">✦</div>
+      <div><h1>Credit Roll</h1><p>Titoli di coda per la live</p></div>
+    </div>
+    <div class="p-pills"><span class="p-pill" id="pill-acc">Account</span><span class="p-pill" id="pill-upd">Dati</span></div>
+  </header>
+
+  <div class="p-grid">
+    <section class="p-card wide tall">
+      <h2>Anteprima</h2>
+      <div class="p-preview-wrap">
+        <div class="p-preview" id="preview-box">
+          <iframe id="preview" title="Anteprima"></iframe>
+          <div class="p-guide" id="exit-guide"><span>i nomi spariscono qui</span></div>
+          <div class="p-guide" id="entry-guide"><span>i nomi compaiono qui</span></div>
+        </div>
+        <div class="p-vslider" id="line-slider" title="Trascina i pallini: quello in alto è dove spariscono i nomi, quello in basso dove compaiono">
+          <div class="p-vrange" id="line-range"></div>
+          <div class="p-vthumb" id="exit-thumb" role="slider" tabindex="0" aria-label="Altezza a cui spariscono i nomi" aria-valuemin="0" aria-valuemax="100"></div>
+          <div class="p-vthumb" id="entry-thumb" role="slider" tabindex="0" aria-label="Altezza a cui compaiono i nomi" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+      </div>
+      <p class="p-hint" id="lines-hint"></p>
+      <div class="p-btns">
+        <button id="btn-restart-live">Riavvia in live</button>
+        <button class="sec" id="btn-restart-preview">Riavvia anteprima</button>
+      </div>
+      <div class="p-row"><label for="preview-audio">Senti la musica nell'anteprima</label><input type="checkbox" id="preview-audio"></div>
+    </section>
+
+    <section class="p-card">
+      <h2>Account Twitch</h2>
+      <div class="p-account"><div class="p-avatar" id="acc-avatar">?</div><div id="acc-text"></div></div>
+      <p class="p-hint">I titoli di coda usano l'account collegato a TwitchGestor: per cambiarlo usa la dashboard.</p>
+      <div class="p-status" id="acc-status"></div>
+    </section>
+
+    <section class="p-card">
+      <h2>Aggiornamento dati</h2>
+      <div class="p-row"><label>Scarica i dati quando OBS si avvia</label><input type="checkbox" data-k="fetchOnStart"></div>
+      <div class="p-row"><label>Aggiorna ogni (minuti, 0 = mai)</label><input type="number" min="0" step="5" data-k="fetchEvery"></div>
+      <div class="p-btns">
+        <button id="btn-fetch">Aggiorna ora</button>
+        <button class="sec" id="btn-demo">Nomi di prova</button>
+      </div>
+      <div class="p-status" id="fetch-status"></div>
+    </section>
+
+    <section class="p-card full">
+      <h2>Categorie</h2>
+      <div class="p-stats">
+        <div class="p-tile" id="tile-subs"><div class="p-tile-top"><span>Abbonati</span><input type="checkbox" data-k="showSubs" aria-label="Mostra abbonati"></div><div class="p-tile-num" id="n-subs">0</div><div class="p-tile-sub">sub attivi</div></div>
+        <div class="p-tile" id="tile-gifts"><div class="p-tile-top"><span>Gift</span><input type="checkbox" data-k="showGifts" aria-label="Mostra gift"></div><div class="p-tile-num" id="n-gifts">0</div><div class="p-tile-sub">chi ha regalato sub</div></div>
+        <div class="p-tile" id="tile-followers"><div class="p-tile-top"><span>Follower</span><input type="checkbox" data-k="showFollowers" aria-label="Mostra follower"></div><div class="p-tile-num" id="n-followers">0</div><div class="p-tile-sub">i più recenti</div></div>
+      </div>
+    </section>
+
+    <section class="p-card wide">
+      <h2>Nomi in arrivo</h2>
+      <p class="p-hint p-hint-top">Clicca un nome per toglierlo dai titoli di coda.</p>
+      <div class="p-names" id="cat-preview"></div>
+      <div class="p-cat p-excluded" id="excluded-box" hidden>
+        <div class="p-cat-head"><span>Esclusi</span><span class="off">clicca per rimetterli</span></div>
+        <div class="p-chips" id="excluded"></div>
+      </div>
+    </section>
+
+    <section class="p-card">
+      <h2>Animazione</h2>
+      <div class="p-field">
+        <label for="speed">Velocità di scorrimento</label>
+        <div class="p-speed"><span>Lenta</span><input type="range" id="speed" min="20" max="200" step="5" data-k="speed"><span>Veloce</span></div>
+        <p class="p-hint" id="speed-hint"></p>
+      </div>
+      <div class="p-row"><label>Attesa prima che arrivino i nomi (s)</label><input type="number" min="0" step="0.5" data-k="startDelay"></div>
+      <div class="p-row"><label>Pausa prima di ricominciare (s)</label><input type="number" min="0" step="1" data-k="gap"></div>
+      <p class="p-hint">L'attesa vale quando la sorgente parte e con "Riavvia". La musica conta i secondi dal momento in cui parte la sorgente, non da quando arrivano i nomi.</p>
+      <div class="p-row"><label>Colonne di nomi</label><input type="number" min="1" max="4" step="1" data-k="columns"></div>
+    </section>
+
+    <section class="p-card wide">
+      <h2>Testi</h2>
+      <div class="p-cols">
+        <div>
+          <div class="p-field"><label>Titolo iniziale</label><input type="text" data-k="headerText"></div>
+          <div class="p-field"><label>Testo sotto il titolo (una riga per paragrafo)</label><textarea data-k="headerSub"></textarea></div>
+          <div class="p-field"><label>Testo finale</label><input type="text" data-k="footerText"></div>
+        </div>
+        <div>
+          <div class="p-field"><label>Titolo abbonati</label><input type="text" data-k="titleSubs"></div>
+          <div class="p-field"><label>Sottotitolo abbonati paganti</label><input type="text" data-k="titleSubsPaid"></div>
+          <div class="p-field"><label>Sottotitolo sub ricevuti in regalo</label><input type="text" data-k="titleSubsGifted"></div>
+          <div class="p-field"><label>Titolo gift</label><input type="text" data-k="titleGifts"></div>
+          <div class="p-field"><label>Titolo follower</label><input type="text" data-k="titleFollowers"></div>
+          <div class="p-field"><label>Testo del badge</label><input type="text" data-k="topGifterText"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="p-card">
+      <h2>Opzioni</h2>
+      <div class="p-row"><label>Dividi abbonati in paganti e regalati</label><input type="checkbox" data-k="splitSubs"></div>
+      <div class="p-row"><label>Includi chi ha ricevuto un sub in regalo</label><input type="checkbox" data-k="includeGiftedInSubs"></div>
+      <div class="p-row"><label>Mostra quanti sub ha regalato ognuno</label><input type="checkbox" data-k="showGiftCount"></div>
+      <div class="p-row"><label>Badge dorato al Top Gifter</label><input type="checkbox" data-k="topGifterTag"></div>
+      <div class="p-row"><label>Follower da mostrare (0 = tutti)</label><input type="number" min="0" step="50" data-k="maxFollowers"></div>
+    </section>
+
+    <section class="p-card wide">
+      <h2>Stile</h2>
+      <div class="p-cols">
+        <div>
+          <div class="p-field"><label>Font titoli</label><input type="text" data-k="fontTitle"></div>
+          <div class="p-field"><label>Font nomi e testi</label><input type="text" data-k="fontText"></div>
+          <p class="p-hint">Cinzel e Inter sono già inclusi. Altri font devono essere installati sul PC.</p>
+          <div class="p-row"><label>Dimensione titolo iniziale</label><input type="number" min="10" step="2" data-k="headerSize"></div>
+          <div class="p-row"><label>Dimensione titoli sezione</label><input type="number" min="10" step="2" data-k="titleSize"></div>
+          <div class="p-row"><label>Dimensione nomi</label><input type="number" min="10" step="2" data-k="nameSize"></div>
+        </div>
+        <div>
+          <div class="p-row"><label>Titolo iniziale e testo finale</label><input type="color" data-k="headerColor"></div>
+          <div class="p-row"><label>Accento (sezioni, linee, bagliore)</label><input type="color" data-k="accentColor"></div>
+          <div class="p-row"><label>Sottotitoli</label><input type="color" data-k="subColor"></div>
+          <div class="p-row"><label>Nomi</label><input type="color" data-k="nameColor"></div>
+          <div class="p-row"><label>Ombra sui nomi</label><input type="checkbox" data-k="nameShadow"></div>
+          <div class="p-row"><label>Particelle luminose</label><input type="checkbox" data-k="particles"></div>
+          <div class="p-row"><label>Colore sfondo</label><input type="color" data-k="bgColor"></div>
+          <div class="p-row"><label>Opacità sfondo</label><input type="range" min="0" max="1" step="0.05" data-k="bgOpacity"></div>
+        </div>
+      </div>
+      <div class="p-btns"><button class="danger" id="btn-reset">Ripristina impostazioni</button></div>
+    </section>
+
+    <section class="p-card">
+      <h2>Musica</h2>
+      <div class="p-drop" id="music-drop">
+        <div class="p-drop-icon">♪</div>
+        <div class="p-drop-text"><b>Trascina qui il brano</b><span>viene salvato in TwitchGestor (data/media/music)</span></div>
+        <button class="sec" id="btn-music-pick">Scegli…</button>
+        <input type="file" id="music-input" accept="audio/*,.mp3,.ogg,.wav,.m4a,.flac" hidden>
+      </div>
+      <div class="p-status" id="music-status"></div>
+      <div class="p-row"><label>Attiva</label><input type="checkbox" data-k="musicOn"></div>
+      <div class="p-field"><label>File audio</label><input type="text" data-k="musicFile" placeholder="carica un brano qui sopra"></div>
+      <div class="p-row"><label>Parte dopo (secondi)</label><input type="number" min="0" step="0.5" data-k="musicDelay"></div>
+      <div class="p-row"><label>Volume</label><input type="range" min="0" max="1" step="0.05" data-k="musicVolume"></div>
+      <div class="p-row"><label>Ripeti se finisce prima</label><input type="checkbox" data-k="musicLoop"></div>
+      <div class="p-row"><label>Dissolvenza finale (s)</label><input type="number" min="0" step="0.5" data-k="musicFade"></div>
+      <div class="p-btns"><button class="sec" id="btn-test-music">Prova musica</button></div>
+      <p class="p-hint">Formati: mp3, ogg, wav, m4a, flac. In alternativa incolla l'indirizzo web di un brano.</p>
+    </section>
+  </div>
+</div>`;
+}
+
+function startPanel() {
+  document.body.classList.add('panel');
+  document.body.insertAdjacentHTML('beforeend', panelHTML());
+  const $ = id => document.getElementById(id);
+  const fmtTime = t => new Date(t).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const setStatus = (node, msg, kind) => { node.textContent = msg || ''; node.className = 'p-status' + (kind ? ' ' + kind : ''); };
+
+  // --- impostazioni collegate ai campi
+  const inputs = [...document.querySelectorAll('[data-k]')];
+  function fillInputs() {
+    const s = getSettings();
+    for (const i of inputs) { const v = s[i.dataset.k]; if (i.type === 'checkbox') i.checked = !!v; else i.value = v; }
+  }
+  for (const i of inputs) {
+    i.addEventListener(i.type === 'checkbox' ? 'change' : 'input', () => {
+      const s = load(K.settings, {});
+      const k = i.dataset.k;
+      if (i.type === 'checkbox') s[k] = i.checked;
+      else if (i.type === 'number' || i.type === 'range') { const n = parseFloat(i.value); if (isNaN(n)) return; s[k] = n; }
+      else s[k] = i.value;
+      save(K.settings, s);
+      renderCategories();
+    });
+  }
+  fillInputs();
+  $('btn-reset').onclick = () => { if (confirm('Ripristinare tutte le impostazioni predefinite?')) { save(K.settings, {}); fillInputs(); renderCategories(); showLines(readLines()); } };
+  // dentro la dashboard di TwitchGestor l'intestazione del pannello è già nella scheda
+  if (window.self !== window.top) document.body.classList.add('embedded');
+
+  // --- nomi esclusi: clic su un nome per toglierlo o rimetterlo
+  function toggleExcluded(name) {
+    const st = load(K.settings, {});
+    const ex = st.excluded || [];
+    st.excluded = isExcluded(st, name) ? ex.filter(e => e.toLowerCase() !== name.toLowerCase()) : [...ex, name];
+    save(K.settings, st);
+    renderCategories();
+  }
+  function nameChip(name, label, cls) {
+    const b = el('button', cls, label);
+    b.type = 'button';
+    b.title = (isExcluded(getSettings(), name) ? 'Rimetti ' : 'Escludi ') + name;
+    b.onclick = () => toggleExcluded(name);
+    return b;
+  }
+  function nameRow(name, count, isTop) {
+    const b = el('button', 'p-item' + (isTop ? ' top' : ''));
+    b.type = 'button';
+    b.title = 'Escludi ' + name;
+    b.append(el('span', 'n', (isTop ? '★ ' : '') + name));
+    if (count) b.append(el('span', 'c', '×' + count));
+    b.append(el('span', 'x', '✕'));
+    b.onclick = () => toggleExcluded(name);
+    return b;
+  }
+
+  // --- anteprima categorie
+  function renderCategories() {
+    const s = getSettings(), d = load(K.data, {});
+    const exBox = $('excluded'); exBox.replaceChildren();
+    for (const n of [...s.excluded].sort(byName)) exBox.append(nameChip(n, n, 'p-chip'));
+    $('excluded-box').hidden = !s.excluded.length;
+    const box = $('cat-preview'); box.replaceChildren();
+    const on = { subs: s.showSubs, gifts: s.showGifts, followers: s.showFollowers };
+    const { sections, top } = buildSections({ ...s, showSubs: true, showGifts: true, showFollowers: true }, d);
+    // una colonna per ogni elenco (Subscribers, Gifted, Sub regalati da, Follower)
+    for (const sec of sections) {
+      $('n-' + sec.key).textContent = sec.groups.reduce((n, g) => n + g.names.length, 0);
+      $('tile-' + sec.key).classList.toggle('off', !on[sec.key]);
+      for (const g of sec.groups) {
+        const col = el('div', 'p-col' + (on[sec.key] ? '' : ' off'));
+        col.append(el('div', 'p-col-sec', [g.title && sec.title, !on[sec.key] && 'nascosta'].filter(Boolean).join(' · ')));
+        const head = el('div', 'p-col-head');
+        head.append(el('span', 'p-col-title', g.title || sec.title), el('span', 'p-col-count', g.names.length));
+        col.append(head);
+        const list = el('div', 'p-list');
+        if (!g.names.length) list.append(el('div', 'p-empty', 'Nessun nome'));
+        g.names.slice(0, 300).forEach((n, i) => list.append(nameRow(n, g.counts && g.counts[i], n === top)));
+        if (g.names.length > 300) list.append(el('div', 'p-empty', `…e altri ${g.names.length - 300}`));
+        col.append(list);
+        box.append(col);
+      }
+    }
+    const st = load(K.status, null);
+    const msg = d.demo ? 'Stai vedendo nomi di prova.' : d.fetchedAt ? 'Ultimo aggiornamento: ' + fmtTime(d.fetchedAt) : 'Nessun dato scaricato.';
+    if (st && st.error) setStatus($('fetch-status'), msg + ' Ultimo errore (' + fmtTime(st.at) + '): ' + st.error, 'err');
+    else setStatus($('fetch-status'), msg, d.fetchedAt ? 'ok' : '');
+    $('pill-upd').textContent = d.demo ? 'Nomi di prova' : d.fetchedAt ? 'Aggiornato ' + fmtTime(d.fetchedAt) : 'Nessun dato';
+    $('pill-upd').className = 'p-pill' + (st && st.error ? ' err' : d.fetchedAt ? ' ok' : '');
+  }
+  renderCategories();
+
+  // --- account (quello di TwitchGestor)
+  function renderAccount() {
+    const on = !!account;
+    $('acc-avatar').textContent = on ? account[0] : '?';
+    $('acc-text').replaceChildren(...(on ? ['Collegato come', el('br'), el('b', null, account)] : [twitchConfigured ? 'Nessun account collegato' : 'Twitch non configurato']));
+    $('pill-acc').textContent = on ? 'Twitch: ' + account : 'Non collegato';
+    $('pill-acc').className = 'p-pill' + (on ? ' ok' : ' err');
+    setStatus($('acc-status'), on ? '' : 'Apri la dashboard di TwitchGestor (http://localhost:3000/dashboard) e clicca "Accedi con Twitch".', on ? '' : 'err');
+  }
+  renderAccount();
+
+  // --- dati
+  $('btn-fetch').onclick = async () => {
+    $('btn-fetch').disabled = true;
+    setStatus($('fetch-status'), 'Scarico i dati da Twitch…');
+    try { await fetchData(); } catch (e) { save(K.status, { at: Date.now(), error: e.message }); }
+    $('btn-fetch').disabled = false;
+    renderCategories(); renderAccount();
+  };
+  $('btn-demo').onclick = () => { save(K.data, demoData()); save(K.status, null); renderCategories(); };
+
+  // --- anteprima animazione
+  const frame = $('preview'), pbox = $('preview-box');
+  const base = location.href.split(/[?#]/)[0];
+  function loadPreview() { frame.src = base + '?anteprima' + ($('preview-audio').checked ? '&audio=1' : '') + '&t=' + Date.now(); }
+  new ResizeObserver(() => { frame.style.transform = `scale(${pbox.clientWidth / 1920})`; }).observe(pbox);
+  loadPreview();
+  $('btn-restart-preview').onclick = loadPreview;
+  $('preview-audio').onchange = loadPreview;
+  $('btn-restart-live').onclick = () => save(K.cmd, { type: 'restart', at: Date.now() });
+
+  // --- linee di uscita (in alto) e di entrata (in basso): due pallini sul cursore accanto all'anteprima
+  const MIN_GAP = 10; // spazio minimo tra le due linee, in % dello schermo
+  const slider = $('line-slider');
+  const thumbs = { exitLine: $('exit-thumb'), entryLine: $('entry-thumb') };
+  const readLines = () => { const s = getSettings(); return { exitLine: s.exitLine, entryLine: s.entryLine }; };
+  // la linea di uscita resta sopra quella di entrata
+  function clampLine(v, k, pct) {
+    return k === 'exitLine' ? Math.max(0, Math.min(v.entryLine - MIN_GAP, pct)) : Math.min(100, Math.max(v.exitLine + MIN_GAP, pct));
+  }
+  function showLines(v) {
+    for (const k in thumbs) { thumbs[k].style.top = v[k] + '%'; thumbs[k].setAttribute('aria-valuenow', v[k]); }
+    $('exit-guide').style.top = v.exitLine + '%';
+    $('entry-guide').style.top = v.entryLine + '%';
+    $('line-range').style.top = v.exitLine + '%';
+    $('line-range').style.bottom = (100 - v.entryLine) + '%';
+    const out = v.exitLine === 0 ? 'escono dal bordo alto' : `spariscono al ${v.exitLine}%`;
+    const inn = v.entryLine === 100 ? 'entrano dal bordo basso' : `compaiono al ${v.entryLine}%`;
+    $('lines-hint').textContent = `I nomi ${inn} e ${out} dello schermo. Trascina i pallini a destra dell'anteprima per cambiarlo.`;
+  }
+  function saveLines(v) {
+    const st = load(K.settings, {});
+    st.exitLine = v.exitLine; st.entryLine = v.entryLine;
+    save(K.settings, st);
+  }
+  const pctAt = y => { const r = slider.getBoundingClientRect(); return Math.round(Math.max(0, Math.min(100, (y - r.top) / r.height * 100))); };
+  let drag = null; // { k: linea trascinata, v: valori durante il trascinamento }
+  slider.addEventListener('pointerdown', e => {
+    const v = readLines(), pct = pctAt(e.clientY);
+    // muove il pallino più vicino al punto cliccato
+    const k = Math.abs(pct - v.exitLine) <= Math.abs(pct - v.entryLine) ? 'exitLine' : 'entryLine';
+    slider.setPointerCapture(e.pointerId);
+    drag = { k, v };
+    v[k] = clampLine(v, k, pct);
+    showLines(v); thumbs[k].focus();
+    e.preventDefault();
+  });
+  slider.addEventListener('pointermove', e => { if (drag) { drag.v[drag.k] = clampLine(drag.v, drag.k, pctAt(e.clientY)); showLines(drag.v); } });
+  // salva solo al rilascio: l'anteprima riparte una volta sola
+  slider.addEventListener('pointerup', () => { if (drag) saveLines(drag.v); drag = null; });
+  for (const k in thumbs) thumbs[k].addEventListener('keydown', e => {
+    const step = { ArrowUp: -1, ArrowDown: 1, PageUp: -10, PageDown: 10 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const v = readLines();
+    v[k] = clampLine(v, k, v[k] + step * (e.shiftKey ? 5 : 1));
+    showLines(v); saveLines(v);
+  });
+  showLines(readLines());
+  onChange(k => { if (k === K.settings && !drag) showLines(readLines()); });
+
+  // durata di un giro: calcolata dall'anteprima (stessa altezza dell'overlay 1920×1080)
+  setInterval(() => {
+    const ms = frame.contentWindow && frame.contentWindow.crDuration;
+    if (!ms) return;
+    const sec = Math.round(ms / 1000);
+    const dur = sec >= 60 ? `${Math.floor(sec / 60)} min ${sec % 60} s` : `${sec} s`;
+    $('speed-hint').textContent = `Con i nomi attuali lo scorrimento dura circa ${dur}.`;
+  }, 1000);
+
+  // --- brano trascinato o scelto: il server lo copia nella cartella e lo imposta
+  async function uploadMusic(file) {
+    if (!file) return;
+    setStatus($('music-status'), 'Copio ' + file.name + ' nella cartella…');
+    try {
+      const r = await api('upload/' + encodeURIComponent(file.name), { method: 'PUT', body: file });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || 'errore ' + r.status);
+      const st = load(K.settings, {});
+      st.musicFile = j.name; st.musicOn = true;
+      save(K.settings, st); fillInputs();
+      setStatus($('music-status'), 'Brano pronto e musica attivata: ' + j.name, 'ok');
+    } catch (e) {
+      setStatus($('music-status'), 'Copia non riuscita: ' + e.message, 'err');
+    }
+  }
+  const drop = $('music-drop');
+  // un file lasciato fuori dalla zona non deve far aprire il brano al posto del pannello
+  document.addEventListener('dragover', e => e.preventDefault());
+  document.addEventListener('drop', e => e.preventDefault());
+  drop.addEventListener('dragover', () => drop.classList.add('over'));
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => { drop.classList.remove('over'); uploadMusic(e.dataTransfer.files[0]); });
+  $('btn-music-pick').onclick = () => $('music-input').click();
+  $('music-input').onchange = e => { uploadMusic(e.target.files[0]); e.target.value = ''; };
+
+  // --- prova musica
+  let testAudio = null;
+  $('btn-test-music').onclick = () => {
+    if (testAudio) { testAudio.pause(); testAudio = null; $('btn-test-music').textContent = 'Prova musica'; return; }
+    const s = getSettings();
+    if (!s.musicFile) { alert('Carica prima un brano.'); return; }
+    testAudio = new Audio(musicSrc(s.musicFile));
+    testAudio.volume = s.musicVolume;
+    testAudio.onended = () => { testAudio = null; $('btn-test-music').textContent = 'Prova musica'; };
+    testAudio.play().then(() => { $('btn-test-music').textContent = 'Ferma'; })
+      .catch(() => { testAudio = null; alert('Non riesco a riprodurre il file: controlla nome e percorso.'); });
+  };
+
+  // aggiorna il pannello quando la sorgente OBS scarica nuovi dati
+  onChange(k => {
+    if (k === K.data || k === K.status) renderCategories();
+    if (k === 'account') renderAccount();
+    if (k === K.settings && !inputs.includes(document.activeElement)) fillInputs();
+  });
+}
+
+boot().then(() => { if (MODE === 'panel') startPanel(); else startRollPlayer(); });
+</script>
+</body>
+</html>

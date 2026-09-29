@@ -63,7 +63,7 @@ end
 
 -- ---------- Ricarica dell'overlay ----------
 
--- Ricarica le sorgenti Browser che mostrano l'overlay di TwitchGestor.
+-- Ricarica le sorgenti Browser di TwitchGestor (overlay degli alert e titoli di coda).
 -- Serve perché OBS carica la pagina appena si apre, quando il programma magari non è ancora pronto:
 -- in quel caso la pagina resta vuota e non riprova da sola.
 local function refresh_overlays()
@@ -75,7 +75,8 @@ local function refresh_overlays()
       local data = obs.obs_source_get_settings(source)
       local url = obs.obs_data_get_string(data, "url")
       obs.obs_data_release(data)
-      if url:match("^https?://localhost[:/].*/overlay") or url:match("^https?://127%.0%.0%.1[:/].*/overlay") then
+      local ours = url:match("^https?://localhost[:/]") or url:match("^https?://127%.0%.0%.1[:/]")
+      if ours and (url:match("/overlay") or url:match("/credits")) then
         local props = obs.obs_source_properties(source)
         local refresh = obs.obs_properties_get(props, "refreshnocache")
         if refresh ~= nil then

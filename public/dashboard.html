@@ -12,6 +12,7 @@
     <nav class="tabs" role="tablist">
       <button class="tab active" data-tab="live" role="tab">📡 Live</button>
       <button class="tab" data-tab="editor" role="tab">🎨 Personalizza alert</button>
+      <button class="tab" data-tab="credits" role="tab">🎬 Titoli di coda</button>
     </nav>
     <div id="statuses" class="statuses"></div>
     <div id="account" class="account"></div>
@@ -129,6 +130,15 @@
       <button id="btn-discard">Annulla modifiche</button>
       <button id="btn-save" class="primary">💾 Salva</button>
     </div>
+  </main>
+
+  <main id="tab-credits" class="credits-tab" hidden>
+    <div class="credits-info">
+      <span>In OBS aggiungi i titoli di coda come <b>Sorgente browser</b> (1920×1080, "Controlla l'audio tramite OBS"):</span>
+      <code id="credits-url"></code>
+      <button id="btn-copy-credits" class="small-btn">Copia</button>
+    </div>
+    <iframe id="credits-frame" title="Pannello dei titoli di coda"></iframe>
   </main>
 
   <script src="/common.js"></script>

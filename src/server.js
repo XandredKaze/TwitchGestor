@@ -17,6 +17,7 @@ const MEDIA_DIR = path.join(DATA_DIR, 'media');
 const UPLOAD_KINDS = {
   sounds: ['.mp3', '.ogg', '.wav'],
   images: ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.webm', '.mp4'],
+  music: ['.mp3', '.ogg', '.wav', '.m4a', '.flac'],
 };
 const UPLOAD_LIMIT = 30 * 1024 * 1024;
 const MIME = {
@@ -33,6 +34,8 @@ const MIME = {
   '.mp3': 'audio/mpeg',
   '.ogg': 'audio/ogg',
   '.wav': 'audio/wav',
+  '.m4a': 'audio/mp4',
+  '.flac': 'audio/flac',
   '.webm': 'video/webm',
   '.mp4': 'video/mp4',
 };
@@ -195,6 +198,12 @@ export function createServer(app) {
       if (route === 'GET /') return send(res, 302, '', { Location: '/dashboard' });
       if (route === 'GET /overlay') return serveStatic(res, '/overlay.html');
       if (route === 'GET /dashboard') return serveStatic(res, '/dashboard.html');
+      if (route === 'GET /credits') return serveStatic(res, '/credits.html');
+      // Titoli di coda: la sorgente OBS legge lo stato senza token (contiene solo nomi e impostazioni).
+      if (route === 'GET /api/credits/state' && app.credits) {
+        const rev = Number(url.searchParams.get('rev'));
+        return send(res, 200, { ...app.credits.store.snapshot(rev), account: app.auth.user?.login ?? null, configured: app.auth.configured });
+      }
       if (req.method === 'GET' && url.pathname.startsWith('/media/')) return serveStatic(res, url.pathname.slice('/media'.length), MEDIA_DIR);
 
       // --- Accesso Twitch ---
@@ -256,6 +265,20 @@ export function createServer(app) {
         if (route === 'PUT /api/config') {
           const config = app.config.save((await readBody(req, 1_000_000)).config);
           return send(res, 200, { config });
+        }
+        if (req.method === 'PUT' && url.pathname.startsWith('/api/credits/state/')) {
+          const key = decodeURIComponent(url.pathname.slice('/api/credits/state/'.length));
+          const rev = app.credits.store.set(key, (await readBody(req, 2_100_000)) ?? null, { fromPage: true });
+          return send(res, 200, { rev });
+        }
+        if (route === 'POST /api/credits/fetch') {
+          const result = await app.credits.refresh('pannello');
+          if (result?.skipped) return send(res, 409, { error: result.skipped });
+          return send(res, 200, { ok: true, errors: result?.errors ?? [] });
+        }
+        if (req.method === 'PUT' && url.pathname.startsWith('/api/credits/upload/')) {
+          const saved = await saveUpload(req, 'music', decodeURIComponent(url.pathname.slice('/api/credits/upload/'.length)));
+          return send(res, 200, { name: saved });
         }
         if (route === 'POST /api/upload') {
           const saved = await saveUpload(req, url.searchParams.get('kind'), req.headers['x-filename'] && decodeURIComponent(req.headers['x-filename']));

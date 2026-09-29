@@ -98,7 +98,7 @@ button.danger { color: var(--danger); }
 .chat-panel { grid-area: chat; display: flex; flex-direction: column; }
 .feed-panel { grid-area: feed; }
 .logs-panel { grid-area: logs; }
-.live-grid[hidden], .editor[hidden] { display: none; }
+.live-grid[hidden], .editor[hidden], .credits-tab[hidden] { display: none; }
 @media (max-width: 1300px) {
   .col { display: contents; }
   .live-grid {
@@ -358,3 +358,10 @@ button.danger { color: var(--danger); }
 .stream-panel .panel-head, .chat-panel .panel-head { flex-wrap: wrap; }
 .stream-panel .panel-head .row, .chat-panel .panel-head .row { flex-wrap: wrap; justify-content: flex-end; }
 @media (max-width: 700px) { #stream-channel { display: none; } }
+
+/* ---------- Titoli di coda ---------- */
+.credits-tab { display: flex; flex-direction: column; gap: 10px; padding: 16px 20px 20px; height: calc(100vh - 70px); min-height: 600px; }
+.credits-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; }
+.credits-info code { padding: 4px 8px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); overflow-wrap: anywhere; }
+#credits-frame { flex: 1; width: 100%; border: 1px solid var(--border); border-radius: 14px; background: #0c0a11; }
+@media (max-width: 700px) { .credits-tab { padding: 12px 16px; height: auto; } #credits-frame { height: 80vh; flex: none; } }

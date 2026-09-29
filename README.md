@@ -18,6 +18,7 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 
 - **Coda degli alert**: le notifiche vengono mostrate una alla volta, mai sovrapposte. Dalla dashboard puoi mettere in pausa, saltare, svuotare la coda o **riproporre** un alert passato.
 - **Anteprima della live e chat di Twitch** direttamente nella dashboard (scheda Live).
+- **Titoli di coda animati** (credit roll) con abbonati, gift e follower scaricati in automatico, musica e pannello di controllo.
 - **Editor degli alert nella dashboard** con anteprima dal vivo: testi, suoni, font, colori, sfondo, immagini e animazioni.
 - **Overlay per OBS** con animazioni, colori per tipo, immagini/GIF/video e suoni (4 suoni integrati o i tuoi file).
 - **Varianti**: alert diversi in base all'importo (es. donazioni sopra i 50 €, bits sopra i 1000, 10+ sub regalate) o alla ricompensa dei punti canale.
@@ -88,6 +89,18 @@ Nella scheda **📡 Live** della dashboard trovi il player della tua live (senza
 - Apri la dashboard da **`http://localhost:3000`**: Twitch mostra player e chat solo su `localhost` (non su `127.0.0.1`).
 - Per scrivere in chat devi essere collegato a twitch.tv nello stesso browser; se il riquadro non te lo permette usa **Finestra ↗**.
 - Con **Nascondi** togli player o chat e risparmi risorse del PC durante la live.
+
+## Titoli di coda (credit roll)
+
+Titoli di coda animati per la fine della live con **abbonati** (paganti e regalati), **chi ha regalato sub** (con badge dorato al Top Gifter) e **follower**. I nomi li scarica TwitchGestor con l'account del canale: all'avvio, ogni N minuti e poco dopo ogni follow, sub o gift ricevuto in live.
+
+1. In OBS, nella scena dei titoli di coda: **+ → Browser**, URL `http://localhost:3000/credits`, 1920×1080, spunta **Controlla l'audio tramite OBS** (per la musica) e, se vuoi, **Aggiorna il browser quando la scena diventa attiva** (così ripartono dall'inizio).
+2. Si configurano dalla scheda **🎬 Titoli di coda** della dashboard: testi, categorie, velocità, zona di comparsa dei nomi, colori, font, particelle, musica (trascina il brano), nomi da escludere (es. i bot), nomi di prova e anteprima.
+3. Facoltativo: il pannello si può aggiungere anche come dock di OBS (**Docks → Dock browser personalizzati**, URL `http://localhost:3000/credits?pannello`; se usi `DASHBOARD_TOKEN` aggiungi `&token=IL_TUO_TOKEN`).
+
+L'elenco abbonati è disponibile solo per canali affiliate o partner: se non si scarica, l'errore compare nel pannello e i follower funzionano comunque.
+
+**Arrivi dal vecchio progetto Credit Roll?** Non servono più `server.js`, `credit-roll.lua` né il Client ID a parte: togli `credit-roll.lua` da OBS (Strumenti → Script → –). Per tenere impostazioni e nomi esclusi copia il vecchio `state.json` in `data/credits.json` (a TwitchGestor spento); i vecchi token vengono ignorati. Il brano va ricaricato dal pannello.
 
 ## Ringraziamenti in chat con un account bot
 
@@ -200,5 +213,6 @@ src/
   core/templates.js            testi con segnaposto
   twitch/                      accesso OAuth, API Helix, EventSub
   sources/                     StreamElements, Ko-fi, webhook generico
-public/                        overlay e dashboard
+  credits.js                   titoli di coda: stato condiviso e download da Twitch
+public/                        overlay, dashboard e titoli di coda (credits.html)
 ```

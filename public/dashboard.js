@@ -259,14 +259,26 @@
   // ---------- Schede ----------
   function showTab(name) {
     for (const t of document.querySelectorAll('.tab')) t.classList.toggle('active', t.dataset.tab === name);
-    $('tab-live').hidden = name !== 'live';
-    $('tab-editor').hidden = name !== 'editor';
+    for (const main of document.querySelectorAll('main[id^="tab-"]')) main.hidden = main.id !== `tab-${name}`;
     if (name === 'editor') window.dispatchEvent(new Event('editor:open'));
+    if (name === 'credits' && !$('credits-frame').src) {
+      // Il pannello dei titoli di coda è una pagina a sé: si carica solo quando apri la scheda.
+      $('credits-frame').src = `/credits?pannello${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+    }
     try { sessionStorage.setItem('tab', name); } catch { /* ignora */ }
   }
   for (const t of document.querySelectorAll('.tab')) t.onclick = () => showTab(t.dataset.tab);
+  const creditsUrl = `${location.protocol}//${location.host}/credits`;
+  $('credits-url').textContent = creditsUrl;
+  $('btn-copy-credits').onclick = async () => {
+    await navigator.clipboard.writeText(creditsUrl);
+    $('btn-copy-credits').textContent = 'Copiato!';
+    setTimeout(() => { $('btn-copy-credits').textContent = 'Copia'; }, 1500);
+  };
   try {
-    if (location.hash === '#chat' || sessionStorage.getItem('tab') === 'editor') showTab('editor');
+    const saved = sessionStorage.getItem('tab');
+    if (location.hash === '#chat') showTab('editor');
+    else if (saved === 'editor' || saved === 'credits') showTab(saved);
   } catch { /* ignora */ }
 
   // ---------- Registro ----------

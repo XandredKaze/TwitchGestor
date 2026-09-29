@@ -8,6 +8,7 @@ import { HelixClient } from './twitch/helix.js';
 import { EventSubClient } from './twitch/eventsub.js';
 import { StreamElementsSource } from './sources/streamelements.js';
 import { createServer } from './server.js';
+import { CreditsStore, startCreditsScheduler } from './credits.js';
 import { createLogger } from './logger.js';
 
 loadEnv();
@@ -48,6 +49,13 @@ function chatAccount() {
   return null;
 }
 
+// Titoli di coda: nomi di abbonati, gift e follower scaricati con l'account del canale.
+const creditsStore = new CreditsStore({ file: path.join(DATA_DIR, 'credits.json') });
+const creditsScheduler = startCreditsScheduler({
+  store: creditsStore,
+  getClient: () => (auth.user ? { helix, user: auth.user } : null),
+});
+
 let eventsub = null;
 const streamelements = env.STREAMELEMENTS_JWT ? new StreamElementsSource({ jwt: env.STREAMELEMENTS_JWT }) : null;
 
@@ -57,6 +65,7 @@ const app = {
   manager,
   auth,
   botAuth,
+  credits: { store: creditsStore, refresh: (reason) => creditsScheduler.refresh(reason) },
   chatAccount,
   getState() {
     return {
@@ -127,6 +136,7 @@ function startEventSub() {
   eventsub.on('event', (type, payload, messageId) => {
     const n = fromEventSub(type, payload, messageId);
     if (n) manager.ingest(n);
+    if (n && ['follow', 'sub', 'resub', 'giftsub'].includes(n.type)) creditsScheduler.soon();
   });
   eventsub.on('status', () => app.broadcastState());
   eventsub.start();
@@ -136,6 +146,7 @@ auth.on('authorized', (user) => {
   log.info(`Accesso Twitch effettuato come ${user.login}`);
   startEventSub();
   auth.startPeriodicValidation();
+  creditsScheduler.refresh('accesso');
   app.broadcastState();
 });
 botAuth.on('authorized', (user) => {
@@ -180,7 +191,10 @@ web.server.listen(port, host, async () => {
     return;
   }
   try {
-    if (await auth.validate()) startEventSub();
+    if (await auth.validate()) {
+      startEventSub();
+      creditsScheduler.onStart();
+    }
   } catch (err) {
     log.error(`Impossibile verificare il token Twitch: ${err.message}`);
   }
@@ -198,6 +212,7 @@ function shutdown() {
   eventsub?.stop();
   streamelements?.stop();
   manager.stop();
+  creditsStore.saveNow();
   try {
     if (fs.readFileSync(PID_FILE, 'utf8') === String(process.pid)) fs.rmSync(PID_FILE);
   } catch { /* già rimosso */ }
