@@ -1,4 +1,4 @@
-# twitch-alert-manager
+# TwitchGestor
 
 Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto quello che fanno i tuoi spettatori, lo mostra in live con un overlay per OBS e ti dà una dashboard per tenere tutto sotto controllo.
 
@@ -33,8 +33,8 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 ## Installazione
 
 ```bash
-git clone https://github.com/XandredKaze/twitch-alert-manager.git
-cd twitch-alert-manager
+git clone https://github.com/XandredKaze/TwitchGestor.git
+cd TwitchGestor
 npm install
 cp .env.example .env
 ```
