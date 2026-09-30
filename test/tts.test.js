@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { once } from 'node:events';
 import { cleanText } from '../src/core/ttsText.js';
-import { TtsService, wavDuration } from '../src/tts.js';
+import { TtsService, wavDuration, speedFactor } from '../src/tts.js';
+import { PiperManager } from '../src/piper.js';
 import { NotificationManager } from '../src/core/NotificationManager.js';
 import { sanitizeConfig } from '../src/core/schema.js';
 import { fromEventSub } from '../src/core/normalize.js';
@@ -42,12 +43,15 @@ test('crea il file audio e ne calcola la durata', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tg-tts-'));
   const spoken = [];
   const tts = new TtsService({ dir, engine: fakeEngine(spoken) });
-  const r = await tts.synthesize('ciao', { voice: 'Elsa', rate: 50, volume: 80 });
+  const r = await tts.synthesize('ciao', { voice: 'finto:Elsa', rate: 50, volume: 80 });
   assert.match(r.url, /^\/tts\/[\w-]+\.wav$/);
   assert.equal(Math.round(r.duration), 2);
   assert.equal(Math.round(wavDuration(path.join(dir, r.url.slice(5)))), 2);
-  assert.deepEqual(spoken[0].opts, { voice: 'Elsa', rate: 10, volume: 80 });
-  assert.deepEqual(await tts.voices(), [{ name: 'Elsa', lang: 'it-IT' }]);
+  assert.deepEqual(spoken[0].opts, { voice: 'Elsa', rate: 10 });
+  assert.deepEqual(await tts.voices(), [{ name: 'Elsa', lang: 'it-IT', id: 'finto:Elsa', engine: 'finto', group: 'finto' }]);
+  // un vecchio valore senza motore va al motore predefinito
+  await tts.synthesize('ciao', { voice: 'Elsa' });
+  assert.equal(spoken[1].opts.voice, 'Elsa');
   assert.equal(await new TtsService({ dir, engine: null }).synthesize('ciao'), null);
 });
 
@@ -105,4 +109,28 @@ test('prova della voce dalla dashboard', async () => {
   assert.equal(audio.headers.get('content-type'), 'audio/wav');
   assert.ok((await audio.arrayBuffer()).byteLength > 44);
   web.server.close();
+});
+
+test('velocità della voce', () => {
+  assert.equal(speedFactor(0), 1);
+  assert.equal(speedFactor(10), 3);
+  assert.equal(speedFactor(-10), 0.5);
+});
+
+test('Piper: trova programma e voci nella sua cartella e le propone tra le voci', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tg-piper-'));
+  const piper = new PiperManager({ dir, platform: 'linux' });
+  assert.equal(piper.engine.ready(), false);
+  assert.deepEqual(piper.status().voices.map((v) => [v.key, v.installed]), [['paola', false], ['riccardo', false]]);
+  fs.mkdirSync(path.join(dir, 'piper'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'piper', 'piper'), '');
+  fs.mkdirSync(path.join(dir, 'voices'));
+  fs.writeFileSync(path.join(dir, 'voices', 'it_IT-paola-medium.onnx'), '');
+  fs.writeFileSync(path.join(dir, 'voices', 'it_IT-paola-medium.onnx.json'), JSON.stringify({ language: { code: 'it_IT' } }));
+  assert.equal(piper.engine.ready(), true);
+  assert.equal(piper.status().voices[0].installed, true);
+  const tts = new TtsService({ dir: path.join(dir, 'out'), engine: null, piper });
+  const voices = await tts.voices();
+  assert.deepEqual(voices.map((v) => [v.id, v.label, v.lang]), [['piper:it_IT-paola-medium', 'Paola', 'it_IT']]);
+  assert.throws(() => piper.install('sconosciuta'), /Voce sconosciuta/);
 });

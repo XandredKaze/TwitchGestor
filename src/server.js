@@ -267,7 +267,17 @@ export function createServer(app) {
           return send(res, 200, { alert: builder.buildAlert(sampleNotification(body.type, body.sample)) });
         }
         if (route === 'GET /api/tts/voices') {
-          return send(res, 200, { engine: app.tts?.engine?.name ?? null, voices: (await app.tts?.voices()) ?? [] });
+          return send(res, 200, {
+            engine: app.tts?.engine?.name ?? null,
+            voices: (await app.tts?.voices()) ?? [],
+            piper: app.tts?.piper?.status() ?? null,
+          });
+        }
+        if (route === 'GET /api/tts/piper') return send(res, 200, app.tts?.piper?.status() ?? null);
+        if (route === 'POST /api/tts/piper/install') {
+          if (!app.tts?.piper) return send(res, 400, { error: 'Piper non disponibile' });
+          const body = await readBody(req);
+          return send(res, 200, app.tts.piper.install(body.voice, { onDone: () => app.tts.invalidateVoices() }));
         }
         if (route === 'POST /api/tts/test') {
           const body = await readBody(req, 1_000_000);

@@ -99,13 +99,16 @@ Nella scheda **📡 Live** della dashboard trovi il player della tua live (senza
 
 ## Voce (text-to-speech)
 
-TwitchGestor può leggere ad alta voce gli alert, per esempio "Mario ha donato 5 €. Continua così!". È gratuito e funziona senza Internet: usa le **voci installate in Windows** (in italiano di solito "Microsoft Elsa"). L'audio viene creato dal programma e suonato dall'overlay, quindi **va in live tramite OBS** come gli altri suoni.
+TwitchGestor può leggere ad alta voce gli alert, per esempio "Mario ha donato 5 €. Continua così!". È gratuito e funziona senza Internet. L'audio viene creato dal programma e suonato dall'overlay, quindi **va in live tramite OBS** come gli altri suoni. Voci disponibili:
+
+- **Voci di Windows**, classiche (es. "Microsoft Elsa Desktop") e moderne (es. "Microsoft Cosimo", "Microsoft Elsa" e quelle aggiunte da *Impostazioni → Ora e lingua → Voce → Aggiungi voci*; poi riavvia TwitchGestor).
+- **Voci naturali Piper** (open source): in *Impostazioni generali → Voce* clicca **⬇ Scarica** accanto a **Paola** (femminile) o **Riccardo** (maschile). Il programma Piper (circa 20 MB) e la voce si scaricano una volta sola in `data/piper/`, poi funzionano senza Internet. Altre voci Piper (file `.onnx` + `.onnx.json` dal catalogo [piper-voices](https://huggingface.co/rhasspy/piper-voices)) si possono copiare a mano in `data/piper/voices/`.
 
 1. Dashboard → **🎨 Personalizza alert → ⚙️ Impostazioni generali → Voce**: attiva la voce e scegli voce, velocità, volume, lunghezza massima e **parole vietate** (lette come "bip"). I link non vengono letti.
 2. In ogni alert, sezione **Voce**: attiva "Leggi ad alta voce" e scegli il testo da leggere (con i segnaposto, es. `{user} ha donato {amountFormatted}. {message}`). **▶ Ascolta con dati di prova** ti fa sentire il risultato.
 3. Per leggere solo sopra una soglia (es. bits da 100 in su) o solo per un premio dei punti canale (es. "Leggi il mio messaggio"), usa la voce negli **alert speciali**.
 
-Altre voci si aggiungono da Windows: *Impostazioni → Ora e lingua → Voce → Aggiungi voci*. Su Linux funziona con `espeak-ng` installato; senza voci di sistema viene usata la voce del browser, che però dentro OBS non si sente.
+Su Linux funzionano Piper ed `espeak-ng` (se installato); senza nessuna voce viene usata quella del browser, che però dentro OBS non si sente.
 
 ## Titoli di coda (credit roll)
 
@@ -242,7 +245,8 @@ src/
   twitch/                      accesso OAuth, API Helix, EventSub
   sources/                     StreamElements, Ko-fi, webhook generico
   credits.js                   titoli di coda: stato condiviso e download da Twitch
-  tts.js                       voce: voci di Windows (o espeak-ng) e file audio
+  tts.js                       voce: voci di Windows (classiche e moderne), espeak-ng e file audio
+  piper.js                     voci naturali Piper: download, elenco e sintesi
 public/                        overlay, dashboard e titoli di coda (credits.html)
 demo/                          "server finto" della versione demo (usa il codice vero di src/core)
 ```

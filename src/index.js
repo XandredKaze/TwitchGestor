@@ -9,7 +9,7 @@ import { EventSubClient } from './twitch/eventsub.js';
 import { StreamElementsSource } from './sources/streamelements.js';
 import { createServer } from './server.js';
 import { CreditsStore, startCreditsScheduler } from './credits.js';
-import { TtsService } from './tts.js';
+import { TtsService, PiperManager } from './tts.js';
 import { createLogger } from './logger.js';
 
 loadEnv();
@@ -26,7 +26,7 @@ const manager = new NotificationManager({ config: config.get(), historyFile: pat
 config.on('change', (c) => manager.setConfig(c));
 
 // Voce (text-to-speech): l'audio si crea mentre l'alert aspetta in coda, poi l'overlay lo suona.
-const tts = new TtsService({ dir: path.join(DATA_DIR, 'tts') });
+const tts = new TtsService({ dir: path.join(DATA_DIR, 'tts'), piper: new PiperManager({ dir: path.join(DATA_DIR, 'piper') }) });
 manager.prepareAlert = async (alert) => {
   const result = await tts.synthesize(alert.tts.text, config.get().tts);
   if (!result) return; // nessuna voce di sistema: l'overlay proverà con quella del browser

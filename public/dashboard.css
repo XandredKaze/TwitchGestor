@@ -387,3 +387,8 @@ button.danger { color: var(--danger); }
 .demo-chat { flex: 1; min-height: 300px; max-height: 560px; overflow-y: auto; padding: 10px 12px; border-radius: 10px; background: var(--bg); font-size: 14px; display: flex; flex-direction: column; gap: 6px; }
 .demo-chat .bot b { color: var(--accent); }
 .demo-chat > div { overflow-wrap: anywhere; }
+
+/* ---------- Voci Piper ---------- */
+.piper-box { margin-top: 14px; padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
+.piper-box h3 { margin: 0 0 4px; text-transform: none; letter-spacing: 0; color: var(--text); font-size: 15px; }
+.piper-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); }
