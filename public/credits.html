@@ -254,6 +254,26 @@ body.offline .p-offline { display: block; }
 .panel .p-excluded button.p-chip { background: transparent; border-color: var(--p-line); color: var(--p-muted); text-decoration: line-through; }
 .panel .p-excluded button.p-chip:hover { background: rgba(98, 224, 166, .12); border-color: rgba(98, 224, 166, .45); color: var(--p-ok); text-decoration: none; }
 
+/* --- selettore dei font --- */
+.fp { position: relative; }
+.panel button.fp-btn { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--p-line); background: var(--p-field); color: var(--p-text); box-shadow: none; font-weight: 400; font-size: 17px; text-align: left; }
+.panel button.fp-btn:hover { filter: none; border-color: var(--p-accent); }
+.fp-btn .fp-cur { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-btn .fp-caret { flex: 0 0 auto; font-family: 'Nunito', system-ui, sans-serif; font-size: 12px; color: var(--p-muted); }
+.fp-pop { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 6px); min-width: min(360px, 88vw); padding: 10px; border-radius: 16px; background: var(--p-card-hi); border: 1px solid var(--p-accent); box-shadow: 0 18px 50px rgba(0, 0, 0, .55); }
+.fp-pop[hidden] { display: none; }
+.fp-cats { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
+.panel .fp-cats button { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--p-field); border: 1px solid var(--p-line); color: var(--p-muted); box-shadow: none; }
+.panel .fp-cats button.on { background: var(--p-accent); border-color: var(--p-accent); color: #fff; }
+.fp-list { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.panel .fp-list button { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; width: 100%; padding: 8px 10px; border-radius: 10px; background: transparent; box-shadow: none; color: var(--p-text); font-weight: 400; font-size: 20px; text-align: left; }
+.panel .fp-list button:hover, .panel .fp-list button:focus-visible { filter: none; background: var(--p-accent-soft); }
+.panel .fp-list button.sel { background: var(--p-accent-soft); outline: 1px solid var(--p-accent); }
+.fp-list small { flex: 0 0 auto; font-family: 'Nunito', system-ui, sans-serif; font-size: 11px; color: var(--p-muted); }
+.fp-count { font-size: 12px; color: var(--p-muted); margin: 4px 2px 0; }
+.fp-custom { display: flex; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--p-line); }
+.fp-custom input { flex: 1; min-width: 0; }
+
 /* --- menu a tendina --- */
 .panel select { padding: 8px 10px; border-radius: 12px; border: 1px solid var(--p-line); background: var(--p-field); color: var(--p-text); font: inherit; outline: none; max-width: 100%; }
 .panel select:focus-visible { border-color: var(--p-accent); box-shadow: 0 0 0 3px var(--p-accent-soft); }
@@ -296,6 +316,7 @@ body.offline .p-offline { display: block; }
   <div id="roll-mask"><div id="roll"></div></div>
 </div>
 
+<script src="/fonts.js"></script>
 <script>
 /* =====================================================================
    IMPOSTAZIONI PREDEFINITE
@@ -905,7 +926,7 @@ function panelHTML() {
         <div>
           <div class="p-field"><label>Font titoli</label><input type="text" data-k="fontTitle" list="cr-fonts"></div>
           <div class="p-field"><label>Font nomi e testi</label><input type="text" data-k="fontText" list="cr-fonts"></div>
-          <p class="p-hint">Scrivi il nome di qualsiasi font di Google Fonts (es. Bebas Neue, Orbitron, Pacifico): viene caricato da solo.</p>
+          <p class="p-hint">Scegli tra oltre 200 font, oppure scrivi in fondo all'elenco il nome di qualsiasi altro font di Google Fonts.</p>
           <div class="p-row"><label>Dimensione titolo iniziale</label><input type="number" min="10" step="2" data-k="headerSize"></div>
           <div class="p-row"><label>Dimensione titoli sezione</label><input type="number" min="10" step="2" data-k="titleSize"></div>
           <div class="p-row"><label>Dimensione nomi</label><input type="number" min="10" step="2" data-k="nameSize"></div>
@@ -990,6 +1011,117 @@ function panelHTML() {
 </datalist>`;
 }
 
+/* =====================================================================
+   SELETTORE DEI FONT
+   Sostituisce i campi di testo dei font: elenco con anteprima, ricerca e categorie.
+   Il valore resta nel campo nascosto [data-k], così si salva come tutti gli altri.
+   ===================================================================== */
+const FP_CATS = [['all', 'Tutti'], ['sans', 'Moderni'], ['serif', 'Eleganti'], ['display', 'Decorativi'], ['hand', 'Scritti a mano'], ['mono', 'Monospazio'], ['system', 'Di sistema']];
+const FP_CAT_LABEL = Object.fromEntries(FP_CATS);
+const previewLoaded = new Set();
+const fontName = css => String(css || '').split(',')[0].replace(/['"]/g, '').trim();
+
+// Per l'anteprima scarica solo le lettere del nome del font: pochi byte per font.
+function loadFontPreview(name) {
+  if (previewLoaded.has(name) || loadedFonts.has(name)) return;
+  previewLoaded.add(name);
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(name).replace(/%20/g, '+') + '&text=' + encodeURIComponent([...new Set(name)].join('')) + '&display=swap';
+  document.head.append(link);
+}
+
+function allFonts() {
+  return [...(window.FONT_CATALOG || []), ...(window.SYSTEM_FONTS || []).map(name => ({ name, cat: 'system' }))];
+}
+
+function fontCss(name) {
+  const f = allFonts().find(x => x.name.toLowerCase() === name.toLowerCase());
+  const fallback = (window.FONT_FALLBACK || {})[f ? f.cat : 'sans'] || 'sans-serif';
+  return `'${name.replace(/'/g, '')}', ${fallback}`;
+}
+
+let openPicker = null;
+document.addEventListener('pointerdown', e => { if (openPicker && !openPicker.contains(e.target)) openPicker.close(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && openPicker) openPicker.close(); });
+
+function attachFontPicker(input) {
+  if (input._picker) return;
+  input.hidden = true;
+  input.removeAttribute('list');
+  const wrap = el('div', 'fp');
+  const btn = el('button', 'fp-btn'); btn.type = 'button';
+  const cur = el('span', 'fp-cur'); const caret = el('span', 'fp-caret', 'Cambia ▾');
+  btn.append(cur, caret);
+  const pop = el('div', 'fp-pop'); pop.hidden = true;
+  const search = el('input'); search.type = 'text'; search.placeholder = 'Cerca un font…'; search.setAttribute('aria-label', 'Cerca un font');
+  const cats = el('div', 'fp-cats');
+  const list = el('div', 'fp-list'); list.setAttribute('role', 'listbox');
+  const count = el('div', 'fp-count');
+  const custom = el('form', 'fp-custom');
+  const customIn = el('input'); customIn.type = 'text'; customIn.placeholder = 'Altro font di Google Fonts (nome esatto)';
+  const customBtn = el('button', 'sec', 'Usa'); customBtn.type = 'submit';
+  custom.append(customIn, customBtn);
+  pop.append(search, cats, list, count, custom);
+  wrap.append(btn, pop);
+  input.after(wrap);
+
+  let cat = 'all';
+  const observer = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { loadFontPreview(e.target.dataset.font); observer.unobserve(e.target); }
+  }, { root: list, rootMargin: '120px' });
+
+  function current() { return fontName(input.value); }
+  function refresh() {
+    const name = current() || 'Predefinito';
+    cur.textContent = name;
+    cur.style.fontFamily = input.value || '';
+    if (name !== 'Predefinito') ensureFont(input.value);
+  }
+  function choose(css) {
+    input.value = css;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    refresh();
+    close();
+  }
+  function renderList() {
+    const q = search.value.trim().toLowerCase();
+    const items = allFonts().filter(f => (cat === 'all' || f.cat === cat) && (!q || f.name.toLowerCase().includes(q)));
+    observer.disconnect();
+    list.replaceChildren(...items.map(f => {
+      const b = el('button'); b.type = 'button'; b.dataset.font = f.name; b.setAttribute('role', 'option');
+      const n = el('span', null, f.name); n.style.fontFamily = `'${f.name}', ${(window.FONT_FALLBACK || {})[f.cat] || 'sans-serif'}`;
+      b.append(n, el('small', null, FP_CAT_LABEL[f.cat] || ''));
+      if (f.name.toLowerCase() === current().toLowerCase()) b.classList.add('sel');
+      b.onclick = () => choose(fontCss(f.name));
+      if (f.cat !== 'system') observer.observe(b);
+      return b;
+    }));
+    count.textContent = items.length ? `${items.length} font` : 'Nessun font trovato: prova a scriverne il nome qui sotto.';
+  }
+  cats.append(...FP_CATS.map(([key, label]) => {
+    const b = el('button', key === 'all' ? 'on' : '', label); b.type = 'button';
+    b.onclick = () => { cat = key; cats.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); renderList(); };
+    return b;
+  }));
+  function open() {
+    openPicker?.close();
+    pop.hidden = false; openPicker = wrap;
+    search.value = ''; renderList();
+    list.querySelector('.sel')?.scrollIntoView({ block: 'center' });
+    search.focus();
+  }
+  function close() { pop.hidden = true; if (openPicker === wrap) openPicker = null; }
+  wrap.close = close;
+  btn.onclick = () => (pop.hidden ? open() : close());
+  search.oninput = renderList;
+  search.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); list.querySelector('button')?.click(); } };
+  custom.onsubmit = e => { e.preventDefault(); const n = customIn.value.trim().replace(/['"]/g, ''); if (n) choose(fontCss(n)); customIn.value = ''; };
+  input._picker = wrap;
+  input._refresh = refresh;
+  refresh();
+}
+
 function startPanel() {
   document.body.classList.add('panel');
   document.body.insertAdjacentHTML('beforeend', panelHTML());
@@ -1006,8 +1138,10 @@ function startPanel() {
       let v = s[i.dataset.k];
       if ((v === undefined || v === '') && i.dataset.fallback) v = s[i.dataset.fallback];
       if (i.type === 'checkbox') i.checked = !!v; else i.value = v ?? '';
+      i._refresh?.();
     }
   }
+  const attachPickers = () => document.querySelectorAll('input[list="cr-fonts"]').forEach(attachFontPicker);
   function bindInputs() {
     for (const i of inputs()) {
       if (i.dataset.bound) continue;
@@ -1026,6 +1160,7 @@ function startPanel() {
     }
   }
   bindInputs();
+  attachPickers();
   fillInputs();
 
   // --- immagini: caricate in TwitchGestor (data/media/images) o indirizzo web
@@ -1154,6 +1289,7 @@ function startPanel() {
       field('Font dei nomi', inputFor('text', secKey(id, 'fontText'), { list: 'cr-fonts', fallback: 'fontText' })));
     box.append(el('p', 'p-hint', 'Senza "stile personalizzato" la sezione usa i colori e i font generali; l\'icona vale sempre.'));
     bindInputs();
+    attachPickers();
     fillInputs();
   }
 
