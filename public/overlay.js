@@ -6,6 +6,7 @@
   const preview = new URLSearchParams(location.search).has('preview');
   let current = null;
   let hideTimer = null;
+  let stopVoice = () => {};
 
   const isVideo = (src) => /\.(webm|mp4)$/i.test(src);
   const mediaSrc = (src) => (/^[a-z][a-z0-9+.-]*:/i.test(src) || src.startsWith('/') ? src : `/${src}`);
@@ -35,6 +36,7 @@
 
   function show(alert, { silent = false } = {}) {
     clearTimeout(hideTimer);
+    stopVoice();
     hide(current);
 
     window.loadFont(alert.font);
@@ -59,7 +61,10 @@
     box.dataset.id = alert.id;
     stage.append(box);
     current = box;
-    if (!silent) window.playSound(alert.sound, alert.volume);
+    if (!silent) {
+      window.playSound(alert.sound, alert.volume);
+      stopVoice = window.speak(alert.tts, { delay: alert.tts?.delay ?? (alert.sound ? 1200 : 300) });
+    }
     hideTimer = setTimeout(() => {
       hide(box);
       if (current === box) current = null;
@@ -89,6 +94,7 @@
       if (msg.type === 'alert') show(msg.alert);
       if (msg.type === 'skip' && current?.dataset.id === msg.id) {
         clearTimeout(hideTimer);
+        stopVoice();
         hide(current);
         current = null;
       }

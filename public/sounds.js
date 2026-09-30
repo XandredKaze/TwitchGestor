@@ -42,6 +42,37 @@
 
   window.SOUND_PRESETS = Object.keys(presets);
 
+  // Voce: file audio creato da TwitchGestor (va in live tramite OBS) oppure, se manca,
+  // la voce del browser (funziona nel browser, non dentro OBS). Ritorna una funzione per fermarla.
+  window.speak = function (tts, { delay = 0 } = {}) {
+    if (!tts || !tts.text) return () => {};
+    let audio = null;
+    let stopped = false;
+    const timer = setTimeout(() => {
+      if (stopped) return;
+      if (tts.url) {
+        audio = new Audio(/^[a-z][a-z0-9+.-]*:/i.test(tts.url) || tts.url.startsWith('/') ? tts.url : `/${tts.url}`);
+        audio.volume = Math.min(Math.max(tts.volume ?? 1, 0), 1);
+        audio.play().catch((err) => console.warn('Voce non riprodotta:', err.message));
+      } else if ('speechSynthesis' in window) {
+        const u = new SpeechSynthesisUtterance(tts.text);
+        u.lang = 'it-IT';
+        const it = speechSynthesis.getVoices().find((v) => v.lang?.toLowerCase().startsWith('it'));
+        if (it) u.voice = it;
+        u.rate = Math.min(2, Math.max(0.5, 1 + (tts.rate || 0) / 10));
+        u.volume = Math.min(Math.max(tts.volume ?? 1, 0), 1);
+        speechSynthesis.cancel();
+        speechSynthesis.speak(u);
+      }
+    }, delay);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      if (audio) audio.pause();
+      else if ('speechSynthesis' in window && !tts.url) speechSynthesis.cancel();
+    };
+  };
+
   window.playSound = function (sound, volume = 0.5) {
     if (!sound) return;
     if (ctx?.state === 'suspended') ctx.resume();

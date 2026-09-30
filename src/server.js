@@ -8,12 +8,14 @@ import { NOTIFICATION_TYPES, testNotification } from './core/normalize.js';
 import { NotificationManager } from './core/NotificationManager.js';
 import { sanitizeConfig, ANIMATIONS, POSITIONS, SOUND_PRESETS } from './core/schema.js';
 import { recentLogs } from './logger.js';
+import { cleanText } from './core/ttsText.js';
 import { parseKofi, parseGenericDonation } from './sources/webhooks.js';
 import { createLogger } from './logger.js';
 
 const log = createLogger('server');
 const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
 const MEDIA_DIR = path.join(DATA_DIR, 'media');
+const TTS_DIR = path.join(DATA_DIR, 'tts');
 const UPLOAD_KINDS = {
   sounds: ['.mp3', '.ogg', '.wav'],
   images: ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.webm', '.mp4'],
@@ -35,6 +37,7 @@ const MIME = {
   '.ogg': 'audio/ogg',
   '.wav': 'audio/wav',
   '.m4a': 'audio/mp4',
+  '.aiff': 'audio/aiff',
   '.flac': 'audio/flac',
   '.webm': 'video/webm',
   '.mp4': 'video/mp4',
@@ -205,6 +208,7 @@ export function createServer(app) {
         return send(res, 200, { ...app.credits.store.snapshot(rev), account: app.auth.user?.login ?? null, configured: app.auth.configured });
       }
       if (req.method === 'GET' && url.pathname.startsWith('/media/')) return serveStatic(res, url.pathname.slice('/media'.length), MEDIA_DIR);
+      if (req.method === 'GET' && url.pathname.startsWith('/tts/')) return serveStatic(res, url.pathname.slice('/tts'.length), app.tts?.dir ?? TTS_DIR);
 
       // --- Accesso Twitch ---
       if (route === 'GET /auth/login') {
@@ -261,6 +265,18 @@ export function createServer(app) {
           if (!NOTIFICATION_TYPES.includes(body.type)) return send(res, 400, { error: 'Tipo sconosciuto' });
           const builder = new NotificationManager({ config: draft(body) ?? app.config.get() });
           return send(res, 200, { alert: builder.buildAlert(sampleNotification(body.type, body.sample)) });
+        }
+        if (route === 'GET /api/tts/voices') {
+          return send(res, 200, { engine: app.tts?.engine?.name ?? null, voices: (await app.tts?.voices()) ?? [] });
+        }
+        if (route === 'POST /api/tts/test') {
+          const body = await readBody(req, 1_000_000);
+          const cfg = (draft(body) ?? app.config.get()).tts ?? {};
+          const text = cleanText(body.text || 'Ciao! Questa è la voce degli alert di TwitchGestor.', cfg);
+          const result = await app.tts?.synthesize(text, cfg).catch((err) => {
+            throw Object.assign(new Error(`La voce non funziona: ${err.message}`), { status: 500 });
+          });
+          return send(res, 200, result ? { ...result, text } : { fallback: true, text, rate: cfg.rate ?? 0, volume: (cfg.volume ?? 100) / 100 });
         }
         if (route === 'PUT /api/config') {
           const config = app.config.save((await readBody(req, 1_000_000)).config);

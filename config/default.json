@@ -30,7 +30,9 @@
       "color": "#9146ff",
       "title": "Nuovo follower!",
       "text": "{user} ora ti segue ❤️",
-      "chatReply": ""
+      "chatReply": "",
+      "tts": false,
+      "ttsText": "{user} ti segue, benvenuto!"
     },
     "sub": {
       "label": "Abbonamento",
@@ -44,7 +46,9 @@
       "color": "#f5a623",
       "title": "Nuovo abbonato!",
       "text": "{user} si è abbonato (Tier {tier})",
-      "chatReply": "Grazie mille per l'abbonamento {user}! 💜"
+      "chatReply": "Grazie mille per l'abbonamento {user}! 💜",
+      "tts": false,
+      "ttsText": "{user} si è abbonato!"
     },
     "resub": {
       "label": "Rinnovo abbonamento",
@@ -64,7 +68,9 @@
           "minAmount": 12,
           "title": "Un anno (o più) insieme! 🎉"
         }
-      ]
+      ],
+      "tts": false,
+      "ttsText": "{user} è abbonato da {months} mesi. {message}"
     },
     "giftsub": {
       "label": "Abbonamenti regalati",
@@ -84,7 +90,9 @@
           "title": "PIOGGIA DI ABBONAMENTI! 🎁",
           "duration": 10000
         }
-      ]
+      ],
+      "tts": false,
+      "ttsText": "{user} ha regalato {amount} abbonament{amount|o|i}!"
     },
     "cheer": {
       "label": "Bits",
@@ -106,7 +114,9 @@
           "title": "PIOGGIA DI BITS! 💎",
           "duration": 9000
         }
-      ]
+      ],
+      "tts": false,
+      "ttsText": "{user} ha inviato {amount} bits. {message}"
     },
     "raid": {
       "label": "Raid",
@@ -120,7 +130,9 @@
       "color": "#e91916",
       "title": "RAID!",
       "text": "{user} arriva con {amount} spettator{amount|e|i}!",
-      "chatReply": "Benvenuti raiders di {user}! Andate a seguirlo su twitch.tv/{login} 🚀"
+      "chatReply": "Benvenuti raiders di {user}! Andate a seguirlo su twitch.tv/{login} 🚀",
+      "tts": false,
+      "ttsText": "Arriva il raid di {user} con {amount} spettator{amount|e|i}!"
     },
     "redemption": {
       "label": "Punti canale",
@@ -142,7 +154,9 @@
           "title": "💧 Idratati!",
           "text": "{user} ti ricorda di bere un sorso d'acqua"
         }
-      ]
+      ],
+      "tts": false,
+      "ttsText": "{user} dice: {message}"
     },
     "donation": {
       "label": "Donazione",
@@ -164,7 +178,18 @@
           "title": "SUPER DONAZIONE! 💸",
           "duration": 12000
         }
-      ]
+      ],
+      "tts": false,
+      "ttsText": "{user} ha donato {amountFormatted}. {message}"
     }
+  },
+  "tts": {
+    "enabled": false,
+    "voice": "",
+    "rate": 0,
+    "volume": 100,
+    "maxLength": 200,
+    "bannedWords": [],
+    "skipLinks": true
   }
 }

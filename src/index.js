@@ -9,6 +9,7 @@ import { EventSubClient } from './twitch/eventsub.js';
 import { StreamElementsSource } from './sources/streamelements.js';
 import { createServer } from './server.js';
 import { CreditsStore, startCreditsScheduler } from './credits.js';
+import { TtsService } from './tts.js';
 import { createLogger } from './logger.js';
 
 loadEnv();
@@ -23,6 +24,16 @@ config.watch();
 
 const manager = new NotificationManager({ config: config.get(), historyFile: path.join(DATA_DIR, 'history.json') });
 config.on('change', (c) => manager.setConfig(c));
+
+// Voce (text-to-speech): l'audio si crea mentre l'alert aspetta in coda, poi l'overlay lo suona.
+const tts = new TtsService({ dir: path.join(DATA_DIR, 'tts') });
+manager.prepareAlert = async (alert) => {
+  const result = await tts.synthesize(alert.tts.text, config.get().tts);
+  if (!result) return; // nessuna voce di sistema: l'overlay proverà con quella del browser
+  const delay = alert.sound ? 1200 : 300; // la voce parte dopo il suono dell'alert
+  alert.tts = { ...alert.tts, url: result.url, delay };
+  alert.duration = Math.max(alert.duration, delay + result.duration * 1000 + 800);
+};
 
 const auth = new TwitchAuth({
   clientId: env.TWITCH_CLIENT_ID,
@@ -68,6 +79,7 @@ const app = {
   auth,
   botAuth,
   credits: { store: creditsStore, refresh: (reason) => creditsScheduler.refresh(reason) },
+  tts,
   chatAccount,
   getState() {
     return {

@@ -53,8 +53,23 @@ const STYLE_FIELDS = {
   chatReply: text(450),
 };
 
+const TTS_ALERT_FIELDS = {
+  tts: bool,
+  ttsText: text(300),
+};
+
+const TTS_FIELDS = {
+  enabled: bool,
+  voice: text(120),
+  rate: num(-10, 10),
+  volume: num(0, 100),
+  maxLength: num(20, 500),
+  skipLinks: bool,
+};
+
 const TYPE_FIELDS = {
   ...STYLE_FIELDS,
+  ...TTS_ALERT_FIELDS,
   label: text(40),
   enabled: bool,
   alert: bool,
@@ -65,6 +80,7 @@ const TYPE_FIELDS = {
 
 const VARIANT_FIELDS = {
   ...STYLE_FIELDS,
+  ...TTS_ALERT_FIELDS,
   minAmount: num(0, 1e9),
   maxAmount: num(0, 1e9),
   reward: text(60),
@@ -103,6 +119,12 @@ export function sanitizeConfig(input, defaults) {
   out.overlay = pick(input.overlay, OVERLAY_FIELDS, out.overlay);
   if (isObject(input.queue)) out.queue.gapMs = num(0, 10000)(input.queue.gapMs) ?? out.queue.gapMs;
   if (isObject(input.chat)) out.chat.enabled = bool(input.chat.enabled) ?? out.chat.enabled;
+  if (out.tts) {
+    out.tts = pick(input.tts, TTS_FIELDS, out.tts);
+    if (Array.isArray(input.tts?.bannedWords)) {
+      out.tts.bannedWords = input.tts.bannedWords.filter((w) => typeof w === 'string' && w.trim()).map((w) => w.trim().slice(0, 40)).slice(0, 200);
+    }
+  }
 
   for (const type of Object.keys(out.types)) {
     const src = input.types?.[type];

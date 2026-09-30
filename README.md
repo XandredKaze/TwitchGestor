@@ -17,6 +17,7 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 **Funzioni principali**
 
 - **Coda degli alert**: le notifiche vengono mostrate una alla volta, mai sovrapposte. Dalla dashboard puoi mettere in pausa, saltare, svuotare la coda o **riproporre** un alert passato.
+- **Voce (text-to-speech)** gratuita e locale: legge gli alert e i messaggi degli spettatori con le voci di Windows, e la voce va in live tramite OBS.
 - **Anteprima della live e chat di Twitch** direttamente nella dashboard (scheda Live).
 - **Titoli di coda animati** (credit roll) con abbonati, gift e follower scaricati in automatico, musica e pannello di controllo.
 - **Editor degli alert nella dashboard** con anteprima dal vivo: testi, suoni, font, colori, sfondo, immagini e animazioni.
@@ -95,6 +96,16 @@ Nella scheda **📡 Live** della dashboard trovi il player della tua live (senza
 - Apri la dashboard da **`http://localhost:3000`**: Twitch mostra player e chat solo su `localhost` (non su `127.0.0.1`).
 - Per scrivere in chat devi essere collegato a twitch.tv nello stesso browser; se il riquadro non te lo permette usa **Finestra ↗**.
 - Con **Nascondi** togli player o chat e risparmi risorse del PC durante la live.
+
+## Voce (text-to-speech)
+
+TwitchGestor può leggere ad alta voce gli alert, per esempio "Mario ha donato 5 €. Continua così!". È gratuito e funziona senza Internet: usa le **voci installate in Windows** (in italiano di solito "Microsoft Elsa"). L'audio viene creato dal programma e suonato dall'overlay, quindi **va in live tramite OBS** come gli altri suoni.
+
+1. Dashboard → **🎨 Personalizza alert → ⚙️ Impostazioni generali → Voce**: attiva la voce e scegli voce, velocità, volume, lunghezza massima e **parole vietate** (lette come "bip"). I link non vengono letti.
+2. In ogni alert, sezione **Voce**: attiva "Leggi ad alta voce" e scegli il testo da leggere (con i segnaposto, es. `{user} ha donato {amountFormatted}. {message}`). **▶ Ascolta con dati di prova** ti fa sentire il risultato.
+3. Per leggere solo sopra una soglia (es. bits da 100 in su) o solo per un premio dei punti canale (es. "Leggi il mio messaggio"), usa la voce negli **alert speciali**.
+
+Altre voci si aggiungono da Windows: *Impostazioni → Ora e lingua → Voce → Aggiungi voci*. Su Linux funziona con `espeak-ng` installato; senza voci di sistema viene usata la voce del browser, che però dentro OBS non si sente.
 
 ## Titoli di coda (credit roll)
 
@@ -231,6 +242,7 @@ src/
   twitch/                      accesso OAuth, API Helix, EventSub
   sources/                     StreamElements, Ko-fi, webhook generico
   credits.js                   titoli di coda: stato condiviso e download da Twitch
+  tts.js                       voce: voci di Windows (o espeak-ng) e file audio
 public/                        overlay, dashboard e titoli di coda (credits.html)
 demo/                          "server finto" della versione demo (usa il codice vero di src/core)
 ```
