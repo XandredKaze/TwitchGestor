@@ -290,6 +290,9 @@ body.offline .p-offline { display: block; }
 .p-tag { padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--p-accent-soft); color: #dccbff; white-space: nowrap; }
 .p-sec-editor { margin-top: 14px; padding: 14px; border-radius: 14px; border: 1px dashed rgba(145, 71, 255, .45); }
 .p-sec-editor h3 { margin: 0 0 10px; font-size: 15px; }
+.panel button.armed { background: var(--p-err); border-color: var(--p-err); color: #fff; }
+.panel .p-sec button.del { padding: 4px 9px; background: transparent; border: 1px solid rgba(255, 123, 147, .4); box-shadow: none; color: var(--p-err); }
+.panel .p-sec button.del.armed { background: var(--p-err); color: #fff; }
 .p-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 18px; }
 
 /* --- anteprima animazione --- */
@@ -1122,6 +1125,26 @@ function attachFontPicker(input) {
   refresh();
 }
 
+/**
+ * Conferma dentro la pagina: il primo clic chiede conferma sul pulsante stesso, il secondo esegue.
+ * Le finestre confirm() del browser non funzionano nei dock di OBS (vengono chiuse da sole).
+ */
+function confirmClick(button, action, question = 'Clicca di nuovo per confermare') {
+  const original = button.textContent;
+  let timer = 0;
+  button.addEventListener('click', e => {
+    e.preventDefault();
+    if (button.classList.contains('armed')) {
+      clearTimeout(timer);
+      button.classList.remove('armed'); button.textContent = original;
+      action();
+      return;
+    }
+    button.classList.add('armed'); button.textContent = question;
+    timer = setTimeout(() => { button.classList.remove('armed'); button.textContent = original; }, 4000);
+  });
+}
+
 function startPanel() {
   document.body.classList.add('panel');
   document.body.insertAdjacentHTML('beforeend', panelHTML());
@@ -1190,6 +1213,15 @@ function startPanel() {
   const secLabel = (s, id) => { const c = customOf(s, id); return c ? (c.title || 'Sezione senza titolo') : (s[TITLE_KEY[id]] || BUILTIN_SECTIONS[id]); };
   function updateSettings(fn) { const st = { ...load(K.settings, {}) }; fn(st, { ...DEFAULTS, ...st }); save(K.settings, st); renderCategories(); renderSections(); }
 
+  function deleteSection(id) {
+    updateSettings(st => {
+      st.customSections = (st.customSections || []).filter(x => x.id !== id);
+      st.order = (st.order || []).filter(x => x !== id);
+      for (const k of Object.keys(st)) if (k.startsWith('sec.' + id + '.')) delete st[k];
+    });
+    renderSectionEditor();
+  }
+
   function renderSections() {
     const s = getSettings();
     const order = sectionOrder(s);
@@ -1218,6 +1250,11 @@ function startPanel() {
       if (c) row.append(el('span', 'p-tag', 'tua'));
       if (s[secKey(id, 'custom')]) row.append(el('span', 'p-tag', 'stile proprio'));
       row.append(show);
+      if (c) {
+        const del = el('button', 'del', '🗑'); del.type = 'button'; del.title = 'Elimina la sezione';
+        confirmClick(del, () => deleteSection(id), 'Elimina?');
+        row.append(del);
+      }
       return row;
     }));
   }
@@ -1258,15 +1295,7 @@ function startPanel() {
       grid.append(field('Titolo', edit('title', el('input'))), field('Sottotitolo (facoltativo)', edit('subtitle', el('input'))));
       box.append(grid, field('Nomi (uno per riga)', edit('names', ta(5))), field('Testo libero sotto il titolo (facoltativo)', edit('text', ta(3))));
       const del = el('button', 'danger', 'Elimina questa sezione'); del.type = 'button';
-      del.onclick = () => {
-        if (!confirm('Eliminare la sezione "' + secLabel(s, id) + '"?')) return;
-        updateSettings(st => {
-          st.customSections = (st.customSections || []).filter(x => x.id !== id);
-          st.order = (st.order || []).filter(x => x !== id);
-          for (const k of Object.keys(st)) if (k.startsWith('sec.' + id + '.')) delete st[k];
-        });
-        renderSectionEditor();
-      };
+      confirmClick(del, () => deleteSection(id), 'Clicca di nuovo per eliminarla');
       box.append(el('div', 'p-btns')); box.lastChild.append(del);
     } else {
       box.append(field('Titolo della sezione', inputFor('text', TITLE_KEY[id])));
@@ -1304,7 +1333,8 @@ function startPanel() {
   };
   renderSections();
   renderSectionEditor();
-  $('btn-reset').onclick = () => { if (confirm('Ripristinare tutte le impostazioni predefinite? Vengono tolte anche le sezioni aggiunte a mano.')) { save(K.settings, {}); fillInputs(); renderCategories(); showLines(readLines()); renderSections(); renderSectionEditor(); } };
+  confirmClick($('btn-reset'), () => { save(K.settings, {}); fillInputs(); renderCategories(); showLines(readLines()); renderSections(); renderSectionEditor(); },
+    'Clicca di nuovo: tolgo anche le sezioni aggiunte');
   // dentro la dashboard di TwitchGestor l'intestazione del pannello è già nella scheda
   if (window.self !== window.top) document.body.classList.add('embedded');
 
