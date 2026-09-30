@@ -8,7 +8,7 @@
  *
  * Si compila con: npm run build:demo  (vedi scripts/build-demo.mjs)
  */
-import defaults from '../config/default.json';
+import defaults from '../src/core/defaults.json';
 import { NotificationManager } from '../src/core/NotificationManager.js';
 import { NOTIFICATION_TYPES, testNotification } from '../src/core/normalize.js';
 import { sanitizeConfig, diffConfig, ANIMATIONS, POSITIONS, SOUND_PRESETS } from '../src/core/schema.js';

@@ -9,7 +9,10 @@ const log = createLogger('config');
 
 export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DATA_DIR = path.join(ROOT_DIR, 'data');
-const DEFAULT_FILE = path.join(ROOT_DIR, 'config', 'default.json');
+// I valori predefiniti stanno tra i file del programma (src/core/defaults.json), così si aggiornano
+// sempre insieme al codice. In config/ restano solo le impostazioni dell'utente (config.json).
+const DEFAULT_FILE = path.join(ROOT_DIR, 'src', 'core', 'defaults.json');
+const OLD_DEFAULT_FILE = path.join(ROOT_DIR, 'config', 'default.json');
 const USER_FILE = path.join(ROOT_DIR, 'config', 'config.json');
 
 export function loadEnv() {
@@ -36,13 +39,16 @@ function readJson(file) {
 }
 
 /**
- * Configurazione = config/default.json + config/config.json (facoltativo, solo le chiavi da cambiare).
+ * Configurazione = valori predefiniti (src/core/defaults.json) + config/config.json (facoltativo, solo le chiavi da cambiare).
  * Il file utente viene ricaricato automaticamente quando lo salvi, anche durante la live.
  */
 export class ConfigStore extends EventEmitter {
   constructor() {
     super();
     this.current = this.#load();
+    if (fs.existsSync(OLD_DEFAULT_FILE)) {
+      log.info('config/default.json è di una versione precedente e non viene più usato: puoi cancellarlo');
+    }
   }
 
   #load() {

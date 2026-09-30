@@ -12,7 +12,7 @@ import { sanitizeConfig } from '../src/core/schema.js';
 import { fromEventSub } from '../src/core/normalize.js';
 import { createServer } from '../src/server.js';
 
-const defaults = JSON.parse(fs.readFileSync(new URL('../config/default.json', import.meta.url)));
+const defaults = JSON.parse(fs.readFileSync(new URL('../src/core/defaults.json', import.meta.url)));
 
 /** WAV finto: 16 kHz, 16 bit mono, `seconds` secondi di silenzio. */
 function fakeWav(file, seconds) {

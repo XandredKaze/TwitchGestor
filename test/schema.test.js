@@ -5,7 +5,7 @@ import { sanitizeConfig, diffConfig, isSafeMedia } from '../src/core/schema.js';
 import { NotificationManager } from '../src/core/NotificationManager.js';
 import { fromEventSub } from '../src/core/normalize.js';
 
-const defaults = JSON.parse(fs.readFileSync(new URL('../config/default.json', import.meta.url)));
+const defaults = JSON.parse(fs.readFileSync(new URL('../src/core/defaults.json', import.meta.url)));
 
 test('accetta solo valori validi e ignora il resto', () => {
   const c = sanitizeConfig({

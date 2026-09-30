@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { NotificationManager } from '../src/core/NotificationManager.js';
 import { fromEventSub, donation } from '../src/core/normalize.js';
 
-const config = JSON.parse(fs.readFileSync(new URL('../config/default.json', import.meta.url)));
+const config = JSON.parse(fs.readFileSync(new URL('../src/core/defaults.json', import.meta.url)));
 const u = { user_id: '1', user_login: 'anna', user_name: 'Anna' };
 
 function setup(overrides = {}) {

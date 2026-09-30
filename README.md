@@ -172,7 +172,7 @@ I file che carichi finiscono in `data/media/`. Le impostazioni vengono salvate i
 
 ### A mano
 
-I valori predefiniti sono in `config/default.json`. **Non modificarlo**: crea `config/config.json` e scrivi solo quello che vuoi cambiare. Esempio (vedi anche `config/config.example.json`):
+I valori predefiniti sono tra i file del programma (`src/core/defaults.json`, da non modificare). Le tue impostazioni stanno in `config/config.json`, che contiene solo quello che hai cambiato. Esempio (vedi anche `config/config.example.json`):
 
 ```json
 {
