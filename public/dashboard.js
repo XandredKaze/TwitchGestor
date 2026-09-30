@@ -35,7 +35,14 @@
     return el('span', { className: `pill ${cls}`, title: status }, `${label}: ${status}`);
   }
 
+  // Dimensione dei testi della dashboard (ricordata in questo browser).
+  const applyZoom = (z) => { document.body.style.zoom = z; };
+  try { const z = localStorage.getItem('uiZoom'); if (z) { $('ui-zoom').value = z; applyZoom(z); } } catch { /* ignora */ }
+  $('ui-zoom').onchange = (e) => { applyZoom(e.target.value); try { localStorage.setItem('uiZoom', e.target.value); } catch { /* ignora */ } };
+
   function renderHeader() {
+    window.TG.version = state.version ?? '(programma precedente alla 1.5)';
+    $('app-version').textContent = state.version ? `v${state.version}` : '';
     const { twitch, sources, overlays } = state;
     $('statuses').replaceChildren(
       pill('Twitch', twitch.user ? twitch.status : 'non collegato'),

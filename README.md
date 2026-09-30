@@ -219,6 +219,12 @@ Plurale: `{amount|o|i}` scrive `o` se l'importo è 1, altrimenti `i` (es. `abbon
 
 **Posizioni overlay**: `top-left`, `top-center`, `top-right`, `center`, `bottom-left`, `bottom-center`, `bottom-right`.
 
+## Se qualcosa non funziona
+
+- In alto accanto a "TwitchGestor" c'è la **versione** del programma acceso. Se compare la fascia rossa **"Serve un riavvio"**, il programma acceso è più vecchio delle pagine: clicca **⏻ Spegni**, riapri OBS (o "Avvia TwitchGestor.vbs") e ricarica con Ctrl+F5.
+- Se la pagina ha un errore compare un **riquadro rosso** con il dettaglio e il pulsante **Copia**: incollalo a chi ti aiuta.
+- I messaggi del programma sono in **Live → Registro del programma** e in `data/twitchgestor.log`.
+
 ## Sicurezza
 
 - Il server ascolta solo su `127.0.0.1` (questo PC) e rifiuta i comandi che arrivano da altri siti web aperti nel browser. Se lo esponi in rete o su Internet, imposta `DASHBOARD_TOKEN` e apri la dashboard con `/dashboard?token=IL_TUO_TOKEN`.

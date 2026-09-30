@@ -40,7 +40,7 @@ html, body {
 .alert.no-box { border-color: transparent; box-shadow: none; }
 .alert img, .alert video { max-width: 300px; max-height: 240px; border-radius: 10px; }
 .alert .title {
-  font-size: calc(var(--size) * 1.4);
+  font-size: var(--title-size, calc(var(--size) * 1.4));
   font-weight: 800;
   line-height: 1.15;
   color: var(--accent);
@@ -48,7 +48,7 @@ html, body {
 }
 .alert .text { font-size: var(--size); font-weight: 600; line-height: 1.25; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6); }
 .alert .message {
-  font-size: calc(var(--size) * 0.77);
+  font-size: var(--msg-size, calc(var(--size) * 0.77));
   font-style: italic;
   opacity: 0.9;
   max-width: 560px;

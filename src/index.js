@@ -8,7 +8,7 @@ import { HelixClient } from './twitch/helix.js';
 import { EventSubClient } from './twitch/eventsub.js';
 import { StreamElementsSource } from './sources/streamelements.js';
 import { createServer } from './server.js';
-import { API_LEVEL, codeChangedSinceStart } from './version.js';
+import { API_LEVEL, APP_VERSION, codeChangedSinceStart } from './version.js';
 import { CreditsStore, startCreditsScheduler } from './credits.js';
 import { TtsService, PiperManager } from './tts.js';
 import { createLogger } from './logger.js';
@@ -85,6 +85,7 @@ const app = {
   getState() {
     return {
       apiLevel: API_LEVEL,
+      version: APP_VERSION,
       restartNeeded: codeChangedSinceStart(),
       twitch: {
         configured: auth.configured,

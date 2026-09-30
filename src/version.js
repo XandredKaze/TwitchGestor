@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT_DIR } from './config.js';
 
-export { API_LEVEL } from './core/apiLevel.js';
+export { API_LEVEL, APP_VERSION } from './core/apiLevel.js';
 
 const SRC_DIR = path.join(ROOT_DIR, 'src');
 

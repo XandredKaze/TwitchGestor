@@ -46,6 +46,8 @@
     box.style.setProperty('--text', alert.textColor || '#fff');
     box.style.setProperty('--bg', hexToRgba(alert.background, opacity));
     box.style.setProperty('--size', `${alert.fontSize || 26}px`);
+    if (alert.titleSize) box.style.setProperty('--title-size', `${alert.titleSize}px`);
+    if (alert.messageSize) box.style.setProperty('--msg-size', `${alert.messageSize}px`);
     box.style.fontFamily = window.fontStack(alert.font);
     if (opacity === 0) box.classList.add('no-box');
 

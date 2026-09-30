@@ -8,7 +8,7 @@
 </head>
 <body>
   <header>
-    <h1>TwitchGestor</h1>
+    <h1>TwitchGestor<span class="app-version" id="app-version"></span></h1>
     <nav class="tabs" role="tablist">
       <button class="tab active" data-tab="live" role="tab">📡 Live</button>
       <button class="tab" data-tab="editor" role="tab">🎨 Personalizza alert</button>
@@ -16,6 +16,9 @@
     </nav>
     <div id="statuses" class="statuses"></div>
     <div id="account" class="account"></div>
+    <label class="zoom" title="Dimensione dei testi della dashboard">Aa
+      <select id="ui-zoom"><option value="0.9">90%</option><option value="1">100%</option><option value="1.15">115%</option><option value="1.3">130%</option><option value="1.5">150%</option></select>
+    </label>
     <button id="btn-shutdown" class="small-btn danger" title="Spegne il programma TwitchGestor">⏻ Spegni</button>
   </header>
 

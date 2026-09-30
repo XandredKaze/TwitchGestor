@@ -394,4 +394,9 @@ button.danger { color: var(--danger); }
 .piper-box h3 { margin: 0 0 4px; text-transform: none; letter-spacing: 0; color: var(--text); font-size: 15px; }
 .piper-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); }
 
+.error-box { position: fixed; left: 16px; bottom: 16px; z-index: 50; width: min(560px, calc(100vw - 32px)); padding: 14px 16px; border-radius: 12px; background: var(--panel); border: 2px solid var(--danger); box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+.error-box p { margin: 4px 0 8px; font-size: 13px; color: var(--muted); }
+.error-box pre { max-height: 180px; overflow: auto; margin: 0; padding: 8px; border-radius: 8px; background: var(--bg); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.app-version { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 6px; }
+.zoom select { font: inherit; font-size: 13px; padding: 3px 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
 .banner:has(.restart-banner) { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--panel)); }

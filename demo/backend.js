@@ -15,7 +15,7 @@ import { sanitizeConfig, diffConfig, ANIMATIONS, POSITIONS, SOUND_PRESETS } from
 import { recentLogs, createLogger } from '../src/logger.js';
 import { liveSession } from '../src/core/session.js';
 import { cleanText } from '../src/core/ttsText.js';
-import { API_LEVEL } from '../src/core/apiLevel.js';
+import { API_LEVEL, APP_VERSION } from '../src/core/apiLevel.js';
 
 const CHANNEL = { id: '0', login: 'canale_demo' };
 const BOT = { id: '1', login: 'Wolfery' };
@@ -172,6 +172,7 @@ class DemoBackend {
     const m = this.manager;
     return {
       apiLevel: API_LEVEL,
+      version: `${APP_VERSION} demo`,
       twitch: { configured: true, user: CHANNEL, status: 'simulato', missingScopes: [], failedSubscriptions: [] },
       sources: { streamelements: 'disattivato', kofi: 'disattivato', webhook: 'disattivato' },
       overlays: this.clients.overlay.size,

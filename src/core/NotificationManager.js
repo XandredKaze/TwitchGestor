@@ -117,6 +117,9 @@ export class NotificationManager extends EventEmitter {
       color: style.color ?? '#9146ff',
       font: style.font || overlay.font || 'Poppins',
       fontSize: style.fontSize ?? overlay.fontSize ?? 26,
+      // titolo e messaggio: se non impostati, proporzionati al testo (come prima)
+      titleSize: style.titleSize ?? overlay.titleSize ?? Math.round((style.fontSize ?? overlay.fontSize ?? 26) * 1.4),
+      messageSize: style.messageSize ?? overlay.messageSize ?? Math.round((style.fontSize ?? overlay.fontSize ?? 26) * 0.77),
       textColor: style.textColor ?? overlay.textColor ?? '#ffffff',
       background: style.background ?? overlay.background ?? '#121218',
       backgroundOpacity: style.backgroundOpacity ?? overlay.backgroundOpacity ?? 0.88,

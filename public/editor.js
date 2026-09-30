@@ -36,7 +36,7 @@
     donation: { amountFormatted: 'importo con valuta', amount: 'importo', currency: 'valuta', message: 'messaggio' },
   };
   // Stili che, se non impostati nell'alert, vengono presi dalle impostazioni generali.
-  const INHERITED = ['font', 'fontSize', 'textColor', 'background', 'backgroundOpacity', 'animation'];
+  const INHERITED = ['font', 'fontSize', 'titleSize', 'messageSize', 'textColor', 'background', 'backgroundOpacity', 'animation'];
 
   let saved = null;
   let draft = null;
@@ -51,6 +51,14 @@
   const sample = {};
 
   const clone = (o) => JSON.parse(JSON.stringify(o));
+  const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+  /** Completa le impostazioni con i valori predefiniti (se ne manca qualcuna l'editor non si blocca). */
+  function withDefaults(value, defs) {
+    if (!isObj(defs)) return value === undefined ? clone(defs) : value;
+    const out = isObj(value) ? { ...value } : {};
+    for (const [k, d] of Object.entries(defs)) out[k] = isObj(d) ? withDefaults(out[k], d) : (out[k] === undefined ? clone(d) : out[k]);
+    return out;
+  }
   const isDirty = () => JSON.stringify(draft) !== JSON.stringify(saved);
 
   // ---------- Caricamento ----------
@@ -63,16 +71,21 @@
       $('form').replaceChildren(el('div', { className: 'notice' }, el('b', {}, '⚠️ Serve un riavvio di TwitchGestor. '), window.TG.RESTART_HELP));
       return;
     }
-    saved = data.config;
-    draft = clone(saved);
     defaults = data.defaults;
+    saved = withDefaults(data.config, defaults);
+    draft = clone(saved);
     media = data.media;
     chatAccount = data.chatAccount;
     twitchConfigured = data.twitchConfigured;
     for (const f of window.ALERT_FONTS.google) window.loadFont(f);
-    ttsInfo = (await api('/api/tts/voices', { method: 'GET', quiet: true })) ?? ttsInfo;
-    if (ttsInfo.piper?.job && !ttsInfo.piper.job.done) watchPiper();
     render();
+    // Su Windows leggere le voci richiede qualche secondo: l'editor si mostra subito, le voci arrivano dopo.
+    api('/api/tts/voices', { method: 'GET', quiet: true }).then((info) => {
+      if (!info) return;
+      ttsInfo = info;
+      if (ttsInfo.piper?.job && !ttsInfo.piper.job.done) watchPiper();
+      if (selected === '__general') renderForm();
+    });
   }
 
   if (location.hash === '#chat') selected = '__general';
@@ -305,7 +318,9 @@
       section('Aspetto',
         el('div', { className: 'grid-2' },
           field('Font', fontSelect(t, 'font', `Come generale (${general.font})`)),
-          field('Dimensione testo', range(t, 'fontSize', { min: 14, max: 72, step: 1, fallback: general.fontSize, format: (v) => `${v}px` }), { onReset: inheritedReset('fontSize') }),
+          field('Dimensione titolo', range(t, 'titleSize', { min: 14, max: 140, step: 1, fallback: general.titleSize ?? Math.round((t.fontSize ?? general.fontSize) * 1.4), format: (v) => `${v}px` }), { onReset: inheritedReset('titleSize') }),
+          field('Dimensione testo', range(t, 'fontSize', { min: 14, max: 96, step: 1, fallback: general.fontSize, format: (v) => `${v}px` }), { onReset: inheritedReset('fontSize') }),
+          field('Dimensione messaggio', range(t, 'messageSize', { min: 10, max: 80, step: 1, fallback: general.messageSize ?? Math.round((t.fontSize ?? general.fontSize) * 0.77), format: (v) => `${v}px` }), { onReset: inheritedReset('messageSize') }),
           field('Colore principale (titolo e bordo)', colorInput(t, 'color', '#9146ff'), { onReset: reset('color') }),
           field('Colore del testo', colorInput(t, 'textColor', general.textColor), { onReset: inheritedReset('textColor') }),
           field('Colore dello sfondo', colorInput(t, 'background', general.background), { onReset: inheritedReset('background') }),
@@ -541,7 +556,9 @@
           field('Posizione sullo schermo', select(o, 'position', Object.entries(POSITION_LABELS).map(([value, label]) => ({ value, label })))),
           field('Animazione', select(o, 'animation', Object.entries(ANIMATION_LABELS).map(([value, label]) => ({ value, label })))),
           field('Font', fontSelect(o, 'font')),
-          field('Dimensione testo', range(o, 'fontSize', { min: 14, max: 72, step: 1, fallback: 26, format: (v) => `${v}px` }), { onReset: reset('fontSize') }),
+          field('Dimensione titolo', range(o, 'titleSize', { min: 14, max: 140, step: 1, fallback: Math.round((o.fontSize ?? 26) * 1.4), format: (v) => `${v}px` }), { onReset: reset('titleSize') }),
+          field('Dimensione testo', range(o, 'fontSize', { min: 14, max: 96, step: 1, fallback: 26, format: (v) => `${v}px` }), { onReset: reset('fontSize') }),
+          field('Dimensione messaggio', range(o, 'messageSize', { min: 10, max: 80, step: 1, fallback: Math.round((o.fontSize ?? 26) * 0.77), format: (v) => `${v}px` }), { onReset: reset('messageSize') }),
           field('Colore del testo', colorInput(o, 'textColor', '#ffffff'), { onReset: reset('textColor') }),
           field('Colore dello sfondo', colorInput(o, 'background', '#121218'), { onReset: reset('background') }),
           field('Opacità dello sfondo', range(o, 'backgroundOpacity', { min: 0, max: 100, step: 5, scale: 0.01, fallback: 0.88, format: (v) => `${Math.round(v * 100)}%` }), { onReset: reset('backgroundOpacity') }))),
@@ -604,7 +621,12 @@
 
   function renderForm() {
     const scroll = $('form').parentElement.scrollTop;
-    $('form').replaceChildren(...(selected === '__general' ? renderGeneralForm() : renderTypeForm(selected)).filter(Boolean));
+    try {
+      $('form').replaceChildren(...(selected === '__general' ? renderGeneralForm() : renderTypeForm(selected)).filter(Boolean));
+    } catch (err) {
+      $('form').replaceChildren(el('div', { className: 'notice' }, el('b', {}, '⚠️ Questa sezione non si è caricata. '), 'Il dettaglio dell\'errore è nel riquadro rosso in basso: copialo e mandalo a chi ti aiuta.'));
+      window.TG.showError?.(`Editor (${selected}): ${err.message}\n${err.stack ?? ''}`);
+    }
     $('form').parentElement.scrollTop = scroll;
   }
 

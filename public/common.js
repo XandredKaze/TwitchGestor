@@ -55,5 +55,31 @@
   const API_LEVEL = 3;
   const RESTART_HELP = 'Il programma TwitchGestor acceso è una versione precedente rispetto a questa pagina (succede se aggiorni i file mentre è acceso). Riavvialo: clicca "⏻ Spegni" in alto a destra, poi riapri OBS (oppure fai doppio clic su "Avvia TwitchGestor.vbs") e ricarica questa pagina con Ctrl+F5.';
 
-  window.TG = { api, el, money, token: () => token, API_LEVEL, RESTART_HELP };
+  window.TG = { api, el, money, token: () => token, API_LEVEL, RESTART_HELP, version: '' };
+
+  /** Mostra un errore della pagina in un riquadro, con un pulsante per copiarlo e mandarlo a chi ti aiuta. */
+  let errorBox = null;
+  function showError(message) {
+    if (!document.body) return;
+    const text = `TwitchGestor ${window.TG.version || '(versione sconosciuta)'} – ${location.pathname}\n${message}`;
+    if (!errorBox) {
+      errorBox = el('div', { className: 'error-box', role: 'alert' });
+      document.body.append(errorBox);
+    }
+    const pre = el('pre', {}, text);
+    errorBox.replaceChildren(
+      el('b', {}, '⚠️ Si è verificato un errore nella pagina'),
+      el('p', {}, 'Copia il testo qui sotto e mandalo a chi ti aiuta con TwitchGestor.'),
+      pre,
+      el('div', { className: 'buttons' },
+        el('button', {
+          onclick: async (e) => {
+            try { await navigator.clipboard.writeText(text); e.target.textContent = 'Copiato!'; } catch { getSelection().selectAllChildren(pre); }
+          },
+        }, 'Copia'),
+        el('button', { onclick: () => { errorBox.remove(); errorBox = null; } }, 'Chiudi')));
+  }
+  window.TG.showError = showError;
+  window.addEventListener('error', (e) => showError(`${e.message}\n${e.filename?.split('/').pop() ?? ''}:${e.lineno ?? ''}:${e.colno ?? ''}\n${e.error?.stack ?? ''}`.trim()));
+  window.addEventListener('unhandledrejection', (e) => showError(`${e.reason?.message ?? e.reason}\n${e.reason?.stack ?? ''}`.trim()));
 })();

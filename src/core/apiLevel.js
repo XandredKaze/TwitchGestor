@@ -3,3 +3,6 @@
  * quando le pagine hanno bisogno di funzioni nuove del programma.
  */
 export const API_LEVEL = 3;
+
+/** Versione mostrata nella dashboard (da tenere uguale a package.json). */
+export const APP_VERSION = '1.5.0';
