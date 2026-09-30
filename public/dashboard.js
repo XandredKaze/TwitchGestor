@@ -57,6 +57,13 @@
     }
 
     const banners = [];
+    // Programma vecchio acceso con pagine nuove (o file aggiornati dopo l'avvio): va riavviato.
+    if (state.apiLevel !== window.TG.API_LEVEL || state.restartNeeded) {
+      banners.push(el('div', { className: 'restart-banner' }, el('b', {}, '⚠️ Serve un riavvio di TwitchGestor. '),
+        state.restartNeeded && state.apiLevel === window.TG.API_LEVEL
+          ? 'Hai aggiornato i file del programma: le novità saranno attive dopo il riavvio. Clicca "⏻ Spegni" in alto a destra, poi riapri OBS (oppure "Avvia TwitchGestor.vbs") e ricarica la pagina con Ctrl+F5.'
+          : window.TG.RESTART_HELP));
+    }
     if (!twitch.configured) banners.push('Imposta TWITCH_CLIENT_ID e TWITCH_CLIENT_SECRET nel file .env e riavvia il programma.');
     else if (!twitch.user) banners.push('Collega il tuo account Twitch con il pulsante "Accedi con Twitch" in alto a destra.');
     if (twitch.missingScopes.length) banners.push(`Mancano dei permessi Twitch (${twitch.missingScopes.join(', ')}): esci e accedi di nuovo.`);

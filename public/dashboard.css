@@ -300,6 +300,7 @@ button.danger { color: var(--danger); }
   border: 1px solid var(--border);
   background: repeating-conic-gradient(#3a3a44 0% 25%, #2a2a32 0% 50%) 50% / 24px 24px;
 }
+.preview-frame iframe, .demo-overlay iframe { color-scheme: normal; } /* senza, col tema scuro il browser mette uno sfondo bianco dietro l'overlay */
 .preview-frame iframe { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; pointer-events: none; }
 .preview-sample { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
 
@@ -392,3 +393,5 @@ button.danger { color: var(--danger); }
 .piper-box { margin-top: 14px; padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
 .piper-box h3 { margin: 0 0 4px; text-transform: none; letter-spacing: 0; color: var(--text); font-size: 15px; }
 .piper-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); }
+
+.banner:has(.restart-banner) { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--panel)); }

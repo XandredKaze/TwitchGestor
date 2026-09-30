@@ -58,6 +58,11 @@
   async function load() {
     const data = await api('/api/config', { method: 'GET' });
     if (!data) return;
+    if (data.apiLevel !== window.TG.API_LEVEL) {
+      // Programma vecchio acceso: l'editor nuovo non può funzionare, spiega cosa fare invece di restare vuoto.
+      $('form').replaceChildren(el('div', { className: 'notice' }, el('b', {}, '⚠️ Serve un riavvio di TwitchGestor. '), window.TG.RESTART_HELP));
+      return;
+    }
     saved = data.config;
     draft = clone(saved);
     defaults = data.defaults;

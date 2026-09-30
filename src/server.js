@@ -9,6 +9,7 @@ import { NotificationManager } from './core/NotificationManager.js';
 import { sanitizeConfig, ANIMATIONS, POSITIONS, SOUND_PRESETS } from './core/schema.js';
 import { recentLogs } from './logger.js';
 import { cleanText } from './core/ttsText.js';
+import { API_LEVEL } from './version.js';
 import { parseKofi, parseGenericDonation } from './sources/webhooks.js';
 import { createLogger } from './logger.js';
 
@@ -180,6 +181,7 @@ export function createServer(app) {
     'POST /api/auth/bot/logout': () => app.logoutBot(),
     'GET /api/logs': () => ({ logs: recentLogs() }),
     'GET /api/config': () => ({
+      apiLevel: API_LEVEL,
       config: app.config.get(),
       defaults: app.config.defaults(),
       options: { animations: ANIMATIONS, positions: POSITIONS, sounds: SOUND_PRESETS },
