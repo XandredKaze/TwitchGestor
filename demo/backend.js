@@ -13,6 +13,7 @@ import { NotificationManager } from '../src/core/NotificationManager.js';
 import { NOTIFICATION_TYPES, testNotification } from '../src/core/normalize.js';
 import { sanitizeConfig, diffConfig, ANIMATIONS, POSITIONS, SOUND_PRESETS } from '../src/core/schema.js';
 import { recentLogs, createLogger } from '../src/logger.js';
+import { liveSession } from '../src/core/session.js';
 
 const CHANNEL = { id: '0', login: 'canale_demo' };
 const BOT = { id: '1', login: 'Wolfery' };
@@ -73,7 +74,15 @@ function demoCreditsData() {
     subs.push({ name: nm(i), gift, gifter: gift ? gifters[(i / 4) % 4] : '', tier: '1000' });
   }
   subs.push({ name: 'GeneroSO', gift: false, gifter: '', tier: '1000' });
-  return { fetchedAt: 0, demo: true, subs, followers: Array.from({ length: 40 }, (_, i) => nm(i + 50)) };
+  subs[1].tier = '2000'; subs[5].tier = '2000'; subs[9].tier = '3000';
+  const pickN = (from, n) => Array.from({ length: n }, (_, i) => nm(from + i));
+  return {
+    fetchedAt: 0, demo: true, subs, followers: pickN(50, 40),
+    moderators: ['ModAnna', 'ModLuca', 'Wolfery'], vips: pickN(120, 4),
+    bits: Object.fromEntries(['day', 'week', 'month', 'year', 'all'].map((p, k) => [p, pickN(140, 6).map((name, i) => ({ name, value: (6 - i) * 250 * (k + 1) }))])),
+    chatters: pickN(200, 25).map((name) => ({ name, at: Date.now() })),
+    session: { ...liveSession([], Date.now()), live: true },
+  };
 }
 
 const VIEWER_CHAT = ['ciao a tutti!', 'che bella live 🔥', 'GG', 'ahahah', 'forza!', 'da dove stai giocando?', 'quel salto era perfetto', 'LUL', 'buonasera chat', '💜💜💜'];
@@ -83,6 +92,7 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 class DemoBackend {
   constructor() {
     this.log = createLogger('demo');
+    this.startedAt = Date.now();
     this.defaults = defaults;
     this.config = sanitizeConfig(deepMerge(defaults, storage.get('tg-demo-config', {})), defaults);
     this.manager = new NotificationManager({ config: this.config });
@@ -102,7 +112,14 @@ class DemoBackend {
     });
     this.manager.on('skip', (alert) => this.#send('overlay', { type: 'skip', id: alert.id }));
     this.manager.on('queue', (queue) => this.#send('dashboard', { type: 'queue', queue }));
-    this.manager.on('notification', () => this.broadcastState());
+    this.manager.on('notification', () => {
+      this.broadcastState();
+      const data = this.credits.state.data;
+      if (data) {
+        this.credits.state.data = { ...data, session: { ...liveSession(this.manager.history, this.startedAt), live: true } };
+        this.credits.rev += 1;
+      }
+    });
     this.manager.on('chat', (text) => {
       this.#chat(this.bot ? this.bot.login : CHANNEL.login, text, true);
       this.log.info(`Chat (${this.bot ? this.bot.login : CHANNEL.login}): ${text}`);

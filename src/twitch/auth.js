@@ -14,6 +14,9 @@ export const SCOPES = [
   'channel:read:redemptions', // punti canale
   'channel:read:charity', // donazioni benefiche Twitch
   'user:write:chat', // ringraziamenti in chat (se non c'è un account bot)
+  'moderation:read', // titoli di coda: moderatori
+  'channel:read:vips', // titoli di coda: VIP
+  'moderator:read:chatters', // titoli di coda: chi era in chat
 ];
 
 /** Permessi dell'account bot: gli serve solo scrivere in chat. */

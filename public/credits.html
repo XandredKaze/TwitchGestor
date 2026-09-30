@@ -366,6 +366,50 @@ const SECTION_STYLE = [
   ['align', '--cr-name-align', 'nameAlign', ''],
 ];
 const BUILTIN_SECTIONS = { subs: 'Abbonati', gifts: 'Gift', followers: 'Follower' };
+// Da dove prende i nomi una sezione aggiunta: solo categorie che Twitch comunica davvero a TwitchGestor.
+const CUSTOM_SOURCES = [
+  ['Scritti a mano', [['manual', 'Nomi scritti a mano']]],
+  ['Da Twitch', [['tier1', 'Abbonati Tier 1'], ['tier2', 'Abbonati Tier 2'], ['tier3', 'Abbonati Tier 3'], ['mods', 'Moderatori'], ['vips', 'VIP'], ['bits', 'Classifica bits'], ['chatters', 'Chi era in chat']]],
+  ['Da questa live', [['live.follows', 'Nuovi follower'], ['live.subs', 'Nuovi abbonati'], ['live.resubs', 'Rinnovi abbonamento'], ['live.gifters', 'Chi ha regalato sub'], ['live.cheers', 'Chi ha inviato bits'], ['live.donations', 'Chi ha donato'], ['live.raids', 'Chi ha fatto raid'], ['live.redemptions', 'Chi ha riscattato premi']]],
+];
+const SOURCE_LABEL = Object.fromEntries(CUSTOM_SOURCES.flatMap(([, list]) => list));
+const AMOUNT_SOURCES = ['bits', 'live.resubs', 'live.gifters', 'live.cheers', 'live.donations', 'live.raids', 'live.redemptions'];
+const RELOGIN_SOURCES = ['mods', 'vips', 'chatters'];
+const SERVER_SOURCES = ['mods', 'vips', 'chatters', 'bits'];
+const BITS_PERIODS = [['day', 'Oggi'], ['week', 'Questa settimana'], ['month', 'Questo mese'], ['year', "Quest'anno"], ['all', 'Da sempre']];
+const fmtNum = n => Number(n || 0).toLocaleString('it-IT');
+const fmtMoney = (v, cur) => { try { return new Intl.NumberFormat('it-IT', { style: 'currency', currency: cur || 'EUR' }).format(v); } catch { return v + ' ' + (cur || ''); } };
+
+/** Nomi (ed eventuale quantità) di una sezione aggiunta, in base alla fonte scelta. */
+function customRows(c, d) {
+  const session = d.session || {};
+  const tier = { tier1: '1000', tier2: '2000', tier3: '3000' }[c.source];
+  const byName = (a, b) => a.name.localeCompare(b.name, 'it', { sensitivity: 'base' });
+  const names = list => list.map(name => ({ name }));
+  switch (c.source || 'manual') {
+    case 'manual': return names(String(c.names || '').split('\n').map(n => n.trim()).filter(Boolean));
+    case 'tier1': case 'tier2': case 'tier3':
+      return names([...new Set((d.subs || []).filter(x => x.tier === tier).map(x => x.name))]).sort(byName);
+    case 'mods': return names(d.moderators || []).sort(byName);
+    case 'vips': return names(d.vips || []).sort(byName);
+    case 'chatters': return names((d.chatters || []).map(x => x.name)).sort(byName);
+    case 'bits': return ((d.bits || {})[c.period || 'all'] || []).map(b => ({ name: b.name, amount: fmtNum(b.value) + ' bits' }));
+    case 'live.follows': return names(session.follows || []);
+    case 'live.subs': return names(session.subs || []);
+    case 'live.resubs': return (session.resubs || []).map(r => ({ name: r.name, amount: r.value + (r.value === 1 ? ' mese' : ' mesi') }));
+    case 'live.gifters': return (session.gifters || []).map(r => ({ name: r.name, amount: r.value + ' sub' }));
+    case 'live.cheers': return (session.cheers || []).map(r => ({ name: r.name, amount: fmtNum(r.value) + ' bits' }));
+    case 'live.donations': return (session.donations || []).map(r => ({ name: r.name, amount: fmtMoney(r.value, r.currency) }));
+    case 'live.raids': return (session.raids || []).map(r => ({ name: r.name, amount: fmtNum(r.value) + (r.value === 1 ? ' spettatore' : ' spettatori') }));
+    case 'live.redemptions': {
+      const want = String(c.reward || '').trim().toLowerCase();
+      const counts = new Map();
+      for (const r of session.redemptions || []) if (!want || r.reward.toLowerCase().includes(want)) counts.set(r.name, (counts.get(r.name) || 0) + 1);
+      return [...counts].map(([name, n]) => ({ name, amount: n + '×' }));
+    }
+    default: return [];
+  }
+}
 const secKey = (id, field) => `sec.${id}.${field}`;
 
 /** Ordine delle sezioni: quello salvato, più le sezioni nuove in fondo. */
@@ -510,8 +554,10 @@ function buildSections(s, d) {
   // sezioni aggiunte a mano (es. Moderatori): nomi scritti nel pannello e testo libero
   for (const c of s.customSections || []) {
     if (c.show === false) continue;
-    const names = String(c.names || '').split('\n').map(n => n.trim()).filter(n => n && keep(n));
-    sections.push({ key: c.id, custom: true, title: c.title || '', text: c.text || '', groups: [{ title: c.subtitle || '', names }] });
+    let rows = customRows(c, d).filter(r => keep(r.name));
+    if (c.max > 0) rows = rows.slice(0, c.max);
+    const withAmount = c.showAmount && AMOUNT_SOURCES.includes(c.source);
+    sections.push({ key: c.id, custom: true, title: c.title || '', text: c.text || '', groups: [{ title: c.subtitle || '', names: rows.map(r => r.name), counts: withAmount ? rows.map(r => r.amount) : null }] });
   }
   const order = sectionOrder(s);
   sections.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
@@ -529,7 +575,22 @@ function demoData() {
     subs.push({ name: nm(i), gift, gifter: gift ? gifters[(i / 4) % 4] : '', tier: '1000' });
   }
   subs.push({ name: 'GeneroSO', gift: false, gifter: '', tier: '1000' });
-  return { fetchedAt: 0, demo: true, subs, followers: Array.from({ length: 40 }, (_, i) => nm(i + 50)) };
+  subs[1].tier = '2000'; subs[5].tier = '2000'; subs[9].tier = '3000';
+  const pick = (from, n) => Array.from({ length: n }, (_, i) => nm(from + i));
+  return {
+    fetchedAt: 0, demo: true, subs, followers: pick(50, 40),
+    moderators: ['ModAnna', 'ModLuca', 'Wolfery'], vips: pick(120, 4),
+    bits: Object.fromEntries(['day', 'week', 'month', 'year', 'all'].map((p, k) => [p, pick(140, 6).map((name, i) => ({ name, value: (6 - i) * 250 * (k + 1) }))])),
+    chatters: pick(200, 25).map(name => ({ name, at: Date.now() })),
+    session: {
+      live: true, since: new Date(Date.now() - 3 * 3600e3).toISOString(),
+      follows: pick(300, 8), subs: pick(320, 3), resubs: pick(330, 3).map((name, i) => ({ name, value: 3 + i * 7 })),
+      gifters: [{ name: 'GeneroSO', value: 10 }, { name: 'ZioSub', value: 5 }], cheers: pick(340, 4).map((name, i) => ({ name, value: 1000 - i * 200 })),
+      donations: [{ name: 'Mecenate_', value: 50, currency: 'EUR' }, { name: pick(350, 1)[0], value: 5, currency: 'EUR' }],
+      raids: [{ name: 'CanaleAmico', value: 42 }],
+      redemptions: pick(360, 5).map((name, i) => ({ name, reward: i % 2 ? 'Idratati' : 'Scegli la canzone' })),
+    },
+  };
 }
 
 /* =====================================================================
@@ -1247,7 +1308,7 @@ function startPanel() {
         else st[SHOW_KEY[id]] = show.checked;
       });
       row.append(arrow('↑', -1, 'Sposta su'), arrow('↓', 1, 'Sposta giù'), name);
-      if (c) row.append(el('span', 'p-tag', 'tua'));
+      if (c) row.append(el('span', 'p-tag', (c.source || 'manual') === 'manual' ? 'a mano' : c.source.startsWith('live.') ? 'dalla live' : 'da Twitch'));
       if (s[secKey(id, 'custom')]) row.append(el('span', 'p-tag', 'stile proprio'));
       row.append(show);
       if (c) {
@@ -1291,9 +1352,61 @@ function startPanel() {
         return node;
       };
       const ta = rows => { const t = el('textarea'); t.rows = rows; return t; };
+      const patch = (changes, rerender) => {
+        const st = load(K.settings, {});
+        st.customSections = (st.customSections || []).map(x => x.id === id ? { ...x, ...changes } : x);
+        save(K.settings, st); renderCategories(); renderSections();
+        if (rerender) renderSectionEditor();
+      };
+      const source = c.source || 'manual';
+
+      // da dove prendere i nomi
+      const srcSel = el('select');
+      for (const [group, list] of CUSTOM_SOURCES) {
+        const og = el('optgroup'); og.label = group;
+        for (const [val, label] of list) { const o = el('option', null, label); o.value = val; og.append(o); }
+        srcSel.append(og);
+      }
+      srcSel.value = source;
+      srcSel.onchange = () => {
+        const next = srcSel.value;
+        const autoTitle = !c.title || c.title === 'Nuova sezione' || Object.values(SOURCE_LABEL).includes(c.title);
+        patch({ source: next, ...(autoTitle ? { title: SOURCE_LABEL[next] } : {}) }, true);
+        if (SERVER_SOURCES.includes(next)) fetchData().catch(() => {}); // scarica subito i nomi che servono
+      };
+
       const grid = el('div', 'p-grid2');
       grid.append(field('Titolo', edit('title', el('input'))), field('Sottotitolo (facoltativo)', edit('subtitle', el('input'))));
-      box.append(grid, field('Nomi (uno per riga)', edit('names', ta(5))), field('Testo libero sotto il titolo (facoltativo)', edit('text', ta(3))));
+      box.append(field('Da dove prendere i nomi', srcSel), grid);
+
+      if (source === 'manual') box.append(field('Nomi (uno per riga)', edit('names', ta(5))));
+      if (source === 'bits') {
+        const per = el('select');
+        for (const [val, label] of BITS_PERIODS) { const o = el('option', null, label); o.value = val; per.append(o); }
+        per.value = c.period || 'all';
+        per.onchange = () => { patch({ period: per.value }); fetchData().catch(() => {}); };
+        box.append(rowField('Periodo della classifica', per));
+      }
+      if (source === 'live.redemptions') box.append(field('Solo questo premio (facoltativo, es. Idratati)', edit('reward', el('input'))));
+      if (AMOUNT_SOURCES.includes(source)) {
+        const amt = el('input'); amt.type = 'checkbox'; amt.checked = !!c.showAmount;
+        amt.onchange = () => patch({ showAmount: amt.checked });
+        box.append(rowField('Mostra la quantità accanto ai nomi', amt));
+      }
+      if (source !== 'manual') {
+        const max = el('input'); max.type = 'number'; max.min = 0; max.step = 1; max.value = c.max || 0;
+        max.oninput = () => patch({ max: Math.max(0, parseInt(max.value, 10) || 0) });
+        box.append(rowField('Numero massimo di nomi (0 = tutti)', max));
+      }
+      const hint = {
+        tier1: 'Gli abbonamenti Prime contano come Tier 1: Twitch non li distingue.',
+        mods: 'Serve un nuovo accesso a Twitch (esci e accedi di nuovo dalla dashboard) la prima volta.',
+        vips: 'Serve un nuovo accesso a Twitch (esci e accedi di nuovo dalla dashboard) la prima volta.',
+        chatters: 'Twitch dice solo chi è collegato alla chat in quel momento: TwitchGestor controlla ogni 5 minuti e ricorda chi è passato nelle ultime 12 ore. Chi guarda senza entrare in chat non si può sapere. La prima volta serve un nuovo accesso a Twitch.',
+        bits: 'Classifica ufficiale dei bits del canale, scaricata da Twitch.',
+      }[source] || (source.startsWith('live.') ? 'Conta gli eventi arrivati a TwitchGestor dall\'inizio della live in corso (se non sei in live, le ultime 12 ore). Gli alert di prova non contano.' : '');
+      if (hint) box.append(el('p', 'p-hint', hint));
+      box.append(field('Testo libero sotto il titolo (facoltativo)', edit('text', ta(3))));
       const del = el('button', 'danger', 'Elimina questa sezione'); del.type = 'button';
       confirmClick(del, () => deleteSection(id), 'Clicca di nuovo per eliminarla');
       box.append(el('div', 'p-btns')); box.lastChild.append(del);
@@ -1325,7 +1438,7 @@ function startPanel() {
   $('btn-add-section').onclick = () => {
     const id = 'c' + Date.now().toString(36);
     updateSettings((st, full) => {
-      st.customSections = [...(st.customSections || []), { id, title: 'Moderatori', subtitle: '', names: '', text: '', show: true }];
+      st.customSections = [...(st.customSections || []), { id, title: 'Nuova sezione', source: 'manual', subtitle: '', names: '', text: '', show: true }];
       st.order = [...sectionOrder(full), id];
     });
     selectedSec = id;
@@ -1358,7 +1471,7 @@ function startPanel() {
     b.type = 'button';
     b.title = 'Escludi ' + name;
     b.append(el('span', 'n', (isTop ? '★ ' : '') + name));
-    if (count) b.append(el('span', 'c', '×' + count));
+    if (count) b.append(el('span', 'c', typeof count === 'number' ? '×' + count : count));
     b.append(el('span', 'x', '✕'));
     b.onclick = () => toggleExcluded(name);
     return b;

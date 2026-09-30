@@ -102,7 +102,12 @@ Titoli di coda animati per la fine della live con **abbonati** (paganti e regala
 
 1. In OBS, nella scena dei titoli di coda: **+ → Browser**, URL `http://localhost:3000/credits`, 1920×1080, spunta **Controlla l'audio tramite OBS** (per la musica) e, se vuoi, **Aggiorna il browser quando la scena diventa attiva** (così ripartono dall'inizio).
 2. Si configurano dalla scheda **🎬 Titoli di coda** della dashboard: testi, categorie, velocità, zona di comparsa dei nomi, colori, font, particelle, musica (trascina il brano), nomi da escludere (es. i bot), nomi di prova e anteprima. In più:
-   - **Sezioni**: ordine con le frecce ↑↓, **sezioni tue** (es. Moderatori, Ringraziamenti speciali) con nomi scritti a mano e testo libero, e per ogni sezione **stile proprio** (colori, font, dimensioni, colonne, allineamento) e un'**icona** accanto ai nomi.
+   - **Sezioni**: ordine con le frecce ↑↓, **sezioni tue** con testo libero e, per ogni sezione, **stile proprio** (colori, font, dimensioni, colonne, allineamento) e un'**icona** accanto ai nomi. I nomi di una sezione aggiunta possono venire da:
+     - **nomi scritti a mano**;
+     - **Twitch**: abbonati Tier 1 / Tier 2 / Tier 3 (i Prime contano come Tier 1), moderatori, VIP, classifica bits (oggi, settimana, mese, anno, sempre), chi era in chat (controllato ogni 5 minuti, ultime 12 ore);
+     - **questa live** (eventi ricevuti da TwitchGestor dall'inizio della live, o nelle ultime 12 ore): nuovi follower, nuovi abbonati, rinnovi, chi ha regalato sub, chi ha inviato bits, chi ha donato, chi ha fatto raid, chi ha riscattato premi (anche un premio preciso). Con la quantità accanto al nome, se vuoi.
+
+     Moderatori, VIP e chat richiedono permessi Twitch aggiuntivi: dopo l'aggiornamento esci e accedi di nuovo dalla dashboard.
    - **Immagini e sfondo**: logo in cima, immagine finale, immagine o video di sfondo (opacità, adattamento, sfocatura), particelle con colore, forma (luci, stelle, cuori, neve), quantità e velocità.
    - **Nomi**: allineamento, spaziatura, spessore, maiuscolo, spaziatura delle lettere ed **effetto di comparsa** (dissolvenza, sale dal basso, zoom, scivola, bagliore).
    - **Fine dello scorrimento**: ricomincia da capo oppure **si ferma sul testo finale**.

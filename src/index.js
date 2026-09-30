@@ -54,7 +54,9 @@ const creditsStore = new CreditsStore({ file: path.join(DATA_DIR, 'credits.json'
 const creditsScheduler = startCreditsScheduler({
   store: creditsStore,
   getClient: () => (auth.user ? { helix, user: auth.user } : null),
+  getHistory: () => manager.history,
 });
+manager.on('notification', () => creditsScheduler.updateSession());
 
 let eventsub = null;
 const streamelements = env.STREAMELEMENTS_JWT ? new StreamElementsSource({ jwt: env.STREAMELEMENTS_JWT }) : null;
