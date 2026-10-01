@@ -18,6 +18,7 @@ import { cleanText } from '../src/core/ttsText.js';
 import { API_LEVEL, APP_VERSION } from '../src/core/apiLevel.js';
 
 const CHANNEL = { id: '0', login: 'canale_demo' };
+const DEMO_SCENES = ['Inizio', 'Gioco', 'Chiacchiere', 'Pausa', 'Fine'];
 const BOT = { id: '1', login: 'Wolfery' };
 const UPLOAD_KINDS = {
   sounds: ['.mp3', '.ogg', '.wav'],
@@ -183,6 +184,7 @@ class DemoBackend {
       queue: m.queueState(),
       stats: { ...m.stats, donors: undefined, topDonors: m.topDonors() },
       history: m.history.slice(0, 200),
+      obs: { enabled: true, host: '127.0.0.1', port: 4455, hasPassword: true, status: 'connesso', error: '', scenes: DEMO_SCENES, current: this.scene ?? DEMO_SCENES[1] },
       demo: { simulating: Boolean(this.simulation), chat: this.chat.slice(-40) },
     };
   }
@@ -262,6 +264,15 @@ class DemoBackend {
       case 'POST /api/auth/logout': return fail(400, 'Nella demo l\'account del canale è simulato e non si può scollegare.');
       case 'POST /api/auth/bot/logout': this.bot = null; this.broadcastState(); return ok();
       case 'POST /api/shutdown': return fail(400, 'Nella demo il programma non si spegne: chiudi semplicemente la pagina.');
+      case 'GET /api/obs': return ok(this.getState().obs);
+      case 'PUT /api/obs/settings': return fail(400, 'Nella demo OBS è simulato: il collegamento si configura nel programma installato sul PC.');
+      case 'POST /api/obs/scene': {
+        if (!DEMO_SCENES.includes(body?.scene)) return fail(400, 'Scena sconosciuta');
+        this.scene = body.scene;
+        this.log.info(`Scena OBS (simulata): ${body.scene}`);
+        this.broadcastState();
+        return ok(this.getState().obs);
+      }
       case 'POST /api/demo/simulate': this.setSimulation(Boolean(body?.on)); this.broadcastState(); return ok();
       case 'POST /api/upload': {
         const kind = url.searchParams.get('kind');

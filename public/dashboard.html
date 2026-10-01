@@ -26,6 +26,16 @@
 
   <main id="tab-live" class="live-grid">
     <div class="col col-side">
+    <section class="panel" id="obs-panel">
+      <div class="panel-head">
+        <h2>Scene OBS</h2>
+        <button id="btn-obs-settings" class="small-btn" title="Impostazioni del collegamento a OBS">⚙ Collegamento</button>
+      </div>
+      <div id="obs-status"></div>
+      <div id="obs-scenes" class="obs-scenes"></div>
+      <form id="obs-form" class="obs-form" hidden autocomplete="off"></form>
+    </section>
+
     <section class="panel" id="queue-panel">
       <h2>Coda alert</h2>
       <div id="now-playing" class="now-playing">Nessun alert in corso</div>

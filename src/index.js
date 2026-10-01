@@ -11,6 +11,7 @@ import { createServer } from './server.js';
 import { API_LEVEL, APP_VERSION, codeChangedSinceStart } from './version.js';
 import { CreditsStore, startCreditsScheduler } from './credits.js';
 import { TtsService, PiperManager } from './tts.js';
+import { ObsClient } from './obs.js';
 import { createLogger } from './logger.js';
 
 loadEnv();
@@ -70,6 +71,9 @@ const creditsScheduler = startCreditsScheduler({
 });
 manager.on('notification', () => creditsScheduler.updateSession());
 
+// Scene di OBS (tramite OBS WebSocket, incluso in OBS 28+).
+const obs = new ObsClient({ file: path.join(DATA_DIR, 'obs.json') });
+
 let eventsub = null;
 const streamelements = env.STREAMELEMENTS_JWT ? new StreamElementsSource({ jwt: env.STREAMELEMENTS_JWT }) : null;
 
@@ -81,6 +85,7 @@ const app = {
   botAuth,
   credits: { store: creditsStore, refresh: (reason) => creditsScheduler.refresh(reason) },
   tts,
+  obs,
   chatAccount,
   getState() {
     return {
@@ -100,6 +105,7 @@ const app = {
         webhook: env.DONATION_WEBHOOK_SECRET ? 'attivo' : 'disattivato',
       },
       overlays: web?.clients.overlay.size ?? 0,
+      obs: obs.state(),
       chatReplies: Boolean(config.get().chat?.enabled),
       chatAccount: chatAccount(),
       overlayUrl: `${publicUrl}/overlay`,
@@ -146,6 +152,9 @@ config.on('change', (c) => {
   web.toOverlays({ type: 'hello', overlay: c.overlay });
   app.broadcastState();
 });
+
+obs.on('status', () => app.broadcastState());
+obs.on('scenes', (state) => web.toDashboards({ type: 'obs', obs: state }));
 
 function startEventSub() {
   eventsub?.stop();
@@ -200,6 +209,7 @@ web.server.listen(port, host, async () => {
   fs.writeFileSync(PID_FILE, String(process.pid));
   log.info(`Dashboard: ${publicUrl}/dashboard${env.DASHBOARD_TOKEN ? '?token=…' : ''}`);
   log.info(`Overlay per OBS: ${publicUrl}/overlay`);
+  obs.start();
   if (!auth.configured) {
     log.warn('TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET mancanti nel file .env: Twitch non verrà collegato');
     return;
@@ -229,6 +239,7 @@ function shutdown() {
   log.info('Chiusura…');
   eventsub?.stop();
   streamelements?.stop();
+  obs.stop();
   manager.stop();
   creditsStore.saveNow();
   try {

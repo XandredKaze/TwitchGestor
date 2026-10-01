@@ -290,6 +290,17 @@ export function createServer(app) {
           });
           return send(res, 200, result ? { ...result, text } : { fallback: true, text, rate: cfg.rate ?? 0, volume: (cfg.volume ?? 100) / 100 });
         }
+        if (route === 'GET /api/obs') return send(res, 200, app.obs?.state() ?? null);
+        if (route === 'PUT /api/obs/settings') {
+          if (!app.obs) return send(res, 400, { error: 'Collegamento a OBS non disponibile' });
+          const state = app.obs.configure(await readBody(req));
+          app.broadcastState();
+          return send(res, 200, state);
+        }
+        if (route === 'POST /api/obs/scene') {
+          if (!app.obs) return send(res, 400, { error: 'Collegamento a OBS non disponibile' });
+          return send(res, 200, await app.obs.setScene(String((await readBody(req)).scene ?? '')));
+        }
         if (route === 'PUT /api/config') {
           const config = app.config.save((await readBody(req, 1_000_000)).config);
           return send(res, 200, { config });

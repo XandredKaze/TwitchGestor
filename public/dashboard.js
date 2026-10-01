@@ -50,6 +50,7 @@
       pill('Ko-fi', sources.kofi),
       pill('Webhook', sources.webhook),
       pill('Overlay aperti', overlays > 0 ? 'attivo' : 'nessuno'),
+      state.obs ? pill('OBS', state.obs.enabled ? state.obs.status : 'disattivato') : null,
     );
     const account = $('account');
     if (twitch.user) {
@@ -154,6 +155,95 @@
       return li;
     }));
   }
+
+  // ---------- Scene OBS (tramite OBS WebSocket) ----------
+
+  let switching = '';
+
+  function renderObs() {
+    const obs = state.obs;
+    $('obs-panel').hidden = !obs;
+    if (!obs) return;
+    const status = $('obs-status');
+    const scenes = $('obs-scenes');
+    if (!obs.enabled) {
+      status.replaceChildren(el('p', { className: 'muted small' },
+        'Collega OBS per cambiare scena da qui con un clic. ',
+        el('a', { href: '#', onclick: (e) => { e.preventDefault(); toggleObsForm(true); } }, 'Configura il collegamento')));
+      scenes.replaceChildren();
+      return;
+    }
+    if (obs.status !== 'connesso') {
+      status.replaceChildren(
+        pill('OBS', obs.status),
+        obs.error ? el('p', { className: 'obs-error' }, obs.error) : null,
+        obs.status === 'non raggiungibile'
+          ? el('p', { className: 'muted small' }, 'Riprovo da solo ogni pochi secondi. Controlla che OBS sia aperto e che in "Strumenti → Impostazioni server WebSocket" sia attivo il server.')
+          : null);
+      scenes.replaceChildren();
+      return;
+    }
+    status.replaceChildren(state.demo ? el('p', { className: 'muted small' }, 'Demo: scene finte, nel programma vero vedi quelle del tuo OBS.') : '');
+    if (!obs.scenes.length) {
+      scenes.replaceChildren(el('p', { className: 'muted small' }, 'Nessuna scena in OBS.'));
+      return;
+    }
+    scenes.replaceChildren(...obs.scenes.map((name) => el('button', {
+      type: 'button',
+      className: `${name === obs.current ? 'live' : ''} ${name === switching ? 'switching' : ''}`,
+      title: name === obs.current ? 'Scena in onda' : `Passa alla scena "${name}"`,
+      'aria-pressed': name === obs.current ? 'true' : 'false',
+      onclick: async () => {
+        if (name === state.obs.current || switching) return;
+        switching = name;
+        renderObs();
+        const result = await window.TG.api('/api/obs/scene', { body: { scene: name } });
+        switching = '';
+        if (result) state.obs = result;
+        renderObs();
+      },
+    }, name)));
+  }
+
+  function toggleObsForm(open = $('obs-form').hidden) {
+    const form = $('obs-form');
+    form.hidden = !open;
+    if (!open) return;
+    const obs = state.obs;
+    const field = (label, input) => el('label', {}, label, input);
+    const enabled = el('input', { type: 'checkbox', checked: true });
+    const host = el('input', { type: 'text', value: obs.host, spellcheck: 'false' });
+    const port = el('input', { type: 'number', min: '1', max: '65535', value: String(obs.port) });
+    const password = el('input', { type: 'password', placeholder: obs.hasPassword ? '•••••• (salvata, lascia vuoto per non cambiarla)' : 'password di OBS WebSocket' });
+    form.replaceChildren(
+      el('ol', { className: 'muted small' },
+        el('li', {}, 'In OBS apri ', el('b', {}, 'Strumenti → Impostazioni server WebSocket'), '.'),
+        el('li', {}, 'Spunta ', el('b', {}, 'Abilita server WebSocket'), '.'),
+        el('li', {}, 'Premi ', el('b', {}, 'Mostra informazioni di connessione'), ' e copia qui porta e password.')),
+      el('label', { className: 'inline' }, enabled, 'Collega TwitchGestor a OBS'),
+      el('div', { className: 'fields' }, field('Indirizzo (PC con OBS)', host), field('Porta', port)),
+      field('Password', password),
+      el('div', { className: 'buttons' },
+        el('button', { type: 'submit', className: 'primary' }, '💾 Salva e collega'),
+        obs.hasPassword ? el('button', {
+          type: 'button',
+          title: 'Da usare se in OBS hai disattivato l\'autenticazione',
+          onclick: async () => { if (await window.TG.api('/api/obs/settings', { method: 'PUT', body: { clearPassword: true } })) toggleObsForm(false); },
+        }, 'Togli password') : null,
+        el('button', { type: 'button', onclick: () => toggleObsForm(false) }, 'Chiudi')),
+      el('p', { className: 'muted small' }, 'Se OBS è su questo PC lascia 127.0.0.1. La password resta salvata solo sul tuo PC (data/obs.json).'));
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const body = { enabled: enabled.checked, host: host.value.trim(), port: Number(port.value) };
+      if (password.value) body.password = password.value;
+      const result = await window.TG.api('/api/obs/settings', { method: 'PUT', body });
+      if (!result) return;
+      state.obs = result;
+      toggleObsForm(false);
+      renderObs();
+    };
+  }
+  $('btn-obs-settings').onclick = () => toggleObsForm();
 
   // ---------- Anteprima live e chat (embed ufficiali di Twitch) ----------
 
@@ -276,6 +366,7 @@
     renderStats();
     renderFilters();
     renderFeed();
+    renderObs();
     $('overlay-url').textContent = state.overlayUrl;
     renderEmbeds();
   }
@@ -361,6 +452,10 @@
         state = msg.state;
         renderAll();
         if (first) renderTestButtons();
+      }
+      if (msg.type === 'obs' && state) {
+        state.obs = msg.obs;
+        renderObs();
       }
       if (msg.type === 'queue' && state) {
         state.queue = msg.queue;

@@ -19,6 +19,7 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 - **Coda degli alert**: le notifiche vengono mostrate una alla volta, mai sovrapposte. Dalla dashboard puoi mettere in pausa, saltare, svuotare la coda o **riproporre** un alert passato.
 - **Voce (text-to-speech)** gratuita e locale: legge gli alert e i messaggi degli spettatori con le voci di Windows, e la voce va in live tramite OBS.
 - **Anteprima della live e chat di Twitch** direttamente nella dashboard (scheda Live).
+- **Cambio scena di OBS** con un clic dalla dashboard (tramite OBS WebSocket, già incluso in OBS).
 - **Titoli di coda animati** (credit roll) con abbonati, gift e follower scaricati in automatico, musica e pannello di controllo.
 - **Editor degli alert nella dashboard** con anteprima dal vivo: testi, suoni, font, colori, sfondo, immagini e animazioni.
 - **Overlay per OBS** con animazioni, colori per tipo, immagini/GIF/video e suoni (4 suoni integrati o i tuoi file).
@@ -96,6 +97,18 @@ Nella scheda **📡 Live** della dashboard trovi il player della tua live (senza
 - Apri la dashboard da **`http://localhost:3000`**: Twitch mostra player e chat solo su `localhost` (non su `127.0.0.1`).
 - Per scrivere in chat devi essere collegato a twitch.tv nello stesso browser; se il riquadro non te lo permette usa **Finestra ↗**.
 - Con **Nascondi** togli player o chat e risparmi risorse del PC durante la live.
+
+## Cambiare scena di OBS
+
+Nella scheda **📡 Live** il riquadro **Scene OBS** mostra tutte le tue scene: quella in onda è rossa, clicca su un'altra per mandarla in onda. La lista si aggiorna da sola se aggiungi, rinomini o cambi scena da OBS.
+
+Serve una sola configurazione:
+
+1. In OBS (versione 28 o successiva) apri **Strumenti → Impostazioni server WebSocket** e spunta **Abilita server WebSocket**.
+2. Premi **Mostra informazioni di connessione** e copia la password.
+3. Nella dashboard clicca **⚙ Collegamento** nel riquadro Scene OBS, incolla la password (la porta di solito è 4455) e premi **Salva e collega**.
+
+Il collegamento resta su questo PC; la password è salvata solo in `data/obs.json`. Se OBS è chiuso TwitchGestor riprova da solo finché non lo riapri. In alto, il pallino **OBS** dice se è collegato.
 
 ## Voce (text-to-speech)
 
@@ -223,6 +236,7 @@ Plurale: `{amount|o|i}` scrive `o` se l'importo è 1, altrimenti `i` (es. `abbon
 
 - In alto accanto a "TwitchGestor" c'è la **versione** del programma acceso. Se compare la fascia rossa **"Serve un riavvio"**, il programma acceso è più vecchio delle pagine: clicca **⏻ Spegni**, riapri OBS (o "Avvia TwitchGestor.vbs") e ricarica con Ctrl+F5.
 - Se la pagina ha un errore compare un **riquadro rosso** con il dettaglio e il pulsante **Copia**: incollalo a chi ti aiuta.
+- **Scene OBS "password errata"**: ricopia la password da OBS (Strumenti → Impostazioni server WebSocket → Mostra informazioni di connessione). **"non raggiungibile"**: OBS è chiuso oppure il server WebSocket non è abilitato.
 - I messaggi del programma sono in **Live → Registro del programma** e in `data/twitchgestor.log`.
 
 ## Sicurezza

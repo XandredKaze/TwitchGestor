@@ -105,6 +105,7 @@ button.danger { color: var(--danger); }
 .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .col-side { grid-area: side; }
 .col-center { grid-area: center; }
+#obs-panel { grid-area: obs; }
 #queue-panel { grid-area: queue; }
 #stats-panel { grid-area: stats; }
 .stream-panel { grid-area: stream; }
@@ -116,11 +117,11 @@ button.danger { color: var(--danger); }
   .col { display: contents; }
   .live-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: "stream stream" "queue chat" "stats chat" "feed feed" "logs logs";
+    grid-template-areas: "stream stream" "obs chat" "queue chat" "stats chat" "feed feed" "logs logs";
   }
 }
 @media (max-width: 700px) {
-  .live-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "stream" "chat" "queue" "stats" "feed" "logs"; padding: 16px; }
+  .live-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "stream" "obs" "chat" "queue" "stats" "feed" "logs"; padding: 16px; }
   .chat-frame { min-height: 420px; }
   header { padding: 12px 16px; }
 }
@@ -400,3 +401,21 @@ button.danger { color: var(--danger); }
 .app-version { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 6px; }
 .zoom select { font: inherit; font-size: 13px; padding: 3px 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
 .banner:has(.restart-banner) { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--panel)); }
+
+/* Scene OBS */
+.obs-scenes { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; margin-top: 10px; }
+.obs-scenes button { padding: 10px 8px; overflow-wrap: anywhere; text-align: center; }
+.obs-scenes button.live { background: var(--danger); border-color: var(--danger); color: #fff; font-weight: 700; }
+.obs-scenes button.live::before { content: '● '; }
+.obs-scenes .switching { opacity: 0.6; }
+.obs-error { margin: 8px 0 0; color: var(--danger); font-size: 13px; }
+.obs-form { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.obs-form[hidden] { display: none; }
+.obs-form .fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(70px, 1fr); gap: 8px; }
+.obs-form label { display: grid; gap: 3px; font-size: 13px; color: var(--muted); }
+.obs-form label.inline { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 14px; }
+.obs-form input[type=text], .obs-form input[type=number], .obs-form input[type=password] {
+  font: inherit; width: 100%; padding: 6px 8px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+}
+.obs-form ol { margin: 0; padding-left: 20px; }
