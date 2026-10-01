@@ -580,9 +580,9 @@ input, select, textarea { transition: border-color 0.15s, box-shadow 0.15s; }
 .ui-brutal .m-line.short { width: 60%; background: #b39bd3; }
 .ui-brutal .m-btn { width: 55%; height: 13px; border: 2px solid #e6e6e6; }
 .roll-brutal { background: #151515 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
-.roll-brutal .m-title { width: 60%; height: 16px; border: 2px solid #e6e6e6; border-bottom-width: 2px; background: linear-gradient(#b39bd3, #b39bd3) 6px 50% / 40% 5px no-repeat, linear-gradient(#e6e6e6, #e6e6e6) calc(100% - 5px) 50% / 6px 6px no-repeat; margin-bottom: 2px; }
-.roll-brutal .m-name { width: 34%; height: 6px; background: #e6e6e6; }
-.roll-brutal .m-name:nth-child(3) { width: 26%; background: #b39bd3; }
+.roll-brutal .m-title { width: 62%; height: 10px; margin-bottom: 4px; background: linear-gradient(#b39bd3, #b39bd3) 0 50% / 9px 9px no-repeat, linear-gradient(#b39bd3, #b39bd3) 14px 50% / 34% 5px no-repeat, linear-gradient(#e6e6e6, #e6e6e6) 100% 50% / 50% 2px no-repeat; }
+.roll-brutal .m-name { width: 30%; height: 6px; background: #e6e6e6; }
+.roll-brutal .m-name:nth-child(3) { width: 24%; }
 
 /* =====================================================================
    TEMA "BRUTALISM" (stile retro-computer): nero carbone con grana,

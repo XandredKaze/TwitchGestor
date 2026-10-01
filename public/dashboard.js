@@ -514,7 +514,7 @@
   ];
   const ROLL_THEMES = [
     { id: 'classic', name: 'Classico', desc: 'Elegante: titoli con linee luminose e i colori scelti nel pannello.' },
-    { id: 'brutal', name: 'Brutalism', desc: 'Sezioni come finestre "// TITOLO", titolo a blocchi in bianco e lilla, testo finale in un riquadro con cerchi.' },
+    { id: 'brutal', name: 'Brutalism', desc: 'Titoli delle sezioni come "▢ SUBSCRIBERS ────", titolo iniziale e testo finale a blocchi in bianco e lilla.' },
   ];
   let rollTheme = null;
 
