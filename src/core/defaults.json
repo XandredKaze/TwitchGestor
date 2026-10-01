@@ -18,6 +18,9 @@
   "chat": {
     "enabled": false
   },
+  "ui": {
+    "theme": "default"
+  },
   "types": {
     "follow": {
       "label": "Follow",

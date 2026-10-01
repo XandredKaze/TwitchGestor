@@ -62,3 +62,10 @@ test('una ricompensa lasciata vuota non vale per tutte', () => {
   const n = fromEventSub('channel.channel_points_custom_reward_redemption.add', { user_name: 'Anna', reward: { title: 'Canzone', cost: 10 } });
   assert.equal(m.buildAlert(n).title, 'Canzone');
 });
+
+test('tema della dashboard: solo i temi conosciuti, salvato solo se diverso dal predefinito', () => {
+  assert.equal(sanitizeConfig({ ui: { theme: 'brutal' } }, defaults).ui.theme, 'brutal');
+  assert.equal(sanitizeConfig({ ui: { theme: 'inventato' } }, defaults).ui.theme, 'default');
+  assert.deepEqual(diffConfig(sanitizeConfig({ ui: { theme: 'brutal' } }, defaults), defaults), { ui: { theme: 'brutal' } });
+  assert.equal(diffConfig(sanitizeConfig({}, defaults), defaults), undefined);
+});

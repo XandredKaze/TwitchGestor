@@ -11,7 +11,7 @@
 import defaults from '../src/core/defaults.json';
 import { NotificationManager } from '../src/core/NotificationManager.js';
 import { NOTIFICATION_TYPES, testNotification } from '../src/core/normalize.js';
-import { sanitizeConfig, diffConfig, ANIMATIONS, POSITIONS, SOUND_PRESETS } from '../src/core/schema.js';
+import { sanitizeConfig, diffConfig, ANIMATIONS, POSITIONS, SOUND_PRESETS, UI_THEMES } from '../src/core/schema.js';
 import { recentLogs, createLogger } from '../src/logger.js';
 import { liveSession } from '../src/core/session.js';
 import { cleanText } from '../src/core/ttsText.js';
@@ -176,6 +176,7 @@ class DemoBackend {
       version: `${APP_VERSION} demo`,
       twitch: { configured: true, user: CHANNEL, status: 'simulato', missingScopes: [], failedSubscriptions: [] },
       sources: { streamelements: 'disattivato', kofi: 'disattivato', webhook: 'disattivato' },
+      ui: this.config.ui,
       overlays: this.clients.overlay.size,
       chatReplies: Boolean(this.config.chat?.enabled),
       chatAccount: this.chatAccount(),
@@ -245,6 +246,13 @@ class DemoBackend {
         this.log.info('Impostazioni salvate (solo in questo browser)');
         return ok({ config: this.config });
       }
+      case 'PUT /api/ui': {
+        if (body?.theme !== undefined && !UI_THEMES.includes(body.theme)) return fail(400, 'Tema sconosciuto');
+        this.config = sanitizeConfig({ ...this.config, ui: { ...this.config.ui, ...body } }, this.defaults);
+        storage.set('tg-demo-config', diffConfig(this.config, this.defaults) ?? {});
+        this.broadcastState();
+        return ok({ ui: this.config.ui });
+      }
       // Nella demo non ci sono voci di sistema: la voce è quella del browser.
       case 'GET /api/tts/voices': return ok({ engine: null, voices: [] });
       case 'POST /api/tts/test': {
@@ -282,7 +290,7 @@ class DemoBackend {
       case 'GET /api/credits/state': {
         const rev = Number(url.searchParams.get('rev'));
         const snap = rev === this.credits.rev ? { rev } : { rev: this.credits.rev, state: this.credits.state };
-        return ok({ ...snap, account: CHANNEL.login, configured: true });
+        return ok({ ...snap, account: CHANNEL.login, configured: true, ui: this.config.ui?.theme ?? 'default' });
       }
       case 'POST /api/credits/fetch':
         return fail(409, 'Nella demo non c\'è un collegamento a Twitch: usa "Nomi di prova".');

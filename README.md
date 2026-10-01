@@ -20,6 +20,7 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 - **Voce (text-to-speech)** gratuita e locale: legge gli alert e i messaggi degli spettatori con le voci di Windows, e la voce va in live tramite OBS.
 - **Anteprima della live e chat di Twitch** direttamente nella dashboard (scheda Live).
 - **Cambio scena di OBS** con un clic dalla dashboard (tramite OBS WebSocket, già incluso in OBS).
+- **Temi** (scheda 🖌 Tema): aspetto predefinito o **Brutalism** (nero, bianco e lilla) per tutta la dashboard, e stile Classico o Brutalism per l'animazione dei titoli di coda.
 - **Titoli di coda animati** (credit roll) con abbonati, gift e follower scaricati in automatico, musica e pannello di controllo.
 - **Editor degli alert nella dashboard** con anteprima dal vivo: testi, suoni, font, colori, sfondo, immagini e animazioni.
 - **Overlay per OBS** con animazioni, colori per tipo, immagini/GIF/video e suoni (4 suoni integrati o i tuoi file).
@@ -98,6 +99,15 @@ Nella scheda **📡 Live** della dashboard trovi il player della tua live (senza
 - Per scrivere in chat devi essere collegato a twitch.tv nello stesso browser; se il riquadro non te lo permette usa **Finestra ↗**.
 - Con **Nascondi** togli player o chat e risparmi risorse del PC durante la live.
 - La chat si adatta all'altezza della finestra. Per sceglierla tu, **trascina la maniglia** sotto la chat (o usala con le frecce ↑ ↓ della tastiera); doppio clic sulla maniglia per tornare all'altezza automatica. Ogni PC o browser ricorda la sua.
+
+## Temi
+
+Nella scheda **🖌 Tema** scegli con un clic:
+
+- **Aspetto di TwitchGestor**: *Predefinito* (viola, segue il tema chiaro o scuro di Windows) oppure *Brutalism* (nero, bianco e lilla, bordi spessi e ombre piene). Vale per dashboard, editor degli alert e pannello dei titoli di coda, anche nel dock di OBS e su ogni browser con cui apri la dashboard.
+- **Animazione dei titoli di coda**: *Classico* oppure *Brutalism* (titoli in blocchi pieni, nomi in riquadri bianchi, lilla e neri). Con Brutalism colori e font scelti nel pannello non si usano. Si sceglie anche nel pannello dei titoli di coda (riquadro Stile), con l'anteprima.
+
+Gli alert in live non cambiano con il tema: si personalizzano in "Personalizza alert".
 
 ## Cambiare scena di OBS
 

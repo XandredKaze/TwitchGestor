@@ -338,6 +338,95 @@ body.offline .p-offline { display: block; }
 #exit-guide span { top: 2px; }
 #entry-guide span { bottom: 2px; }
 .p-preview iframe { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; background: transparent; }
+
+/* =====================================================================
+   TITOLI DI CODA "BRUTALISM": nero, bianco e lilla. Blocchi pieni,
+   bordi spessi, ombre piene, maiuscolo. Leggibile su qualsiasi sfondo.
+   ===================================================================== */
+body.roll-brutal { --b-lilac: #c4a3ff; }
+.roll-brutal .cr-header { margin-bottom: 90px; }
+.roll-brutal .cr-header h1 { display: inline-block; margin: 0 0 26px; padding: 18px 36px 22px; background: #000; color: #fff; border: 6px solid #fff; box-shadow: 16px 16px 0 var(--b-lilac); font-family: 'Archivo Black', 'Arial Black', sans-serif; font-weight: 400; letter-spacing: .01em; line-height: 1.05; text-shadow: none; }
+.roll-brutal .cr-header p { display: table; margin: 10px auto 0; padding: 6px 16px; background: #fff; color: #000; border: 3px solid #000; font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: .02em; }
+.roll-brutal .cr-section { margin-bottom: 110px; }
+.roll-brutal .cr-title { display: table; margin: 0 auto 30px; padding: 12px 30px 14px; background: var(--b-lilac); color: #000; border: 5px solid #000; box-shadow: 12px 12px 0 #fff; font-family: 'Archivo Black', 'Arial Black', sans-serif; font-weight: 400; letter-spacing: .05em; transform: rotate(-1.5deg); }
+.roll-brutal .cr-title::before, .roll-brutal .cr-title::after { display: none; }
+.roll-brutal .cr-subtitle { display: table; margin: 34px auto 16px; padding: 5px 16px; background: #000; color: #fff; border: 3px solid #fff; font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: .2em; }
+.roll-brutal .cr-names { gap: 16px 20px; max-width: calc(var(--cr-columns) * 600px); }
+.roll-brutal .cr-name { padding: 8px 18px; background: #fff; color: #000; border: 4px solid #000; box-shadow: 8px 8px 0 var(--b-lilac); font-family: 'Space Grotesk', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; text-shadow: none; }
+.roll-brutal .cr-name:nth-child(3n+2) { background: var(--b-lilac); box-shadow: 8px 8px 0 #000; }
+.roll-brutal .cr-name:nth-child(3n) { background: #000; color: #fff; border-color: #fff; box-shadow: 8px 8px 0 var(--b-lilac); }
+.roll-brutal .cr-count { color: inherit; opacity: .7; }
+.roll-brutal .cr-tag { margin-left: 14px; padding: 2px 10px; background: #000; color: var(--b-lilac); border: 3px solid var(--b-lilac); border-radius: 0; box-shadow: none; font-family: 'Archivo Black', sans-serif; font-weight: 400; }
+.roll-brutal .cr-name:nth-child(3n) .cr-tag { background: var(--b-lilac); color: #000; border-color: #000; }
+.roll-brutal .cr-text { display: table; margin: 0 auto 26px; padding: 10px 18px; background: #fff; color: #000; border: 3px solid #000; box-shadow: 6px 6px 0 #000; font-family: 'Space Grotesk', sans-serif; font-weight: 500; }
+.roll-brutal .cr-footer { display: inline-block; padding: 16px 34px 20px; background: var(--b-lilac); color: #000; border: 6px solid #000; box-shadow: 16px 16px 0 #fff; font-family: 'Archivo Black', 'Arial Black', sans-serif; font-weight: 400; letter-spacing: .02em; text-shadow: none; }
+.roll-brutal .cr-logo, .roll-brutal .cr-footer-img { border: 5px solid #000; box-shadow: 10px 10px 0 var(--b-lilac); }
+.roll-brutal.fx-glow .cr-name.in, .roll-brutal .fx-glow .cr-name.in { animation: none; }
+
+/* =====================================================================
+   PANNELLO con il tema "Brutalism" della dashboard (scheda Tema)
+   ===================================================================== */
+html[data-ui="brutal"] body.panel {
+  --p-bg: #fff; --p-card: #fff; --p-card-hi: #fff; --p-field: #fff; --p-line: #000;
+  --p-text: #000; --p-muted: #2b2b2b; --p-accent: #c4a3ff; --p-accent-hi: #c4a3ff; --p-accent-soft: #f3edff;
+  --p-ok: #000; --p-err: #000; --p-radius: 0;
+  background: #fff linear-gradient(#0000000d 1px, transparent 1px) 0 0 / 28px 28px, #fff linear-gradient(90deg, #0000000d 1px, transparent 1px) 0 0 / 28px 28px;
+  background-color: #fff;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  scrollbar-color: #000 transparent;
+}
+html[data-ui="brutal"] body.panel :not(#stage, #stage *, .p-preview *) { border-radius: 0 !important; }
+html[data-ui="brutal"] body.embedded { background: #fff; }
+html[data-ui="brutal"] .panel h2, html[data-ui="brutal"] .p-brand h1 { font-family: 'Archivo Black', 'Arial Black', sans-serif; font-weight: 400; color: #000; letter-spacing: .04em; }
+html[data-ui="brutal"] .panel .p-card h2::before { background: var(--p-accent); border: 2px solid #000; box-shadow: none; border-radius: 0; }
+html[data-ui="brutal"] .p-card { background: #fff; border: 3px solid #000; box-shadow: 6px 6px 0 #000; }
+html[data-ui="brutal"] .p-logo { background: var(--p-accent); color: #000; border: 3px solid #000; box-shadow: 3px 3px 0 #000; }
+html[data-ui="brutal"] .p-pill { background: #fff; border: 2px solid #000; color: #000; font-weight: 700; }
+html[data-ui="brutal"] .p-tile, html[data-ui="brutal"] .p-col, html[data-ui="brutal"] .p-sec, html[data-ui="brutal"] .p-group, html[data-ui="brutal"] .p-sec-editor { background: #fff; border: 2px solid #000; }
+html[data-ui="brutal"] .p-tile-num { background: none; color: #000; font-family: 'Archivo Black', sans-serif; font-weight: 400; }
+html[data-ui="brutal"] .p-sec.sel { background: var(--p-accent); box-shadow: 4px 4px 0 #000; }
+html[data-ui="brutal"] .p-sub { color: #000; background: var(--p-accent); display: inline-block; padding: 1px 8px; border: 2px solid #000; }
+html[data-ui="brutal"] .p-ed-head { border-bottom: 3px solid #000; }
+html[data-ui="brutal"] .p-switch-row { background: var(--p-accent-soft); border: 2px solid #000; }
+html[data-ui="brutal"] .p-row + .p-row { border-top: 1px solid #0000002a; }
+html[data-ui="brutal"] .panel input[type=text], html[data-ui="brutal"] .panel input[type=number], html[data-ui="brutal"] .panel textarea, html[data-ui="brutal"] .panel select { background: #fff; color: #000; border: 2px solid #000; }
+html[data-ui="brutal"] .panel input:focus-visible, html[data-ui="brutal"] .panel textarea:focus-visible, html[data-ui="brutal"] .panel select:focus-visible { box-shadow: 4px 4px 0 var(--p-accent); }
+html[data-ui="brutal"] .panel input[type=checkbox] { background: #fff; border: 2px solid #000; }
+html[data-ui="brutal"] .panel input[type=checkbox]::after { top: 2px; left: 2px; width: 15px; height: 15px; background: #000; border-radius: 0; }
+html[data-ui="brutal"] .panel input[type=checkbox]:checked { background: var(--p-accent); }
+html[data-ui="brutal"] .panel input[type=checkbox]:checked::after { background: #000; }
+html[data-ui="brutal"] .panel input[type=color] { border: 2px solid #000; border-radius: 0; }
+html[data-ui="brutal"] .panel input[type=color]::-webkit-color-swatch { border-radius: 0; }
+html[data-ui="brutal"] .panel input[type=range] { accent-color: #000; }
+html[data-ui="brutal"] .panel button { background: var(--p-accent); color: #000; border: 2px solid #000; box-shadow: 3px 3px 0 #000; filter: none; }
+html[data-ui="brutal"] .panel button:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 #000; filter: none; }
+html[data-ui="brutal"] .panel button:active { transform: translate(3px, 3px); box-shadow: none; }
+html[data-ui="brutal"] .panel button.sec, html[data-ui="brutal"] .panel .p-sec button.arrow { background: #fff; color: #000; border: 2px solid #000; }
+html[data-ui="brutal"] .panel button.danger, html[data-ui="brutal"] .panel .p-ed-head button.danger { background: #000; color: #fff; border: 2px solid #000; }
+html[data-ui="brutal"] .panel .p-ed-head button.danger.armed { background: var(--p-accent); color: #000; }
+html[data-ui="brutal"] .panel .p-sec button.name { color: #000; box-shadow: none; border: 0; transform: none; }
+html[data-ui="brutal"] .panel button.p-sec-add { background: #fff; color: #000; border: 2px dashed #000; }
+html[data-ui="brutal"] .panel button.p-item { box-shadow: none; border: 0; background: transparent; color: #000; }
+html[data-ui="brutal"] .panel button.p-item:hover { background: #000; transform: none; }
+html[data-ui="brutal"] .panel button.p-item:hover .n { color: #fff; }
+html[data-ui="brutal"] .p-chip, html[data-ui="brutal"] .panel button.p-chip, html[data-ui="brutal"] .p-tag, html[data-ui="brutal"] .p-col-count { background: #fff; color: #000; border: 2px solid #000; box-shadow: none; }
+html[data-ui="brutal"] .p-chip.top, html[data-ui="brutal"] .panel button.p-chip.top { background: var(--p-accent); color: #000; }
+html[data-ui="brutal"] .panel button.p-chip:hover { background: #000; color: #fff; border-color: #000; transform: none; }
+html[data-ui="brutal"] .p-hint, html[data-ui="brutal"] .p-field label, html[data-ui="brutal"] .p-mini > label { color: #2b2b2b; }
+html[data-ui="brutal"] .p-wait, html[data-ui="brutal"] .p-offline { background: #000; color: #fff; border: 2px solid #000; }
+html[data-ui="brutal"] .p-preview { border: 3px solid #000; }
+html[data-ui="brutal"] .p-drop { border: 2px dashed #000; background: var(--p-accent-soft); }
+html[data-ui="brutal"] .p-drop-icon { background: #000; color: var(--p-accent); }
+html[data-ui="brutal"] .p-code { color: #000; text-shadow: none; }
+html[data-ui="brutal"] .p-code-box { border: 2px dashed #000; }
+html[data-ui="brutal"] .p-vthumb { background: var(--p-accent); border: 3px solid #000; box-shadow: none; border-radius: 0 !important; }
+html[data-ui="brutal"] .p-guide span { background: #000; color: #fff; }
+html[data-ui="brutal"] .panel button.fp-btn { background: #fff; color: #000; border: 2px solid #000; box-shadow: none; transform: none; }
+html[data-ui="brutal"] .panel button.fp-btn:hover { box-shadow: 3px 3px 0 #000; }
+html[data-ui="brutal"] .fp-pop { background: #fff; border: 3px solid #000; box-shadow: 6px 6px 0 #000; }
+html[data-ui="brutal"] .panel .fp-cats button, html[data-ui="brutal"] .panel .fp-list button { background: #fff; color: #000; border: 2px solid #000; box-shadow: none; transform: none; }
+html[data-ui="brutal"] .panel .fp-list button { border-color: transparent; }
+html[data-ui="brutal"] .panel .fp-cats button.on, html[data-ui="brutal"] .panel .fp-list button.sel, html[data-ui="brutal"] .panel .fp-list button:hover { background: var(--p-accent); border-color: #000; outline: 0; }
 </style>
 </head>
 <body>
@@ -377,7 +466,9 @@ const DEFAULTS = {
   // nomi
   nameAlign: 'center', nameGap: 4, nameWeight: 400, nameUppercase: false, nameSpacing: 0.04, nameEffect: 'none',
   // alla fine dello scorrimento: 'loop' ricomincia, 'stop' si ferma con il testo finale a metà schermo
-  endMode: 'loop'
+  endMode: 'loop',
+  // stile dell'animazione: 'classic' oppure 'brutal' (Brutalism: nero, bianco e lilla)
+  rollTheme: 'classic'
 };
 // Le impostazioni di una singola sezione si salvano come 'sec.<sezione>.<campo>', es. 'sec.subs.accent'.
 const SECTION_STYLE = [
@@ -500,6 +591,11 @@ function getSettings() { return { ...DEFAULTS, ...load(K.settings, {}) }; }
 
 async function sync() {
   const j = await (await api('state?rev=' + rev)).json();
+  // tema della dashboard (scheda Tema): vale anche per questo pannello
+  if (MODE === 'panel' && j.ui && document.documentElement.dataset.ui !== j.ui) {
+    document.documentElement.dataset.ui = j.ui;
+    if (j.ui === 'brutal') { ensureFont("'Archivo Black'"); ensureFont("'Space Grotesk', sans-serif"); }
+  }
   if (j.account !== account || j.configured !== twitchConfigured) {
     account = j.account; twitchConfigured = j.configured;
     changeListeners.forEach(fn => fn('account'));
@@ -669,6 +765,10 @@ function applyStyle(s) {
   r.setProperty('--cr-name-transform', s.nameUppercase ? 'uppercase' : 'none');
   r.setProperty('--cr-name-spacing', (+s.nameSpacing || 0) + 'em');
   ensureFont(s.fontTitle); ensureFont(s.fontText);
+  // tema Brutalism: blocchi pieni, bordi spessi, nero/bianco/lilla (i colori e i font del pannello non contano)
+  const brutal = s.rollTheme === 'brutal';
+  document.body.classList.toggle('roll-brutal', brutal && MODE !== 'panel');
+  if (brutal) { ensureFont("'Archivo Black'"); ensureFont("'Space Grotesk', sans-serif"); }
   applyBackground(s);
   particleCfg = { color: s.particleColor, count: Math.max(0, Math.min(400, s.particleCount | 0)), shape: s.particleShape, speed: +s.particleSpeed || 1 };
   const hex = s.bgColor.replace('#', '');
@@ -1029,6 +1129,8 @@ function panelHTML() {
 
     <section class="p-card wide">
       <h2>Stile</h2>
+      <div class="p-field"><label>Stile dell'animazione</label><select data-k="rollTheme"><option value="classic">Classico</option><option value="brutal">Brutalism (nero, bianco e lilla)</option></select></div>
+      <p class="p-hint p-hint-top">Con Brutalism colori, font e stile delle singole sezioni non si usano: l'aspetto è fisso. Si sceglie anche dalla scheda 🖌 Tema.</p>
       <div class="p-cols">
         <div>
           <div class="p-field"><label>Font titoli</label><input type="text" data-k="fontTitle" list="cr-fonts"></div>

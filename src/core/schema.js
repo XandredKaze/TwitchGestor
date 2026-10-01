@@ -6,6 +6,8 @@
 
 export const ANIMATIONS = ['pop', 'fade', 'slide-down', 'slide-up', 'slide-left', 'slide-right', 'zoom', 'bounce', 'flip', 'shake'];
 export const POSITIONS = ['top-left', 'top-center', 'top-right', 'center', 'bottom-left', 'bottom-center', 'bottom-right'];
+/** Temi della dashboard (scheda Tema). */
+export const UI_THEMES = ['default', 'brutal'];
 export const SOUND_PRESETS = ['chime', 'coin', 'pop', 'fanfare', 'bell', 'levelup', 'laser'];
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -123,6 +125,7 @@ export function sanitizeConfig(input, defaults) {
   out.overlay = pick(input.overlay, OVERLAY_FIELDS, out.overlay);
   if (isObject(input.queue)) out.queue.gapMs = num(0, 10000)(input.queue.gapMs) ?? out.queue.gapMs;
   if (isObject(input.chat)) out.chat.enabled = bool(input.chat.enabled) ?? out.chat.enabled;
+  if (out.ui && isObject(input.ui)) out.ui.theme = oneOf(UI_THEMES)(input.ui.theme) ?? out.ui.theme;
   if (out.tts) {
     out.tts = pick(input.tts, TTS_FIELDS, out.tts);
     if (Array.isArray(input.tts?.bannedWords)) {

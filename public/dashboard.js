@@ -35,6 +35,14 @@
     return el('span', { className: `pill ${cls}`, title: status }, `${label}: ${status}`);
   }
 
+  // Tema della dashboard: subito quello ricordato (niente lampo), poi quello salvato nel programma.
+  function applyUi(theme) {
+    const t = theme === 'brutal' ? 'brutal' : 'default';
+    if (document.documentElement.dataset.ui !== t) document.documentElement.dataset.ui = t;
+    try { localStorage.setItem('uiTheme', t); } catch { /* ignora */ }
+  }
+  try { applyUi(localStorage.getItem('uiTheme')); } catch { /* ignora */ }
+
   // Altezza della barra in alto (fissa mentre scorri): serve ai riquadri "appiccicosi" dell'editor.
   new ResizeObserver(([entry]) => {
     document.documentElement.style.setProperty('--header-h', `${Math.ceil(entry.target.getBoundingClientRect().height)}px`);
@@ -444,6 +452,8 @@
   }
 
   function renderAll() {
+    applyUi(state.ui?.theme);
+    if (!$('tab-theme').hidden) renderThemes();
     renderHeader();
     renderQueue(state.queue);
     renderStats();
@@ -480,11 +490,75 @@
     }
   };
 
+  // ---------- Tema ----------
+
+  const UI_THEMES = [
+    { id: 'default', name: 'Predefinito', desc: 'Viola e sfumature, segue il tema chiaro o scuro di Windows.' },
+    { id: 'brutal', name: 'Brutalism', desc: 'Nero, bianco e lilla. Bordi spessi, ombre piene, caratteri grandi.' },
+  ];
+  const ROLL_THEMES = [
+    { id: 'classic', name: 'Classico', desc: 'Elegante: titoli con linee luminose e i colori scelti nel pannello.' },
+    { id: 'brutal', name: 'Brutalism', desc: 'Nero, bianco e lilla. Blocchi pieni, bordi spessi, nomi in riquadri.' },
+  ];
+  let rollTheme = null;
+
+  function themeCard(t, current, kind, onPick) {
+    const active = t.id === current;
+    const mock = el('div', { className: `theme-mock ${kind}-${t.id}`, 'aria-hidden': 'true' },
+      kind === 'ui'
+        ? [el('i', { className: 'm-bar' }), el('i', { className: 'm-card' }, el('i', { className: 'm-line' }), el('i', { className: 'm-btn' })), el('i', { className: 'm-card' }, el('i', { className: 'm-line' }), el('i', { className: 'm-line short' }))]
+        : [el('i', { className: 'm-title' }), el('i', { className: 'm-name' }), el('i', { className: 'm-name' }), el('i', { className: 'm-name' })]);
+    return el('button', {
+      type: 'button',
+      className: `theme-card ${active ? 'active' : ''}`,
+      'aria-pressed': active ? 'true' : 'false',
+      onclick: () => { if (!active) onPick(t.id); },
+    }, mock,
+    el('span', { className: 'theme-name' }, t.name, active ? el('span', { className: 'theme-badge' }, 'In uso') : null),
+    el('span', { className: 'theme-desc' }, t.desc));
+  }
+
+  function renderThemes() {
+    const ui = state?.ui?.theme ?? 'default';
+    $('ui-themes').replaceChildren(...UI_THEMES.map((t) => themeCard(t, ui, 'ui', async (id) => {
+      applyUi(id); // subito, senza aspettare il programma
+      if (state) state.ui = { ...state.ui, theme: id };
+      renderThemes();
+      await window.TG.api('/api/ui', { method: 'PUT', body: { theme: id } });
+    })));
+    $('roll-themes').replaceChildren(...ROLL_THEMES.map((t) => themeCard(t, rollTheme ?? 'classic', 'roll', setRollTheme)));
+  }
+
+  // Lo stile dei titoli di coda sta nelle loro impostazioni (le stesse del pannello Titoli di coda).
+  async function loadRollTheme() {
+    const data = await window.TG.api('/api/credits/state', { method: 'GET', quiet: true });
+    rollTheme = data?.state?.settings?.rollTheme ?? 'classic';
+    renderThemes();
+  }
+  async function setRollTheme(id) {
+    const data = await window.TG.api('/api/credits/state', { method: 'GET', quiet: true });
+    const settings = { ...(data?.state?.settings ?? {}), rollTheme: id };
+    rollTheme = id;
+    renderThemes();
+    await window.TG.api('/api/credits/state/settings', { method: 'PUT', body: settings });
+  }
+
+  function openThemeTab() {
+    renderThemes();
+    loadRollTheme();
+    const frame = $('theme-roll-frame');
+    if (!frame.src) {
+      frame.src = `/credits?anteprima${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+      new ResizeObserver(([entry]) => { frame.style.transform = `scale(${entry.contentRect.width / 1920})`; }).observe(frame.parentElement);
+    }
+  }
+
   // ---------- Schede ----------
   function showTab(name) {
     for (const t of document.querySelectorAll('.tab')) t.classList.toggle('active', t.dataset.tab === name);
     for (const main of document.querySelectorAll('main[id^="tab-"]')) main.hidden = main.id !== `tab-${name}`;
     if (name === 'editor') window.dispatchEvent(new Event('editor:open'));
+    if (name === 'theme') openThemeTab();
     if (name === 'credits' && !$('credits-frame').src) {
       // Il pannello dei titoli di coda è una pagina a sé: si carica solo quando apri la scheda.
       $('credits-frame').src = `/credits?pannello${token ? `&token=${encodeURIComponent(token)}` : ''}`;
@@ -502,7 +576,7 @@
   try {
     const saved = sessionStorage.getItem('tab');
     if (location.hash === '#chat') showTab('editor');
-    else if (saved === 'editor' || saved === 'credits') showTab(saved);
+    else if (saved === 'editor' || saved === 'credits' || saved === 'theme') showTab(saved);
   } catch { /* ignora */ }
 
   // ---------- Registro ----------

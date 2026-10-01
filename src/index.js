@@ -104,6 +104,7 @@ const app = {
         kofi: env.KOFI_VERIFICATION_TOKEN ? 'attivo' : 'disattivato',
         webhook: env.DONATION_WEBHOOK_SECRET ? 'attivo' : 'disattivato',
       },
+      ui: config.get().ui,
       overlays: web?.clients.overlay.size ?? 0,
       obs: obs.state(),
       chatReplies: Boolean(config.get().chat?.enabled),

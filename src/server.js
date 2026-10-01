@@ -6,7 +6,7 @@ import { WebSocketServer } from 'ws';
 import { ROOT_DIR, DATA_DIR } from './config.js';
 import { NOTIFICATION_TYPES, testNotification } from './core/normalize.js';
 import { NotificationManager } from './core/NotificationManager.js';
-import { sanitizeConfig, ANIMATIONS, POSITIONS, SOUND_PRESETS } from './core/schema.js';
+import { sanitizeConfig, ANIMATIONS, POSITIONS, SOUND_PRESETS, UI_THEMES } from './core/schema.js';
 import { recentLogs } from './logger.js';
 import { cleanText } from './core/ttsText.js';
 import { API_LEVEL } from './version.js';
@@ -207,7 +207,10 @@ export function createServer(app) {
       // Titoli di coda: la sorgente OBS legge lo stato senza token (contiene solo nomi e impostazioni).
       if (route === 'GET /api/credits/state' && app.credits) {
         const rev = Number(url.searchParams.get('rev'));
-        return send(res, 200, { ...app.credits.store.snapshot(rev), account: app.auth.user?.login ?? null, configured: app.auth.configured });
+        return send(res, 200, {
+          ...app.credits.store.snapshot(rev), account: app.auth.user?.login ?? null, configured: app.auth.configured,
+          ui: app.config.get().ui?.theme ?? 'default', // tema della dashboard, anche per il pannello nel dock di OBS
+        });
       }
       if (req.method === 'GET' && url.pathname.startsWith('/media/')) return serveStatic(res, url.pathname.slice('/media'.length), MEDIA_DIR);
       if (req.method === 'GET' && url.pathname.startsWith('/tts/')) return serveStatic(res, url.pathname.slice('/tts'.length), app.tts?.dir ?? TTS_DIR);
@@ -300,6 +303,14 @@ export function createServer(app) {
         if (route === 'POST /api/obs/scene') {
           if (!app.obs) return send(res, 400, { error: 'Collegamento a OBS non disponibile' });
           return send(res, 200, await app.obs.setScene(String((await readBody(req)).scene ?? '')));
+        }
+        if (route === 'PUT /api/ui') {
+          // Solo il tema: non tocca il resto delle impostazioni (es. modifiche non salvate nell'editor).
+          const body = await readBody(req);
+          if (body.theme !== undefined && !UI_THEMES.includes(body.theme)) return send(res, 400, { error: 'Tema sconosciuto' });
+          const current = app.config.get();
+          const config = app.config.save({ ...current, ui: { ...current.ui, ...body } });
+          return send(res, 200, { ui: config.ui });
         }
         if (route === 'PUT /api/config') {
           const config = app.config.save((await readBody(req, 1_000_000)).config);

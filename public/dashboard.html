@@ -6,7 +6,7 @@
   <title>TwitchGestor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&display=swap">
   <link rel="stylesheet" href="/dashboard.css">
 </head>
 <body>
@@ -16,6 +16,7 @@
       <button class="tab active" data-tab="live" role="tab">📡 Live</button>
       <button class="tab" data-tab="editor" role="tab">🎨 Personalizza alert</button>
       <button class="tab" data-tab="credits" role="tab">🎬 Titoli di coda</button>
+      <button class="tab" data-tab="theme" role="tab">🖌 Tema</button>
     </nav>
     <div id="statuses" class="statuses"></div>
     <div id="account" class="account"></div>
@@ -162,6 +163,26 @@
       <button id="btn-copy-credits" class="small-btn">Copia</button>
     </div>
     <iframe id="credits-frame" title="Pannello dei titoli di coda"></iframe>
+  </main>
+
+  <main id="tab-theme" class="theme-tab" hidden>
+    <section class="panel">
+      <h2>Aspetto di TwitchGestor</h2>
+      <p class="muted small">Cambia l'aspetto di dashboard, editor degli alert e pannello dei titoli di coda (anche nel dock di OBS). Gli alert in live non cambiano: quelli si personalizzano in "Personalizza alert".</p>
+      <div class="theme-cards" id="ui-themes"></div>
+    </section>
+    <section class="panel">
+      <h2>Animazione dei titoli di coda</h2>
+      <p class="muted small">Lo stile dei titoli di coda che vedono gli spettatori (sorgente browser in OBS).</p>
+      <div class="theme-cards" id="roll-themes"></div>
+      <div class="theme-roll-preview">
+        <div class="theme-roll-head">
+          <h3>Anteprima</h3>
+          <span class="muted small">Usa i nomi veri; se non ce ne sono, aggiungi "Nomi di prova" nella scheda Titoli di coda.</span>
+        </div>
+        <div class="theme-roll-frame"><iframe id="theme-roll-frame" title="Anteprima dei titoli di coda" tabindex="-1"></iframe></div>
+      </div>
+    </section>
   </main>
 
   <script src="/common.js"></script>

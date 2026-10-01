@@ -55,3 +55,22 @@ test('i file caricati non possono uscire dalla loro cartella', async () => {
   assert.equal(bad.status, 400);
   web.server.close();
 });
+
+test('tema: si salva solo il tema e i temi sconosciuti sono rifiutati', async () => {
+  const app = fakeApp();
+  let saved = null;
+  app.config = { get: () => ({ overlay: {}, ui: { theme: 'default' } }), defaults: () => ({}), save: (c) => { saved = c; return c; } };
+  const web = createServer(app);
+  web.server.listen(0, '127.0.0.1');
+  await once(web.server, 'listening');
+  const base = `http://127.0.0.1:${web.server.address().port}`;
+  const put = (theme) => fetch(`${base}/api/ui`, { method: 'PUT', headers: { 'x-twitchgestor': '1', 'content-type': 'application/json' }, body: JSON.stringify({ theme }) });
+  const ok = await put('brutal');
+  assert.equal(ok.status, 200);
+  assert.deepEqual((await ok.json()).ui, { theme: 'brutal' });
+  assert.deepEqual(saved, { overlay: {}, ui: { theme: 'brutal' } });
+  const bad = await put('inventato');
+  assert.equal(bad.status, 400);
+  await bad.text();
+  web.server.close();
+});
