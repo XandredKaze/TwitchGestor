@@ -104,8 +104,8 @@ Nella scheda **📡 Live** della dashboard trovi il player della tua live (senza
 
 Nella scheda **🖌 Tema** scegli con un clic:
 
-- **Aspetto di TwitchGestor**: *Predefinito* (viola, segue il tema chiaro o scuro di Windows) oppure *Brutalism* (nero, bianco e lilla, bordi spessi e ombre piene). Vale per dashboard, editor degli alert e pannello dei titoli di coda, anche nel dock di OBS e su ogni browser con cui apri la dashboard.
-- **Animazione dei titoli di coda**: *Classico* oppure *Brutalism* (titoli in blocchi pieni, nomi in riquadri bianchi, lilla e neri). Con Brutalism colori e font scelti nel pannello non si usano. Si sceglie anche nel pannello dei titoli di coda (riquadro Stile), con l'anteprima.
+- **Aspetto di TwitchGestor**: *Predefinito* (viola, segue il tema chiaro o scuro di Windows) oppure *Brutalism* in stile retro-computer: nero carbone con grana, linee bianche sottili, finestre "// TITOLO" con _ ▢ ✕, quadratini e croci, accento lilla; titoli in Bungee, etichette in Share Tech Mono, testi in Outfit. Vale per dashboard, editor degli alert e pannello dei titoli di coda, anche nel dock di OBS e su ogni browser con cui apri la dashboard.
+- **Animazione dei titoli di coda**: *Classico* oppure *Brutalism* (titolo a blocchi con la prima parola in lilla, ogni sezione in una finestra "// TITOLO", sottotitoli con quadratino e linea, testo finale in un riquadro con cerchi intrecciati). Con Brutalism colori e font scelti nel pannello non si usano. Si sceglie anche nel pannello dei titoli di coda (riquadro Stile), con l'anteprima.
 
 Gli alert in live non cambiano con il tema: si personalizzano in "Personalizza alert".
 

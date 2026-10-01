@@ -43,6 +43,22 @@
   }
   try { applyUi(localStorage.getItem('uiTheme')); } catch { /* ignora */ }
 
+  // Per il tema Brutalism: "Twitch" e l'ultima parola dei titoli dei riquadri si colorano di lilla
+  // (con il tema predefinito lo <span> non cambia nulla).
+  function highlightLastWord(node) {
+    const text = node.lastChild;
+    if (!text || text.nodeType !== Node.TEXT_NODE || node.querySelector('.hl')) return;
+    const m = /^(.*\s)?(\S+)\s*$/s.exec(text.textContent);
+    if (!m) return;
+    text.textContent = m[1] ?? '';
+    node.append(el('span', { className: 'hl' }, m[2]));
+  }
+  const brand = document.querySelector('header h1');
+  if (brand.firstChild?.nodeType === Node.TEXT_NODE && brand.firstChild.textContent === 'TwitchGestor') {
+    brand.firstChild.replaceWith(el('span', {}, el('span', { className: 'hl' }, 'Twitch'), 'Gestor'));
+  }
+  document.querySelectorAll('.panel h2').forEach(highlightLastWord);
+
   // Altezza della barra in alto (fissa mentre scorri): serve ai riquadri "appiccicosi" dell'editor.
   new ResizeObserver(([entry]) => {
     document.documentElement.style.setProperty('--header-h', `${Math.ceil(entry.target.getBoundingClientRect().height)}px`);
@@ -494,11 +510,11 @@
 
   const UI_THEMES = [
     { id: 'default', name: 'Predefinito', desc: 'Viola e sfumature, segue il tema chiaro o scuro di Windows.' },
-    { id: 'brutal', name: 'Brutalism', desc: 'Nero, bianco e lilla. Bordi spessi, ombre piene, caratteri grandi.' },
+    { id: 'brutal', name: 'Brutalism', desc: 'Nero carbone con grana, linee bianche sottili e lilla: finestre "// TITOLO" in stile retro-computer.' },
   ];
   const ROLL_THEMES = [
     { id: 'classic', name: 'Classico', desc: 'Elegante: titoli con linee luminose e i colori scelti nel pannello.' },
-    { id: 'brutal', name: 'Brutalism', desc: 'Nero, bianco e lilla. Blocchi pieni, bordi spessi, nomi in riquadri.' },
+    { id: 'brutal', name: 'Brutalism', desc: 'Sezioni come finestre "// TITOLO", titolo a blocchi in bianco e lilla, testo finale in un riquadro con cerchi.' },
   ];
   let rollTheme = null;
 
