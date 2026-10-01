@@ -138,7 +138,8 @@ Titoli di coda animati per la fine della live con **abbonati** (paganti e regala
      Moderatori, VIP e chat richiedono permessi Twitch aggiuntivi: dopo l'aggiornamento esci e accedi di nuovo dalla dashboard.
    - **Immagini e sfondo**: logo in cima, immagine finale, immagine o video di sfondo (opacità, adattamento, sfocatura), particelle con colore, forma (luci, stelle, cuori, neve), quantità e velocità.
    - **Nomi**: allineamento, spaziatura, spessore, maiuscolo, spaziatura delle lettere ed **effetto di comparsa** (dissolvenza, sale dal basso, zoom, scivola, bagliore).
-   - **Fine dello scorrimento**: ricomincia da capo oppure **si ferma sul testo finale**.
+   - **Fine dello scorrimento**: ricomincia da capo oppure **si ferma con il testo finale a metà schermo**. La **distanza del testo finale dai nomi** si sceglie in Testi (es. 500 px per farlo arrivare da solo).
+   - **Musica che continua**: con "Continua la musica quando lo scorrimento finisce" il brano non sfuma e non si ferma alla fine dei titoli (e con "Ricomincia da capo" non riparte da zero a ogni giro).
    - **Font**: selettore con oltre 200 font di Google Fonts (con anteprima, ricerca e categorie: moderni, eleganti, decorativi, scritti a mano, monospazio, di sistema), per i font generali e per ogni sezione; qualsiasi altro font si aggiunge scrivendone il nome.
 3. Facoltativo: il pannello si può aggiungere anche come dock di OBS (**Docks → Dock browser personalizzati**, URL `http://localhost:3000/credits?pannello`; se usi `DASHBOARD_TOKEN` aggiungi `&token=IL_TUO_TOKEN`).
 

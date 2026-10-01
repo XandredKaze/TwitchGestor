@@ -357,13 +357,13 @@ const DEFAULTS = {
   titleGifts: 'Sub regalati da', titleFollowers: 'Follower',
   headerText: 'La stream è terminata',
   headerSub: 'Un ringraziamento a tutti gli spettatori che sono passati dal canale,\na chi ha seguito e commentato i miei video su YouTube e,\nin particolare, a chi ha supportato attivamente il canale con sub e gift. ♥',
-  footerText: '',
+  footerText: '', footerGap: 20,
   splitSubs: true, includeGiftedInSubs: true, showGiftCount: true, maxFollowers: 200,
   topGifterTag: true, topGifterText: 'Top Gifter',
   excluded: [], // nomi da non mostrare mai (bot, account secondari…)
   speed: 80, startDelay: 0, gap: 3, exitLine: 0, entryLine: 100, columns: 1,
   fetchOnStart: true, fetchEvery: 30,
-  musicOn: false, musicFile: '', musicDelay: 2, musicVolume: 0.6, musicLoop: true, musicFade: 3,
+  musicOn: false, musicFile: '', musicDelay: 2, musicVolume: 0.6, musicLoop: true, musicFade: 3, musicKeep: false,
   fontTitle: "'Cinzel', serif", fontText: "'Inter', sans-serif",
   headerColor: '#ffffff', accentColor: '#9147ff', subColor: '#bf94ff', nameColor: '#e8deff',
   headerSize: 52, titleSize: 22, nameSize: 28, nameShadow: false,
@@ -376,7 +376,7 @@ const DEFAULTS = {
   particleColor: '#a050ff', particleCount: 120, particleShape: 'dots', particleSpeed: 1,
   // nomi
   nameAlign: 'center', nameGap: 4, nameWeight: 400, nameUppercase: false, nameSpacing: 0.04, nameEffect: 'none',
-  // alla fine dello scorrimento: 'loop' ricomincia, 'stop' si ferma sul testo finale
+  // alla fine dello scorrimento: 'loop' ricomincia, 'stop' si ferma con il testo finale a metà schermo
   endMode: 'loop'
 };
 // Le impostazioni di una singola sezione si salvano come 'sec.<sezione>.<campo>', es. 'sec.subs.accent'.
@@ -723,7 +723,11 @@ function renderRoll(roll, s, d) {
     }
     roll.append(box);
   }
-  if (s.footerText) roll.append(el('div', 'cr-footer', s.footerText));
+  if (s.footerText) {
+    const footer = el('div', 'cr-footer', s.footerText);
+    footer.style.marginTop = Math.max(0, +s.footerGap || 0) + 'px'; // distanza dal resto dei titoli
+    roll.append(footer);
+  }
   if (s.footerImage) {
     const img = el('img', 'cr-footer-img');
     img.src = mediaSrc(s.footerImage); img.alt = ''; img.style.width = (+s.footerImageSize || 260) + 'px';
@@ -819,6 +823,8 @@ function startRollPlayer() {
     };
     fadeRaf = requestAnimationFrame(step);
   }
+  // con "continua la musica" il brano non si interrompe (né sfuma) quando lo scorrimento finisce
+  const musicPlaying = () => audio && !audio.paused && !audio.ended;
   function startMusic(s, dur) {
     if (!s.musicOn || !s.musicFile) return;
     if (MODE === 'preview' && !PREVIEW_AUDIO) return;
@@ -829,15 +835,17 @@ function startRollPlayer() {
       audio.volume = Math.max(0, Math.min(1, s.musicVolume));
       audio.play().catch(e => console.warn('Musica non avviata:', e));
       const fadeAt = dur - delay - s.musicFade * 1000;
-      if (s.musicFade > 0 && fadeAt > 0) musicTimers.push(setTimeout(() => fadeOut(s.musicFade), fadeAt));
+      if (!s.musicKeep && s.musicFade > 0 && fadeAt > 0) musicTimers.push(setTimeout(() => fadeOut(s.musicFade), fadeAt));
     }, delay));
   }
 
   function cycle(first) {
     timers.forEach(clearTimeout); timers = [];
-    stopMusic();
-    if (anim) anim.cancel();
     const s = getSettings();
+    // al giro successivo la musica che deve continuare non riparte da capo
+    const keepMusic = !first && s.musicKeep && s.musicOn && musicPlaying();
+    if (!keepMusic) stopMusic();
+    if (anim) anim.cancel();
     applyStyle(s);
     renderRoll(roll, s, load(K.data, {}));
     // effetto di comparsa: ogni nome si anima quando supera la linea di entrata
@@ -854,8 +862,8 @@ function startRollPlayer() {
       // i nomi partono dalla linea di entrata e finiscono quando l'ultima riga passa la linea di uscita
       const startY = H * s.entryLine / 100;
       let endY = H * s.exitLine / 100 - h;
-      // "fermati sul testo finale": l'ultimo elemento si ferma al centro dello schermo
-      const last = roll.lastElementChild;
+      // "fermati sul testo finale": il testo finale (o, se manca, l'ultimo elemento) si ferma a metà schermo
+      const last = roll.querySelector('.cr-footer') || roll.lastElementChild;
       const stop = s.endMode === 'stop' && last;
       if (stop) endY = H / 2 - (last.offsetTop + last.offsetHeight / 2);
       const dur = (startY - endY) / Math.max(5, s.speed) * 1000;
@@ -864,10 +872,11 @@ function startRollPlayer() {
       const wait = first ? Math.max(0, s.startDelay) * 1000 : 0;
       if (anim) anim.cancel(); // due riavvii ravvicinati non devono lasciare un'animazione vecchia attiva
       anim = roll.animate([{ transform: `translateY(${startY}px)` }, { transform: `translateY(${endY}px)` }], { duration: dur, delay: wait, easing: 'linear', fill: 'both' });
-      startMusic(s, wait + dur);
+      if (!keepMusic) startMusic(s, wait + dur);
       anim.onfinish = () => {
-        if (stop) { if (!(s.musicFade > 0)) stopMusic(); return; } // resta fermo finché non si riavvia
-        stopMusic(); timers.push(setTimeout(() => cycle(false), Math.max(0, s.gap) * 1000));
+        if (stop) { if (!s.musicKeep && !(s.musicFade > 0)) stopMusic(); return; } // resta fermo finché non si riavvia
+        if (!s.musicKeep) stopMusic();
+        timers.push(setTimeout(() => cycle(false), Math.max(0, s.gap) * 1000));
       };
     });
   }
@@ -981,7 +990,7 @@ function panelHTML() {
         <p class="p-hint" id="speed-hint"></p>
       </div>
       <div class="p-row"><label>Attesa prima che arrivino i nomi (s)</label><input type="number" min="0" step="0.5" data-k="startDelay"></div>
-      <div class="p-row"><label>Alla fine dello scorrimento</label><select data-k="endMode"><option value="loop">Ricomincia da capo</option><option value="stop">Fermati sul testo finale</option></select></div>
+      <div class="p-row"><label>Alla fine dello scorrimento</label><select data-k="endMode"><option value="loop">Ricomincia da capo</option><option value="stop">Fermati con il testo finale a metà schermo</option></select></div>
       <div class="p-row"><label>Pausa prima di ricominciare (s)</label><input type="number" min="0" step="1" data-k="gap"></div>
       <p class="p-hint">L'attesa vale quando la sorgente parte e con "Riavvia". La musica conta i secondi dal momento in cui parte la sorgente, non da quando arrivano i nomi.</p>
       <div class="p-row"><label>Colonne di nomi</label><input type="number" min="1" max="4" step="1" data-k="columns"></div>
@@ -994,6 +1003,9 @@ function panelHTML() {
           <div class="p-field"><label>Titolo iniziale</label><input type="text" data-k="headerText"></div>
           <div class="p-field"><label>Testo sotto il titolo (una riga per paragrafo)</label><textarea data-k="headerSub"></textarea></div>
           <div class="p-field"><label>Testo finale</label><input type="text" data-k="footerText"></div>
+          <div class="p-row"><label>Distanza del testo finale dai nomi (px)</label><input type="number" min="0" max="3000" step="20" data-k="footerGap"></div>
+          <div class="p-field"><label>Alla fine dei titoli</label><select data-k="endMode"><option value="loop">Ricomincia da capo</option><option value="stop">Fermati con il testo finale a metà schermo</option></select></div>
+          <p class="p-hint">Con una distanza grande (es. 500) il testo finale arriva da solo, staccato dai nomi. Scegli "Fermati…" per farlo restare fermo al centro dello schermo finché non riavvii.</p>
         </div>
         <div>
           <div class="p-field"><label>Titolo abbonati</label><input type="text" data-k="titleSubs"></div>
@@ -1094,6 +1106,8 @@ function panelHTML() {
       <div class="p-row"><label>Volume</label><input type="range" min="0" max="1" step="0.05" data-k="musicVolume"></div>
       <div class="p-row"><label>Ripeti se finisce prima</label><input type="checkbox" data-k="musicLoop"></div>
       <div class="p-row"><label>Dissolvenza finale (s)</label><input type="number" min="0" step="0.5" data-k="musicFade"></div>
+      <div class="p-row"><label>Continua la musica quando lo scorrimento finisce</label><input type="checkbox" data-k="musicKeep"></div>
+      <p class="p-hint">Attivo: la musica non sfuma e non si ferma alla fine dei titoli (con "Ricomincia da capo" non riparte da zero a ogni giro). Con "Riavvia" riparte da capo. Per fermarla nascondi la sorgente in OBS (con "Arresta la sorgente quando non è visibile" spuntato nelle sue proprietà).</p>
       <div class="p-btns"><button class="sec" id="btn-test-music">Prova musica</button></div>
       <p class="p-hint">Formati: mp3, ogg, wav, m4a, flac. In alternativa incolla l'indirizzo web di un brano.</p>
     </section>
@@ -1268,6 +1282,8 @@ function startPanel() {
         else if (i.type === 'number' || i.type === 'range') { const n = parseFloat(i.value); if (isNaN(n)) return; s[k] = n; }
         else s[k] = i.value;
         save(K.settings, s);
+        // la stessa impostazione può comparire in due riquadri (es. "Alla fine"): li tengo allineati
+        for (const o of inputs()) if (o !== i && o.dataset.k === k) { if (o.type === 'checkbox') o.checked = i.checked; else o.value = i.value; }
         renderCategories();
         if (k.startsWith('sec.') || k.startsWith('title') || k.startsWith('show')) renderSections();
         if (k.endsWith('.custom')) fillInputs();
