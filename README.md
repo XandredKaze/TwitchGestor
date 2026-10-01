@@ -97,6 +97,7 @@ Nella scheda **📡 Live** della dashboard trovi il player della tua live (senza
 - Apri la dashboard da **`http://localhost:3000`**: Twitch mostra player e chat solo su `localhost` (non su `127.0.0.1`).
 - Per scrivere in chat devi essere collegato a twitch.tv nello stesso browser; se il riquadro non te lo permette usa **Finestra ↗**.
 - Con **Nascondi** togli player o chat e risparmi risorse del PC durante la live.
+- La chat si adatta all'altezza della finestra. Per sceglierla tu, **trascina la maniglia** sotto la chat (o usala con le frecce ↑ ↓ della tastiera); doppio clic sulla maniglia per tornare all'altezza automatica. Ogni PC o browser ricorda la sua.
 
 ## Cambiare scena di OBS
 

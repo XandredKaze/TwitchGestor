@@ -278,6 +278,11 @@
       el('a', { href: url }, url), '.');
   }
 
+  function updateChatGrip() {
+    $('chat-resize').hidden = !chatBox();
+    fitChat();
+  }
+
   function renderEmbed(kind) {
     const login = channelLogin();
     const hidden = store.get(`hide-${kind}`) === '1';
@@ -336,6 +341,7 @@
         : el('p', { className: 'muted small' }, 'Qui compaiono i messaggi della chat e i ringraziamenti del bot (attivali in "Personalizza alert → Impostazioni generali → Chat").')));
     const box = $('chat-body').firstChild;
     box.scrollTop = box.scrollHeight;
+    updateChatGrip();
   }
 
   function renderEmbeds() {
@@ -351,6 +357,7 @@
     }
     renderEmbed('stream');
     renderEmbed('chat');
+    updateChatGrip();
   }
 
   // Statistiche: si possono nascondere (ricordato in questo browser).
@@ -367,10 +374,67 @@
   };
   renderStatsToggle();
 
+  // Altezza della chat: si trascina la maniglia sotto il riquadro (ricordata in questo browser).
+  // Finché non la scegli, la chat si adatta alla finestra così il fondo resta visibile.
+  const chatPanel = $('chat-panel');
+  const chatBox = () => chatPanel.querySelector('.chat-frame, .demo-chat');
+  const uiZoom = () => Number(document.body.style.zoom) || 1;
+  const setChatHeight = (h) => chatPanel.style.setProperty('--chat-h', `${Math.round(Math.min(Math.max(h, 200), 4000))}px`);
+  function fitChat() {
+    const saved = Number(store.get('chatHeight'));
+    if (saved) return setChatHeight(saved);
+    const box = chatBox();
+    if (!box) return;
+    const z = uiZoom();
+    const rect = box.getBoundingClientRect();
+    const top = rect.top + window.scrollY;
+    // Spazio occupato sotto la chat (nota, maniglia, margini del riquadro) + un piccolo margine.
+    const below = chatPanel.getBoundingClientRect().bottom - rect.bottom + 16 * z;
+    // Se la chat inizia in basso (telefono, finestre strette): 3/4 dello schermo.
+    setChatHeight(top < innerHeight * 0.6 ? (innerHeight - top - below) / z : (innerHeight / z) * 0.75);
+  }
+  window.addEventListener('resize', fitChat);
+  $('ui-zoom').addEventListener('change', () => requestAnimationFrame(fitChat));
+  (function chatResize() {
+    const grip = $('chat-resize');
+    const save = () => store.set('chatHeight', String(chatBox()?.offsetHeight ?? ''));
+    let start = null;
+    grip.addEventListener('pointerdown', (e) => {
+      if (!chatBox()) return;
+      e.preventDefault();
+      start = { y: e.clientY, h: chatBox().offsetHeight };
+      grip.setPointerCapture(e.pointerId);
+      chatPanel.classList.add('resizing');
+    });
+    grip.addEventListener('pointermove', (e) => {
+      if (start) setChatHeight(start.h + (e.clientY - start.y) / uiZoom());
+    });
+    const end = () => {
+      if (!start) return;
+      start = null;
+      chatPanel.classList.remove('resizing');
+      save();
+    };
+    grip.addEventListener('pointerup', end);
+    grip.addEventListener('pointercancel', end);
+    grip.addEventListener('dblclick', () => {
+      store.set('chatHeight', '');
+      fitChat();
+    });
+    grip.addEventListener('keydown', (e) => {
+      const step = { ArrowUp: -40, ArrowDown: 40 }[e.key];
+      if (!step || !chatBox()) return;
+      e.preventDefault();
+      setChatHeight(chatBox().offsetHeight + step);
+      save();
+    });
+  })();
+
   for (const kind of ['stream', 'chat']) {
     $(`btn-${kind}-toggle`).onclick = () => {
       store.set(`hide-${kind}`, store.get(`hide-${kind}`) === '1' ? '0' : '1');
       renderEmbed(kind);
+      updateChatGrip();
     };
   }
 
