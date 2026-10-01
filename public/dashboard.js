@@ -353,6 +353,20 @@
     renderEmbed('chat');
   }
 
+  // Statistiche: si possono nascondere (ricordato in questo browser).
+  function renderStatsToggle() {
+    const hidden = store.get('hide-stats') === '1';
+    $('stats-body').hidden = hidden;
+    $('btn-reset-stats').hidden = hidden;
+    $('btn-stats-toggle').textContent = hidden ? 'Mostra' : 'Nascondi';
+    $('stats-panel').classList.toggle('collapsed', hidden);
+  }
+  $('btn-stats-toggle').onclick = () => {
+    store.set('hide-stats', store.get('hide-stats') === '1' ? '0' : '1');
+    renderStatsToggle();
+  };
+  renderStatsToggle();
+
   for (const kind of ['stream', 'chat']) {
     $(`btn-${kind}-toggle`).onclick = () => {
       store.set(`hide-${kind}`, store.get(`hide-${kind}`) === '1' ? '0' : '1');

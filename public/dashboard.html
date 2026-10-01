@@ -36,33 +36,28 @@
       <form id="obs-form" class="obs-form" hidden autocomplete="off"></form>
     </section>
 
-    <section class="panel" id="queue-panel">
-      <h2>Coda alert</h2>
-      <div id="now-playing" class="now-playing">Nessun alert in corso</div>
-      <div class="muted" id="pending"></div>
-      <div class="buttons">
-        <button id="btn-pause">⏸ Pausa</button>
-        <button id="btn-skip">⏭ Salta</button>
-        <button id="btn-clear" class="danger">🗑 Svuota coda</button>
+    <section class="panel feed-panel">
+      <div class="panel-head">
+        <h2>Notifiche</h2>
+        <input id="search" type="search" placeholder="Cerca utente o messaggio…">
       </div>
-      <h3>Prova gli alert</h3>
-      <div class="buttons" id="test-buttons"></div>
-      <h3>Overlay per OBS</h3>
-      <div class="overlay-url">
-        <code id="overlay-url"></code>
-        <button id="btn-copy">Copia</button>
-      </div>
-      <p class="muted small">Aggiungilo in OBS come "Sorgente browser" (1920×1080) e spunta "Controlla l'audio tramite OBS".</p>
+      <div id="filters" class="filters"></div>
+      <ul id="feed" class="feed"></ul>
     </section>
 
     <section class="panel" id="stats-panel">
       <div class="panel-head">
         <h2>Statistiche della sessione</h2>
-        <button id="btn-reset-stats" class="small-btn">Azzera</button>
+        <div class="row">
+          <button id="btn-reset-stats" class="small-btn">Azzera</button>
+          <button id="btn-stats-toggle" class="small-btn"></button>
+        </div>
       </div>
-      <div id="stats" class="stats"></div>
-      <h3>Top donatori</h3>
-      <ol id="top-donors" class="top-donors"></ol>
+      <div id="stats-body">
+        <div id="stats" class="stats"></div>
+        <h3>Top donatori</h3>
+        <ol id="top-donors" class="top-donors"></ol>
+      </div>
     </section>
 
     </div>
@@ -80,13 +75,23 @@
       <div id="stream-body"></div>
     </section>
 
-    <section class="panel feed-panel">
-      <div class="panel-head">
-        <h2>Notifiche</h2>
-        <input id="search" type="search" placeholder="Cerca utente o messaggio…">
+    <section class="panel" id="queue-panel">
+      <h2>Coda alert</h2>
+      <div id="now-playing" class="now-playing">Nessun alert in corso</div>
+      <div class="muted" id="pending"></div>
+      <div class="buttons">
+        <button id="btn-pause">⏸ Pausa</button>
+        <button id="btn-skip">⏭ Salta</button>
+        <button id="btn-clear" class="danger">🗑 Svuota coda</button>
       </div>
-      <div id="filters" class="filters"></div>
-      <ul id="feed" class="feed"></ul>
+      <h3>Prova gli alert</h3>
+      <div class="buttons" id="test-buttons"></div>
+      <h3>Overlay per OBS</h3>
+      <div class="overlay-url">
+        <code id="overlay-url"></code>
+        <button id="btn-copy">Copia</button>
+      </div>
+      <p class="muted small">Aggiungilo in OBS come "Sorgente browser" (1920×1080) e spunta "Controlla l'audio tramite OBS".</p>
     </section>
 
     </div>

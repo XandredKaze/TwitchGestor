@@ -108,6 +108,8 @@ button.danger { color: var(--danger); }
 #obs-panel { grid-area: obs; }
 #queue-panel { grid-area: queue; }
 #stats-panel { grid-area: stats; }
+#stats-panel.collapsed .panel-head { margin-bottom: 0; }
+#stats-panel .panel-head .row { flex-shrink: 0; }
 .stream-panel { grid-area: stream; }
 .chat-panel { grid-area: chat; display: flex; flex-direction: column; }
 .feed-panel { grid-area: feed; }
@@ -117,11 +119,11 @@ button.danger { color: var(--danger); }
   .col { display: contents; }
   .live-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: "stream stream" "obs chat" "queue chat" "stats chat" "feed feed" "logs logs";
+    grid-template-areas: "stream stream" "obs chat" "feed chat" "stats chat" "queue queue" "logs logs";
   }
 }
 @media (max-width: 700px) {
-  .live-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "stream" "obs" "chat" "queue" "stats" "feed" "logs"; padding: 16px; }
+  .live-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "stream" "obs" "chat" "feed" "stats" "queue" "logs"; padding: 16px; }
   .chat-frame { min-height: 420px; }
   header { padding: 12px 16px; }
 }
@@ -370,7 +372,8 @@ button.danger { color: var(--danger); }
   background: var(--panel);
   color: var(--text);
 }
-.stream-panel .panel-head, .chat-panel .panel-head { flex-wrap: wrap; }
+.stream-panel .panel-head, .chat-panel .panel-head, .feed-panel .panel-head { flex-wrap: wrap; }
+.feed-panel #search { flex: 1 1 140px; min-width: 0; }
 .stream-panel .panel-head .row, .chat-panel .panel-head .row { flex-wrap: wrap; justify-content: flex-end; }
 @media (max-width: 700px) { #stream-channel { display: none; } }
 
