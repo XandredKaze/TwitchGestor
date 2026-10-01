@@ -35,6 +35,11 @@
     return el('span', { className: `pill ${cls}`, title: status }, `${label}: ${status}`);
   }
 
+  // Altezza della barra in alto (fissa mentre scorri): serve ai riquadri "appiccicosi" dell'editor.
+  new ResizeObserver(([entry]) => {
+    document.documentElement.style.setProperty('--header-h', `${Math.ceil(entry.target.getBoundingClientRect().height)}px`);
+  }).observe(document.querySelector('header'));
+
   // Dimensione dei testi della dashboard (ricordata in questo browser).
   const applyZoom = (z) => { document.body.style.zoom = z; };
   try { const z = localStorage.getItem('uiZoom'); if (z) { $('ui-zoom').value = z; applyZoom(z); } } catch { /* ignora */ }
