@@ -3,6 +3,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { randomBytes } from 'node:crypto';
 import { createLogger } from '../logger.js';
+import { QUICK_ACTION_SCOPES } from '../quickActions.js';
 
 const log = createLogger('twitch-auth');
 const OAUTH = 'https://id.twitch.tv/oauth2';
@@ -18,6 +19,7 @@ export const SCOPES = [
   'channel:read:vips', // titoli di coda: VIP
   'moderator:read:chatters', // titoli di coda: chi era in chat
   'user:read:chat', // comandi della chat (!discord, !uptime...)
+  ...QUICK_ACTION_SCOPES, // azioni rapide (titolo, clip, raid, sondaggi, chat...)
 ];
 
 /** Permessi dell'account bot: gli serve solo scrivere in chat. */

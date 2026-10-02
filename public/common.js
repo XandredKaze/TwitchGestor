@@ -52,7 +52,7 @@
   }
 
   // Deve corrispondere ad API_LEVEL in src/version.js.
-  const API_LEVEL = 6;
+  const API_LEVEL = 7;
   const RESTART_HELP = 'Il programma TwitchGestor acceso è una versione precedente rispetto a questa pagina (succede se aggiorni i file mentre è acceso). Riavvialo: clicca "⏻ Spegni" in alto a destra, poi riapri OBS (oppure fai doppio clic su "Avvia TwitchGestor.vbs") e ricarica questa pagina con Ctrl+F5.';
 
   window.TG = { api, el, money, token: () => token, API_LEVEL, RESTART_HELP, version: '' };

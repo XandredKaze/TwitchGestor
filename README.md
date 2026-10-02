@@ -20,6 +20,7 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 - **Voce (text-to-speech)** gratuita e locale: legge gli alert e i messaggi degli spettatori con le voci di Windows, e la voce va in live tramite OBS.
 - **Anteprima della live e chat di Twitch** direttamente nella dashboard (scheda Live).
 - **Cambio scena di OBS** con un clic dalla dashboard (tramite OBS WebSocket, già incluso in OBS).
+- **Azioni rapide** come nel Gestore stream di Twitch (scheda Live): titolo e categoria, clip, segnalibro, raid, shoutout, annuncio, sondaggi, pronostici, pubblicità e impostazioni della chat.
 - **Comandi della chat** (scheda 💬 Comandi): `!discord`, `!uptime`, `!followage`, `!so`, `!scena`… con risposte, permessi, attese, contatori e messaggi a tempo; risponde il bot (es. Wolfery).
 - **Temi** (scheda 🖌 Tema): aspetto predefinito o **Brutalism** (nero, bianco e lilla) per tutta la dashboard, e stile Classico o Brutalism per l'animazione dei titoli di coda.
 - **Titoli di coda animati** (credit roll) con abbonati, gift e follower scaricati in automatico, musica e pannello di controllo.
@@ -100,6 +101,18 @@ Nella scheda **📡 Live** della dashboard trovi il player della tua live (senza
 - Per scrivere in chat devi essere collegato a twitch.tv nello stesso browser; se il riquadro non te lo permette usa **Finestra ↗**.
 - Con **Nascondi** togli player o chat e risparmi risorse del PC durante la live.
 - La chat si adatta all'altezza della finestra. Per sceglierla tu, **trascina la maniglia** sotto la chat (o usala con le frecce ↑ ↓ della tastiera); doppio clic sulla maniglia per tornare all'altezza automatica. Ogni PC o browser ricorda la sua.
+
+## Azioni rapide
+
+Nella scheda **📡 Live**, tra l'anteprima della live e la coda degli alert, ci sono le **Azioni rapide** del Gestore stream di Twitch:
+
+- **Titolo e categoria** (con ricerca della categoria), **Crea clip** (con il link per modificarla), **Segnalibro** nel video;
+- **Raid** (Twitch lo fa partire dopo circa 90 secondi, si può annullare), **Shoutout** ufficiale, **Annuncio** colorato in chat;
+- **Sondaggio** e **Pronostico**: li crei, vedi voti e puntate, li chiudi o scegli il risultato vincente;
+- **Pubblicità** (30–180 secondi);
+- chat: **Solo emote**, **Solo follower** (con il tempo minimo), **Solo abbonati**, **Modalità lenta**, **Messaggi unici**, **Modalità scudo**, **Svuota chat** (doppio clic per sicurezza). Gli interruttori mostrano se sono attivi.
+
+Con **⚙ Personalizza** scegli quali azioni mostrare. La prima volta servono nuovi permessi: **Esci** e **Accedi con Twitch**. Pubblicità, sondaggi, pronostici e clip Twitch li permette solo ai canali affiliate o partner.
 
 ## Comandi della chat
 

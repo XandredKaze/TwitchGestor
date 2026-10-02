@@ -312,6 +312,20 @@ export function createServer(app) {
           const config = app.config.save({ ...current, ui: { ...current.ui, ...body } });
           return send(res, 200, { ui: config.ui });
         }
+        // --- Azioni rapide (come nel Gestore stream di Twitch) ---
+        if (route === 'GET /api/actions/state') {
+          if (!app.quickActions) return send(res, 400, { error: 'Azioni rapide non disponibili' });
+          return send(res, 200, await app.quickActions.state());
+        }
+        if (route === 'GET /api/actions/categories') {
+          return send(res, 200, await app.quickActions.run('categories', { query: url.searchParams.get('q') }));
+        }
+        if (req.method === 'POST' && url.pathname.startsWith('/api/actions/')) {
+          const name = decodeURIComponent(url.pathname.slice('/api/actions/'.length));
+          const result = await app.quickActions.run(name, await readBody(req));
+          if (name === 'info' || name.startsWith('chat') || name === 'shield') app.broadcastState();
+          return send(res, 200, result);
+        }
         if (route === 'PUT /api/commands') {
           // Solo i comandi della chat: non tocca le altre impostazioni.
           const body = await readBody(req, 1_000_000);

@@ -12,6 +12,7 @@ import { API_LEVEL, APP_VERSION, codeChangedSinceStart } from './version.js';
 import { CreditsStore, startCreditsScheduler } from './credits.js';
 import { TtsService, PiperManager } from './tts.js';
 import { ObsClient } from './obs.js';
+import { createQuickActions } from './quickActions.js';
 import { ChatCommands, humanDuration } from './core/commands.js';
 import { sanitizeConfig } from './core/schema.js';
 import { createLogger } from './logger.js';
@@ -155,6 +156,8 @@ function testCommand(text, role = 'broadcaster', draft) {
   return tester.handle({ text, user: { id: role === 'broadcaster' ? auth.user?.id : 'prova', login: name, name }, badges }, { dryRun: true });
 }
 
+const quickActions = createQuickActions({ helix, getUser: () => auth.user });
+
 let eventsub = null;
 const streamelements = env.STREAMELEMENTS_JWT ? new StreamElementsSource({ jwt: env.STREAMELEMENTS_JWT }) : null;
 
@@ -168,6 +171,7 @@ const app = {
   tts,
   obs,
   testCommand,
+  quickActions,
   chatAccount,
   getState() {
     return {

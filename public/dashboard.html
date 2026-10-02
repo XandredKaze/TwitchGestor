@@ -80,6 +80,20 @@
       <div id="stream-body"></div>
     </section>
 
+    <section class="panel" id="actions-panel">
+      <div class="panel-head">
+        <h2>Azioni rapide</h2>
+        <div class="row">
+          <button id="qa-refresh" class="small-btn" title="Aggiorna lo stato da Twitch">↻</button>
+          <button id="qa-custom" class="small-btn" title="Scegli quali azioni mostrare">⚙ Personalizza</button>
+        </div>
+      </div>
+      <div id="qa-custom-box" class="qa-custom" hidden></div>
+      <div id="qa-grid" class="qa-grid"></div>
+      <div id="qa-form" class="qa-form" hidden></div>
+      <div id="qa-msg" class="qa-msg" role="status"></div>
+    </section>
+
     <section class="panel" id="queue-panel">
       <h2>Coda alert</h2>
       <div id="now-playing" class="now-playing">Nessun alert in corso</div>
@@ -251,5 +265,6 @@
   <script src="/dashboard.js"></script>
   <script src="/editor.js"></script>
   <script src="/commands.js"></script>
+  <script src="/actions.js"></script>
 </body>
 </html>

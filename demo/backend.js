@@ -17,6 +17,7 @@ import { liveSession } from '../src/core/session.js';
 import { cleanText } from '../src/core/ttsText.js';
 import { API_LEVEL, APP_VERSION } from '../src/core/apiLevel.js';
 import { ChatCommands, humanDuration } from '../src/core/commands.js';
+import { createQuickActions } from '../src/quickActions.js';
 
 const CHANNEL = { id: '0', login: 'canale_demo' };
 const DEMO_SCENES = ['Inizio', 'Gioco', 'Chiacchiere', 'Pausa', 'Fine'];
@@ -153,6 +154,7 @@ class DemoBackend {
       },
     };
     this.commandDeps = commandDeps;
+    this.quickActions = createQuickActions({ helix: this.#fakeTwitch(), getUser: () => CHANNEL });
     this.commands = new ChatCommands({
       ...commandDeps,
       getConfig: () => this.config.commands,
@@ -160,6 +162,60 @@ class DemoBackend {
     });
     setInterval(() => this.commands.tick(), 30000);
     this.log.info('Demo avviata: nessun collegamento a Twitch, gli eventi sono simulati');
+  }
+
+  /** Twitch finto per le azioni rapide: risponde come le API vere, con dati in memoria. */
+  #fakeTwitch() {
+    const tw = {
+      channel: { title: 'Live demo di TwitchGestor', game_id: '509658', game_name: 'Just Chatting' },
+      chat: { emote_mode: false, follower_mode: false, follower_mode_duration: 0, subscriber_mode: false, slow_mode: false, slow_mode_wait_time: 30, unique_chat_mode: false },
+      shield: false, poll: null, prediction: null,
+    };
+    const GAMES = ['Just Chatting', 'Minecraft', 'Fortnite', 'League of Legends', 'Valorant', 'GTA V', 'Elden Ring', 'The Legend of Zelda: Tears of the Kingdom', 'Art', 'Music', 'Chess', 'Among Us'];
+    const params = (url) => Object.fromEntries(new URL(url, 'http://x').searchParams);
+    const vote = () => { // voti finti che arrivano col tempo
+      for (const c of tw.poll?.choices ?? []) c.votes += Math.floor(Math.random() * 3);
+      for (const o of tw.prediction?.status === 'ACTIVE' ? tw.prediction.outcomes : []) { o.users += Math.floor(Math.random() * 2); o.channel_points = o.users * 250; }
+    };
+    return {
+      request: async (method, url, body) => {
+        const path = url.split('?')[0];
+        const p = params(url);
+        vote();
+        switch (`${method} ${path}`) {
+          case 'GET /channels': return { data: [tw.channel] };
+          case 'PATCH /channels':
+            if (body.title) tw.channel.title = body.title;
+            if (body.game_id) tw.channel = { ...tw.channel, game_id: body.game_id, game_name: GAMES[Number(body.game_id) - 1] ?? tw.channel.game_name };
+            this.log.info(`Titolo: "${tw.channel.title}" · categoria: ${tw.channel.game_name}`);
+            return {};
+          case 'GET /search/categories':
+            return { data: GAMES.map((name, i) => ({ id: String(i + 1), name })).filter((g) => g.name.toLowerCase().includes(p.query.toLowerCase())).slice(0, 8) };
+          case 'GET /chat/settings': return { data: [tw.chat] };
+          case 'PATCH /chat/settings': Object.assign(tw.chat, body); return { data: [tw.chat] };
+          case 'GET /moderation/shield_mode': return { data: [{ is_active: tw.shield }] };
+          case 'PUT /moderation/shield_mode': tw.shield = body.is_active; return {};
+          case 'DELETE /moderation/chat': this.chat = []; this.broadcastState(); return {};
+          case 'POST /chat/announcements': this.#chat(CHANNEL.login, `📢 ${body.message}`); return {};
+          case 'POST /streams/markers': return { data: [{ id: 'm1' }] };
+          case 'POST /clips': return { data: [{ id: 'clip', edit_url: 'https://www.twitch.tv/' }] };
+          case 'POST /channels/commercial': return { data: [{ length: body.length, message: `Pubblicità di ${body.length} secondi (simulata)` }] };
+          case 'GET /users': return { data: [{ id: '99', login: p.login, display_name: p.login }] };
+          case 'POST /raids': case 'DELETE /raids': case 'POST /chat/shoutouts': return {};
+          case 'GET /polls': return { data: tw.poll ? [tw.poll] : [] };
+          case 'POST /polls':
+            tw.poll = { id: 'poll1', status: 'ACTIVE', title: body.title, duration: body.duration, started_at: new Date().toISOString(), choices: body.choices.map((c) => ({ title: c.title, votes: 0 })) };
+            return {};
+          case 'PATCH /polls': if (tw.poll) tw.poll.status = 'TERMINATED'; return {};
+          case 'GET /predictions': return { data: tw.prediction ? [tw.prediction] : [] };
+          case 'POST /predictions':
+            tw.prediction = { id: 'pred1', status: 'ACTIVE', title: body.title, prediction_window: body.prediction_window, created_at: new Date().toISOString(), outcomes: body.outcomes.map((o, i) => ({ id: `o${i}`, title: o.title, users: 0, channel_points: 0 })) };
+            return {};
+          case 'PATCH /predictions': if (tw.prediction) tw.prediction.status = body.status; return {};
+          default: throw Object.assign(new Error(`Non simulato nella demo: ${method} ${path}`), { status: 404 });
+        }
+      },
+    };
   }
 
   /** Un messaggio arrivato nella chat simulata: compare in chat e passa ai comandi. */
@@ -288,6 +344,8 @@ class DemoBackend {
         this.log.info('Impostazioni salvate (solo in questo browser)');
         return ok({ config: this.config });
       }
+      case 'GET /api/actions/state': return ok(await this.quickActions.state());
+      case 'GET /api/actions/categories': return ok(await this.quickActions.run('categories', { query: url.searchParams.get('q') }));
       case 'PUT /api/commands': {
         this.config = sanitizeConfig({ ...this.config, commands: body?.commands }, this.defaults);
         storage.set('tg-demo-config', diffConfig(this.config, this.defaults) ?? {});
@@ -359,6 +417,13 @@ class DemoBackend {
         break;
     }
 
+    if (method === 'POST' && url.pathname.startsWith('/api/actions/')) {
+      try {
+        return ok(await this.quickActions.run(decodeURIComponent(url.pathname.slice('/api/actions/'.length)), body ?? {}));
+      } catch (err) {
+        return fail(err.status ?? 400, err.message);
+      }
+    }
     if (method === 'POST' && url.pathname.startsWith('/api/test/')) {
       const type = url.pathname.slice('/api/test/'.length);
       if (!NOTIFICATION_TYPES.includes(type)) return fail(400, `Tipo sconosciuto: ${type}`);

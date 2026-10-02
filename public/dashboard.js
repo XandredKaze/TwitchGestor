@@ -103,7 +103,10 @@
     }
     if (!twitch.configured) banners.push('Imposta TWITCH_CLIENT_ID e TWITCH_CLIENT_SECRET nel file .env e riavvia il programma.');
     else if (!twitch.user) banners.push('Collega il tuo account Twitch con il pulsante "Accedi con Twitch" in alto a destra.');
-    if (twitch.missingScopes.length) banners.push(`Mancano dei permessi Twitch (${twitch.missingScopes.join(', ')}): esci e accedi di nuovo.`);
+    if (twitch.missingScopes.length) {
+      banners.push(el('span', { title: `Permessi mancanti: ${twitch.missingScopes.join(', ')}` },
+        el('b', {}, 'Servono nuovi permessi Twitch '), '(per le funzioni aggiunte, es. azioni rapide e comandi della chat): clicca ', el('b', {}, 'Esci'), ' in alto a destra e poi ', el('b', {}, 'Accedi con Twitch'), '.'));
+    }
     for (const f of twitch.failedSubscriptions) banners.push(`Evento Twitch non attivo: ${f.type} — ${f.error}`);
     if (state.demo) {
       banners.unshift(el('div', { className: 'demo-banner' },
