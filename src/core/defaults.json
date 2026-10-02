@@ -21,6 +21,121 @@
   "ui": {
     "theme": "default"
   },
+  "commands": {
+    "enabled": false,
+    "prefix": "!",
+    "list": [
+      {
+        "id": "comandi",
+        "name": "comandi",
+        "aliases": [
+          "help"
+        ],
+        "action": "list",
+        "response": "Comandi: {result}",
+        "permission": "everyone",
+        "cooldown": 10,
+        "userCooldown": 30,
+        "enabled": true
+      },
+      {
+        "id": "uptime",
+        "name": "uptime",
+        "aliases": [],
+        "action": "reply",
+        "response": "{channel} è in live da {uptime}",
+        "permission": "everyone",
+        "cooldown": 10,
+        "userCooldown": 30,
+        "enabled": true
+      },
+      {
+        "id": "followage",
+        "name": "followage",
+        "aliases": [],
+        "action": "reply",
+        "response": "{user} segue {channel} da {followage}",
+        "permission": "everyone",
+        "cooldown": 5,
+        "userCooldown": 30,
+        "enabled": true
+      },
+      {
+        "id": "discord",
+        "name": "discord",
+        "aliases": [
+          "dc"
+        ],
+        "action": "reply",
+        "response": "Entra nel Discord: (incolla qui il link)",
+        "permission": "everyone",
+        "cooldown": 15,
+        "userCooldown": 30,
+        "enabled": false
+      },
+      {
+        "id": "social",
+        "name": "social",
+        "aliases": [
+          "instagram",
+          "ig",
+          "youtube"
+        ],
+        "action": "reply",
+        "response": "Instagram: @xandred_director · YouTube: @xandredkaze777",
+        "permission": "everyone",
+        "cooldown": 15,
+        "userCooldown": 30,
+        "enabled": true
+      },
+      {
+        "id": "so",
+        "name": "so",
+        "aliases": [
+          "shoutout"
+        ],
+        "action": "reply",
+        "response": "Andate a seguire {target}! 👉 twitch.tv/{target}",
+        "permission": "moderator",
+        "cooldown": 0,
+        "userCooldown": 0,
+        "enabled": true
+      },
+      {
+        "id": "scena",
+        "name": "scena",
+        "aliases": [
+          "scene"
+        ],
+        "action": "scene",
+        "response": "Scena cambiata: {scene}",
+        "permission": "moderator",
+        "cooldown": 0,
+        "userCooldown": 0,
+        "enabled": true
+      },
+      {
+        "id": "titoli",
+        "name": "titoli",
+        "aliases": [],
+        "action": "credits",
+        "response": "Titoli di coda ripartiti!",
+        "permission": "broadcaster",
+        "cooldown": 0,
+        "userCooldown": 0,
+        "enabled": true
+      }
+    ],
+    "timers": [
+      {
+        "id": "social-timer",
+        "message": "Seguimi anche su Instagram @xandred_director e YouTube @xandredkaze777 💜",
+        "interval": 20,
+        "minLines": 10,
+        "enabled": false
+      }
+    ]
+  },
   "types": {
     "follow": {
       "label": "Follow",

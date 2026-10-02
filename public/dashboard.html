@@ -16,6 +16,7 @@
       <button class="tab active" data-tab="live" role="tab">📡 Live</button>
       <button class="tab" data-tab="editor" role="tab">🎨 Personalizza alert</button>
       <button class="tab" data-tab="credits" role="tab">🎬 Titoli di coda</button>
+      <button class="tab" data-tab="commands" role="tab">💬 Comandi</button>
       <button class="tab" data-tab="theme" role="tab">🖌 Tema</button>
     </nav>
     <div id="statuses" class="statuses"></div>
@@ -165,6 +166,65 @@
     <iframe id="credits-frame" title="Pannello dei titoli di coda"></iframe>
   </main>
 
+  <main id="tab-commands" class="commands-tab" hidden>
+    <section class="panel cmd-head-panel">
+      <div class="panel-head">
+        <h2>Comandi della chat</h2>
+        <label class="switch"><input type="checkbox" id="cmd-enabled"> Attivi</label>
+      </div>
+      <div id="cmd-status"></div>
+      <div class="cmd-settings">
+        <label class="inline small">Simbolo dei comandi
+          <select id="cmd-prefix"><option>!</option><option>?</option><option>#</option><option>$</option><option>%</option><option>&amp;</option><option>*</option><option>+</option><option>.</option><option>~</option><option>-</option></select>
+        </label>
+        <span class="muted small">Gli spettatori scrivono il simbolo seguito dal nome, es. <code>!discord</code>. Tu e i moderatori non avete attese.</span>
+      </div>
+    </section>
+
+    <section class="panel cmd-list-panel">
+      <div class="panel-head">
+        <h2>Comandi</h2>
+        <button id="cmd-add" class="small-btn primary">＋ Nuovo comando</button>
+      </div>
+      <div class="cmd-layout">
+        <div id="cmd-list" class="cmd-list"></div>
+        <div id="cmd-editor" class="cmd-editor"></div>
+      </div>
+    </section>
+
+    <section class="panel cmd-test-panel">
+      <h2>Prova un comando</h2>
+      <p class="muted small">Vedi cosa risponderebbe il bot, senza scrivere in chat e senza cambiare nulla (anche con le modifiche non salvate).</p>
+      <form id="cmd-test" class="cmd-test">
+        <input type="text" id="cmd-test-text" placeholder="!discord" autocomplete="off">
+        <select id="cmd-test-role">
+          <option value="broadcaster">come te</option>
+          <option value="moderator">come moderatore</option>
+          <option value="vip">come VIP</option>
+          <option value="subscriber">come abbonato</option>
+          <option value="everyone">come spettatore</option>
+        </select>
+        <button type="submit" class="primary">▶ Prova</button>
+      </form>
+      <div id="cmd-test-out" class="cmd-test-out muted small">La risposta comparirà qui.</div>
+    </section>
+
+    <section class="panel cmd-timers-panel">
+      <div class="panel-head">
+        <h2>Messaggi a tempo</h2>
+        <button id="timer-add" class="small-btn">＋ Nuovo messaggio</button>
+      </div>
+      <p class="muted small">Il bot li scrive da solo ogni tot minuti, ma solo se nel frattempo in chat sono stati scritti abbastanza messaggi (così non parla da solo a chat vuota). Puoi usare le stesse variabili dei comandi.</p>
+      <div id="timer-list" class="timer-list"></div>
+    </section>
+
+    <div class="save-bar" id="cmd-save-bar" hidden>
+      <span>Comandi non salvati</span>
+      <button id="cmd-discard">Annulla modifiche</button>
+      <button id="cmd-save" class="primary">💾 Salva</button>
+    </div>
+  </main>
+
   <main id="tab-theme" class="theme-tab" hidden>
     <section class="panel">
       <h2>Aspetto di TwitchGestor</h2>
@@ -190,5 +250,6 @@
   <script src="/fonts.js"></script>
   <script src="/dashboard.js"></script>
   <script src="/editor.js"></script>
+  <script src="/commands.js"></script>
 </body>
 </html>

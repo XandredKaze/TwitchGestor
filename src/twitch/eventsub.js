@@ -16,6 +16,8 @@ export function subscriptionsFor(userId) {
     { type: 'channel.raid', version: '1', condition: { to_broadcaster_user_id: userId } },
     { type: 'channel.channel_points_custom_reward_redemption.add', version: '1', condition: me },
     { type: 'channel.charity_campaign.donate', version: '1', condition: me },
+    // messaggi della chat, letti con il tuo account: servono per i comandi (!discord, !uptime...)
+    { type: 'channel.chat.message', version: '1', condition: { ...me, user_id: userId } },
   ];
 }
 

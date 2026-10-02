@@ -30,7 +30,7 @@ test('si iscrive, riceve eventi, scarta i duplicati e migra la sessione senza re
   client.start();
   await once(client, 'status'); // connessione…
   while (client.status !== 'connesso') await once(client, 'status');
-  assert.equal(subscribed.length, 8);
+  assert.equal(subscribed.length, 9);
   assert.ok(subscribed.every((s) => s.sessionId === 's1'));
   assert.equal(subscribed.find((s) => s.type === 'channel.raid').condition.to_broadcaster_user_id, '42');
 
@@ -41,7 +41,7 @@ test('si iscrive, riceve eventi, scarta i duplicati e migra la sessione senza re
   sockets[0].send(JSON.stringify({ metadata: { message_type: 'session_reconnect' }, payload: { session: { reconnect_url: `${url}?reconnect` } } }));
   await once(client, 'status'); // connessione…
   while (client.status !== 'connesso') await once(client, 'status');
-  assert.equal(subscribed.length, 8, 'nessuna nuova iscrizione dopo la migrazione');
+  assert.equal(subscribed.length, 9, 'nessuna nuova iscrizione dopo la migrazione');
 
   sockets[1].send(notification('m2', 'channel.cheer', { user_name: 'Bea' }));
   await once(client, 'event');

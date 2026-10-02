@@ -17,6 +17,7 @@ export const SCOPES = [
   'moderation:read', // titoli di coda: moderatori
   'channel:read:vips', // titoli di coda: VIP
   'moderator:read:chatters', // titoli di coda: chi era in chat
+  'user:read:chat', // comandi della chat (!discord, !uptime...)
 ];
 
 /** Permessi dell'account bot: gli serve solo scrivere in chat. */

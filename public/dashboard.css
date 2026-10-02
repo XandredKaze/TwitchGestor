@@ -560,6 +560,56 @@ input, select, textarea { transition: border-color 0.15s, box-shadow 0.15s; }
 .theme-roll-frame { position: relative; aspect-ratio: 16 / 9; overflow: hidden; margin-top: 8px; border-radius: 12px; border: 1px solid var(--border); background: repeating-conic-gradient(#3a3a44 0% 25%, #2a2a32 0% 50%) 50% / 24px 24px; }
 .theme-roll-frame iframe { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; pointer-events: none; color-scheme: normal; }
 
+/* ---------- Scheda Comandi ---------- */
+.commands-tab { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 16px 20px 90px; max-width: 1400px; margin: 0 auto; }
+.commands-tab[hidden] { display: none; }
+.cmd-head-panel, .cmd-list-panel { grid-column: 1 / -1; }
+@media (max-width: 900px) { .commands-tab { grid-template-columns: minmax(0, 1fr); padding: 16px 16px 90px; } }
+.cmd-settings { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 10px; }
+.cmd-settings select { font: inherit; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--inset); color: var(--text); }
+.cmd-settings code, .cmd-warn code { padding: 1px 5px; border-radius: 5px; background: var(--inset); }
+.cmd-warn, .cmd-ok { margin: 0; padding: 9px 12px; border-radius: 10px; font-size: 14px; }
+.cmd-warn { border: 1px solid var(--warn); background: color-mix(in srgb, var(--warn) 10%, var(--panel)); }
+.cmd-ok { border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--border)); background: color-mix(in srgb, var(--ok) 8%, var(--panel)); }
+.cmd-layout { display: grid; grid-template-columns: minmax(220px, 320px) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 760px) { .cmd-layout { grid-template-columns: minmax(0, 1fr); } }
+.cmd-list { display: flex; flex-direction: column; gap: 6px; max-height: 560px; overflow-y: auto; padding-right: 2px; }
+.cmd-item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--inset); cursor: pointer; }
+.cmd-item:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.cmd-item.active { border-color: var(--accent); box-shadow: var(--glow); }
+.cmd-item.off .cmd-name { opacity: 0.5; text-decoration: line-through; }
+.cmd-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; font-family: ui-monospace, Consolas, monospace; }
+.cmd-name small { font-weight: 400; color: var(--muted); }
+.cmd-perm { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--panel); border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+.cmd-item input, .timer-item input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--accent); }
+.cmd-editor { min-width: 0; }
+.cmd-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.cmd-editor-head h3 { margin: 0; font-size: 18px; text-transform: none; letter-spacing: 0; color: var(--text); font-family: ui-monospace, Consolas, monospace; }
+.commands-tab input[type=text], .commands-tab input[type=number], .commands-tab textarea, .commands-tab select {
+  min-width: 0; font: inherit; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--inset); color: var(--text);
+}
+.commands-tab .field input, .commands-tab .field select, .commands-tab .field textarea { width: 100%; }
+.commands-tab textarea { resize: vertical; width: 100%; }
+.commands-tab .chips .chip { font-family: ui-monospace, Consolas, monospace; font-size: 12px; padding: 2px 8px; }
+.cmd-test { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.cmd-test input { flex: 1 1 180px; }
+.cmd-test-out { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--inset); border: 1px dashed var(--border); overflow-wrap: anywhere; min-height: 42px; }
+.timer-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.timer-item { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--inset); }
+.timer-item.off { opacity: 0.6; }
+.timer-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.timer-opts input[type=number] { width: 70px; padding: 4px 6px; }
+.timer-opts .danger { margin-left: auto; }
+[data-ui="brutal"] .cmd-item { background: transparent; border: 1.5px solid #5a5a5a; }
+[data-ui="brutal"] .cmd-item.active { border-color: var(--line); background: #0f0f0f; box-shadow: none; }
+[data-ui="brutal"] .cmd-item.active .cmd-name { color: var(--lilac); }
+[data-ui="brutal"] .cmd-name, [data-ui="brutal"] .cmd-editor-head h3 { font-family: var(--mono); font-weight: 400; }
+[data-ui="brutal"] .cmd-perm { background: transparent; border: 1px solid #6a6a6a; font-family: var(--mono); font-weight: 400; text-transform: uppercase; }
+[data-ui="brutal"] .cmd-warn { background: transparent; border: 1.5px dashed var(--lilac); }
+[data-ui="brutal"] .cmd-ok { background: transparent; border: 1.5px solid var(--lilac); }
+[data-ui="brutal"] .cmd-test-out, [data-ui="brutal"] .timer-item { background: #0f0f0f; border: 1.5px dashed #6a6a6a; }
+[data-ui="brutal"] .cmd-editor-head { border-bottom: 1.5px solid #6a6a6a; }
+
 /* Miniature dei temi (disegnate, non immagini) */
 .theme-mock { position: relative; display: block; height: 120px; overflow: hidden; border-radius: 10px; }
 .theme-mock i { display: block; }
@@ -772,4 +822,10 @@ html:root[data-ui="brutal"] {
 [data-ui="brutal"] .theme-badge { background: var(--lilac); color: #111; font-family: var(--mono); font-weight: 400; }
 [data-ui="brutal"] .theme-desc { color: var(--muted); text-transform: none; font-family: 'Outfit', sans-serif; }
 [data-ui="brutal"] ::-webkit-scrollbar-thumb { background: #5a5a5a; border: 0; }
-@media (max-width: 700px) { [data-ui="brutal"] .tab.active::before { content: none; } [data-ui="brutal"] h1 { font-size: 20px; } }
+@media (max-width: 700px) {
+  [data-ui="brutal"] .tab.active::before { content: none; }
+  [data-ui="brutal"] h1 { font-size: 20px; }
+  [data-ui="brutal"] .tabs { flex-wrap: wrap; }
+  [data-ui="brutal"] .tab { flex: 1 1 30%; min-width: 0; padding: 6px 4px; font-size: 12px; letter-spacing: 0.02em; overflow-wrap: anywhere; }
+}
+[data-ui="brutal"] .commands-tab .chips .chip { text-transform: none; }

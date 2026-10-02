@@ -312,6 +312,18 @@ export function createServer(app) {
           const config = app.config.save({ ...current, ui: { ...current.ui, ...body } });
           return send(res, 200, { ui: config.ui });
         }
+        if (route === 'PUT /api/commands') {
+          // Solo i comandi della chat: non tocca le altre impostazioni.
+          const body = await readBody(req, 1_000_000);
+          const config = app.config.save({ ...app.config.get(), commands: body.commands });
+          app.broadcastState();
+          return send(res, 200, { commands: config.commands });
+        }
+        if (route === 'POST /api/commands/test') {
+          const body = await readBody(req, 1_000_000);
+          const reply = await app.testCommand?.(String(body.text ?? '').slice(0, 500), body.role, body.commands);
+          return send(res, 200, { reply: reply ?? null });
+        }
         if (route === 'PUT /api/config') {
           const config = app.config.save((await readBody(req, 1_000_000)).config);
           return send(res, 200, { config });

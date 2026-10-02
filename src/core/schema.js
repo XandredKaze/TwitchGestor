@@ -4,6 +4,8 @@
  * tutto il resto viene ignorato, così un valore sbagliato non può rompere l'overlay.
  */
 
+import { PERMISSIONS, ACTIONS } from './commands.js';
+
 export const ANIMATIONS = ['pop', 'fade', 'slide-down', 'slide-up', 'slide-left', 'slide-right', 'zoom', 'bounce', 'flip', 'shake'];
 export const POSITIONS = ['top-left', 'top-center', 'top-right', 'center', 'bottom-left', 'bottom-center', 'bottom-right'];
 /** Temi della dashboard (scheda Tema). */
@@ -117,6 +119,50 @@ function pick(input, fields, base = {}) {
   return out;
 }
 
+const WORD = /^[\p{L}\p{N}_-]{1,30}$/u;
+const cmdWord = (v) => (typeof v === 'string' && WORD.test(v.trim().replace(/^!+/, '')) ? v.trim().replace(/^!+/, '').toLowerCase() : undefined);
+const id = (v) => (typeof v === 'string' && /^[\w-]{1,40}$/.test(v) ? v : undefined);
+
+const COMMAND_FIELDS = {
+  id,
+  name: cmdWord,
+  action: oneOf(ACTIONS),
+  response: text(450),
+  permission: oneOf(PERMISSIONS),
+  cooldown: num(0, 3600),
+  userCooldown: num(0, 3600),
+  enabled: bool,
+};
+const TIMER_FIELDS = { id, message: text(450), interval: num(1, 240), minLines: num(0, 200), enabled: bool };
+
+/** Comandi della chat: nomi unici (anche tra i nomi alternativi), al massimo 100 comandi e 20 messaggi a tempo. */
+function sanitizeCommands(input, base) {
+  const out = { ...base };
+  if (!isObject(input)) return out;
+  if (typeof input.enabled === 'boolean') out.enabled = input.enabled;
+  if (typeof input.prefix === 'string' && /^[!?#$%&*+.~-]$/.test(input.prefix)) out.prefix = input.prefix;
+  if (Array.isArray(input.list)) {
+    const used = new Set();
+    out.list = input.list.filter(isObject).slice(0, 100).map((c, i) => {
+      const cmd = pick(c, COMMAND_FIELDS, { action: 'reply', permission: 'everyone', cooldown: 5, userCooldown: 0, enabled: true, response: '' });
+      cmd.id ??= `c${i}`;
+      cmd.aliases = (Array.isArray(c.aliases) ? c.aliases : []).map(cmdWord).filter(Boolean).slice(0, 10);
+      return cmd;
+    }).filter((cmd) => {
+      if (!cmd.name || used.has(cmd.name) || used.has(cmd.id)) return false;
+      cmd.aliases = cmd.aliases.filter((a) => a !== cmd.name && !used.has(a));
+      used.add(cmd.name).add(cmd.id);
+      cmd.aliases.forEach((a) => used.add(a));
+      return true;
+    });
+  }
+  if (Array.isArray(input.timers)) {
+    out.timers = input.timers.filter(isObject).slice(0, 20)
+      .map((t, i) => ({ ...pick(t, TIMER_FIELDS, { interval: 15, minLines: 5, enabled: true, message: '' }), id: id(t.id) ?? `t${i}` }));
+  }
+  return out;
+}
+
 /** Ritorna la configurazione completa e valida, partendo dai predefiniti. */
 export function sanitizeConfig(input, defaults) {
   const out = structuredClone(defaults);
@@ -126,6 +172,7 @@ export function sanitizeConfig(input, defaults) {
   if (isObject(input.queue)) out.queue.gapMs = num(0, 10000)(input.queue.gapMs) ?? out.queue.gapMs;
   if (isObject(input.chat)) out.chat.enabled = bool(input.chat.enabled) ?? out.chat.enabled;
   if (out.ui && isObject(input.ui)) out.ui.theme = oneOf(UI_THEMES)(input.ui.theme) ?? out.ui.theme;
+  if (out.commands) out.commands = sanitizeCommands(input.commands, out.commands);
   if (out.tts) {
     out.tts = pick(input.tts, TTS_FIELDS, out.tts);
     if (Array.isArray(input.tts?.bannedWords)) {

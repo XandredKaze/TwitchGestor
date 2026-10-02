@@ -12,6 +12,8 @@ import { API_LEVEL, APP_VERSION, codeChangedSinceStart } from './version.js';
 import { CreditsStore, startCreditsScheduler } from './credits.js';
 import { TtsService, PiperManager } from './tts.js';
 import { ObsClient } from './obs.js';
+import { ChatCommands, humanDuration } from './core/commands.js';
+import { sanitizeConfig } from './core/schema.js';
 import { createLogger } from './logger.js';
 
 loadEnv();
@@ -74,6 +76,85 @@ manager.on('notification', () => creditsScheduler.updateSession());
 // Scene di OBS (tramite OBS WebSocket, incluso in OBS 28+).
 const obs = new ObsClient({ file: path.join(DATA_DIR, 'obs.json') });
 
+// --- Comandi della chat (!discord, !uptime...): letti con il tuo account, risposte del bot ---
+function sendChat(text) {
+  if (!auth.user) return Promise.reject(new Error('account Twitch non collegato'));
+  const client = botAuth.user ? botHelix : helix;
+  return client.sendChatMessage(text, auth.user.id).then(() => log.info(`Chat (${client.auth.user.login}): ${text}`));
+}
+
+// contatori dei comandi con {count}, salvati in data/command-counts.json
+const COUNTS_FILE = path.join(DATA_DIR, 'command-counts.json');
+let counts = {};
+try { counts = JSON.parse(fs.readFileSync(COUNTS_FILE, 'utf8')); } catch { /* ancora nessun contatore */ }
+let countsTimer = null;
+const commandCounts = {
+  get: (id) => counts[id] ?? 0,
+  set: (id, n) => {
+    counts[id] = n;
+    clearTimeout(countsTimer);
+    countsTimer = setTimeout(() => fs.writeFile(COUNTS_FILE, JSON.stringify(counts), () => {}), 1000);
+  },
+};
+
+// dati di Twitch per le variabili, tenuti in memoria per un minuto
+const cache = new Map();
+async function cached(key, fn) {
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < 60000) return hit.value;
+  const value = await fn();
+  cache.set(key, { at: Date.now(), value });
+  return value;
+}
+// senza account collegato le variabili che chiedono dati a Twitch lo dicono, invece di un "?"
+const needsAccount = (fn) => (...args) => (auth.user ? fn(...args) : '(account Twitch non collegato)');
+const channelInfo = () => cached('channel', async () => (await helix.request('GET', `/channels?broadcaster_id=${auth.user.id}`)).data?.[0] ?? {});
+
+const commandDeps = {
+  counts: commandCounts,
+  log,
+  vars: {
+    channel: () => auth.user?.login ?? '',
+    scene: () => obs.current,
+    lastfollow: () => manager.history.find((n) => n.type === 'follow' && !n.test)?.user?.name ?? 'nessuno, per ora',
+    game: needsAccount(async () => (await channelInfo()).game_name || 'nessuna categoria'),
+    title: needsAccount(async () => (await channelInfo()).title || ''),
+    uptime: needsAccount(() => cached('stream', async () => {
+      const live = (await helix.request('GET', `/streams?user_id=${auth.user.id}`)).data?.[0];
+      return live ? humanDuration(Date.now() - Date.parse(live.started_at)) : 'zero minuti (adesso non è in live)';
+    })),
+    followage: needsAccount(async (user) => {
+      if (!user?.id || user.id === auth.user?.id) return 'sempre: è il canale!';
+      const f = (await helix.request('GET', `/channels/followers?broadcaster_id=${auth.user.id}&user_id=${encodeURIComponent(user.id)}`)).data?.[0];
+      return f ? humanDuration(Date.now() - Date.parse(f.followed_at), { precise: true }) : 'mai: non segue ancora il canale';
+    }),
+  },
+  actions: {
+    async scene(wanted) {
+      if (obs.status !== 'connesso') throw new Error('OBS non è collegato a TwitchGestor');
+      const w = wanted.toLowerCase();
+      const name = obs.scenes.find((s) => s.toLowerCase() === w)
+        ?? obs.scenes.find((s) => s.toLowerCase().startsWith(w))
+        ?? obs.scenes.find((s) => s.toLowerCase().includes(w));
+      if (!name) throw new Error(`Scena "${wanted}" non trovata`);
+      await obs.setScene(name);
+      return name;
+    },
+    credits: () => creditsStore.set('cmd', { type: 'restart', at: Date.now() }),
+  },
+};
+const commands = new ChatCommands({ ...commandDeps, getConfig: () => config.get().commands, send: sendChat });
+setInterval(() => commands.tick(), 30000).unref();
+
+/** Prova di un comando dalla dashboard: non scrive in chat e non cambia nulla. */
+function testCommand(text, role = 'broadcaster', draft) {
+  const settings = draft ? sanitizeConfig({ ...config.get(), commands: draft }, config.defaults()).commands : config.get().commands;
+  const tester = new ChatCommands({ ...commandDeps, getConfig: () => settings, send: () => {} });
+  const badges = role === 'everyone' ? [] : [{ set_id: role }];
+  const name = role === 'broadcaster' ? auth.user?.login ?? 'tu' : 'spettatore_di_prova';
+  return tester.handle({ text, user: { id: role === 'broadcaster' ? auth.user?.id : 'prova', login: name, name }, badges }, { dryRun: true });
+}
+
 let eventsub = null;
 const streamelements = env.STREAMELEMENTS_JWT ? new StreamElementsSource({ jwt: env.STREAMELEMENTS_JWT }) : null;
 
@@ -86,6 +167,7 @@ const app = {
   credits: { store: creditsStore, refresh: (reason) => creditsScheduler.refresh(reason) },
   tts,
   obs,
+  testCommand,
   chatAccount,
   getState() {
     return {
@@ -107,6 +189,11 @@ const app = {
       ui: config.get().ui,
       overlays: web?.clients.overlay.size ?? 0,
       obs: obs.state(),
+      commands: {
+        enabled: Boolean(config.get().commands?.enabled),
+        missingScope: Boolean(auth.user && auth.missingScopes.includes('user:read:chat')),
+        reading: Boolean(eventsub && eventsub.status === 'connesso' && !eventsub.failedSubscriptions?.some((f) => f.type === 'channel.chat.message')),
+      },
       chatReplies: Boolean(config.get().chat?.enabled),
       chatAccount: chatAccount(),
       overlayUrl: `${publicUrl}/overlay`,
@@ -144,10 +231,7 @@ manager.on('queue', (queue) => web.toDashboards({ type: 'queue', queue }));
 manager.on('notification', () => app.broadcastState());
 manager.on('chat', (text) => {
   if (!auth.user) return;
-  const client = botAuth.user ? botHelix : helix;
-  client.sendChatMessage(text, auth.user.id)
-    .then(() => log.info(`Chat (${client.auth.user.login}): ${text}`))
-    .catch((err) => log.warn(`Invio messaggio in chat fallito (${client.auth.user.login}): ${err.message}`));
+  sendChat(text).catch((err) => log.warn(`Invio messaggio in chat fallito: ${err.message}`));
 });
 config.on('change', (c) => {
   web.toOverlays({ type: 'hello', overlay: c.overlay });
@@ -162,6 +246,15 @@ function startEventSub() {
   if (!auth.user) return;
   eventsub = new EventSubClient({ helix, userId: auth.user.id, url: env.EVENTSUB_WS_URL });
   eventsub.on('event', (type, payload, messageId) => {
+    if (type === 'channel.chat.message') {
+      if (payload.chatter_user_id === botAuth.user?.id) return; // il bot non risponde a sé stesso
+      commands.handle({
+        text: payload.message?.text,
+        user: { id: payload.chatter_user_id, login: payload.chatter_user_login, name: payload.chatter_user_name },
+        badges: payload.badges,
+      }).catch((err) => log.warn(`Comando non riuscito: ${err.message}`));
+      return;
+    }
     const n = fromEventSub(type, payload, messageId);
     if (n) manager.ingest(n);
     if (n && ['follow', 'sub', 'resub', 'giftsub'].includes(n.type)) creditsScheduler.soon();

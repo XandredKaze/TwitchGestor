@@ -364,6 +364,18 @@
       }).observe($('stream-body').querySelector('.stream-frame'));
     }
     const lines = state.demo.chat;
+    // casella per scrivere nella chat simulata (es. per provare i comandi): creata una volta sola
+    if (!$('demo-chat-form')) {
+      const input = el('input', { type: 'text', placeholder: 'Scrivi in chat, es. !uptime', autocomplete: 'off' });
+      $('chat-panel').append(el('form', {
+        id: 'demo-chat-form', className: 'channel-form',
+        onsubmit: (e) => {
+          e.preventDefault();
+          if (input.value.trim()) window.TG.api('/api/demo/chat', { body: { text: input.value } });
+          input.value = '';
+        },
+      }, input, el('button', { type: 'submit' }, 'Invia')));
+    }
     $('chat-body').replaceChildren(el('div', { className: 'demo-chat' },
       lines.length
         ? lines.map((m) => el('div', { className: m.bot ? 'bot' : '' }, el('b', {}, `${m.user}: `), m.text))
@@ -575,6 +587,7 @@
     for (const main of document.querySelectorAll('main[id^="tab-"]')) main.hidden = main.id !== `tab-${name}`;
     if (name === 'editor') window.dispatchEvent(new Event('editor:open'));
     if (name === 'theme') openThemeTab();
+    if (name === 'commands') window.dispatchEvent(new Event('commands:open'));
     if (name === 'credits' && !$('credits-frame').src) {
       // Il pannello dei titoli di coda è una pagina a sé: si carica solo quando apri la scheda.
       $('credits-frame').src = `/credits?pannello${token ? `&token=${encodeURIComponent(token)}` : ''}`;
@@ -592,7 +605,7 @@
   try {
     const saved = sessionStorage.getItem('tab');
     if (location.hash === '#chat') showTab('editor');
-    else if (saved === 'editor' || saved === 'credits' || saved === 'theme') showTab(saved);
+    else if (['editor', 'credits', 'theme', 'commands'].includes(saved)) showTab(saved);
   } catch { /* ignora */ }
 
   // ---------- Registro ----------
@@ -623,6 +636,7 @@
       if (msg.type === 'state') {
         const first = !state;
         state = msg.state;
+        window.dispatchEvent(new CustomEvent('tg:state', { detail: state }));
         renderAll();
         if (first) renderTestButtons();
       }

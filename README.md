@@ -20,6 +20,7 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 - **Voce (text-to-speech)** gratuita e locale: legge gli alert e i messaggi degli spettatori con le voci di Windows, e la voce va in live tramite OBS.
 - **Anteprima della live e chat di Twitch** direttamente nella dashboard (scheda Live).
 - **Cambio scena di OBS** con un clic dalla dashboard (tramite OBS WebSocket, già incluso in OBS).
+- **Comandi della chat** (scheda 💬 Comandi): `!discord`, `!uptime`, `!followage`, `!so`, `!scena`… con risposte, permessi, attese, contatori e messaggi a tempo; risponde il bot (es. Wolfery).
 - **Temi** (scheda 🖌 Tema): aspetto predefinito o **Brutalism** (nero, bianco e lilla) per tutta la dashboard, e stile Classico o Brutalism per l'animazione dei titoli di coda.
 - **Titoli di coda animati** (credit roll) con abbonati, gift e follower scaricati in automatico, musica e pannello di controllo.
 - **Editor degli alert nella dashboard** con anteprima dal vivo: testi, suoni, font, colori, sfondo, immagini e animazioni.
@@ -99,6 +100,22 @@ Nella scheda **📡 Live** della dashboard trovi il player della tua live (senza
 - Per scrivere in chat devi essere collegato a twitch.tv nello stesso browser; se il riquadro non te lo permette usa **Finestra ↗**.
 - Con **Nascondi** togli player o chat e risparmi risorse del PC durante la live.
 - La chat si adatta all'altezza della finestra. Per sceglierla tu, **trascina la maniglia** sotto la chat (o usala con le frecce ↑ ↓ della tastiera); doppio clic sulla maniglia per tornare all'altezza automatica. Ogni PC o browser ricorda la sua.
+
+## Comandi della chat
+
+Nella scheda **💬 Comandi** crei i comandi che gli spettatori scrivono in chat con il "!" (es. `!discord`): TwitchGestor legge la chat con il tuo account e risponde con il bot (es. Wolfery), oppure con il tuo account se il bot non è collegato.
+
+1. **La prima volta** serve un permesso Twitch in più per leggere la chat: in alto a destra clicca **Esci** e poi **Accedi con Twitch** (Wolfery non va ricollegato).
+2. Accendi l'interruttore **Attivi** e premi **Salva**.
+
+Per ogni comando scegli:
+- **nome** e **nomi alternativi** (es. `!discord` e `!dc`);
+- **cosa fa**: risponde con un testo, elenca i comandi, **cambia scena di OBS** (`!scena gioco`, basta l'inizio del nome) o **fa ripartire i titoli di coda**;
+- **chi può usarlo**: tutti, abbonati, VIP, moderatori o solo tu;
+- **attese**: tra un uso e l'altro e per lo stesso spettatore (tu e i moderatori non avete attese);
+- la **risposta**, con le variabili: `{user}` chi scrive, `{target}` il nome dopo il comando (es. `!so @nome`), `{args}`, `{1}`…`{9}`, `{channel}`, `{uptime}`, `{followage}`, `{game}`, `{title}`, `{lastfollow}`, `{count}` (quante volte è stato usato: salvato in `data/command-counts.json`), `{random:1-100}`, `{scene}`, `{result}`.
+
+Ci sono già alcuni comandi pronti (`!comandi`, `!uptime`, `!followage`, `!social`, `!discord`, `!so`, `!scena`, `!titoli`) da modificare a piacere. Con **Prova un comando** vedi la risposta senza scrivere in chat. I **messaggi a tempo** il bot li scrive da solo ogni N minuti, ma solo se in chat sono stati scritti abbastanza messaggi.
 
 ## Temi
 

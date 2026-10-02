@@ -16,6 +16,7 @@ import { recentLogs, createLogger } from '../src/logger.js';
 import { liveSession } from '../src/core/session.js';
 import { cleanText } from '../src/core/ttsText.js';
 import { API_LEVEL, APP_VERSION } from '../src/core/apiLevel.js';
+import { ChatCommands, humanDuration } from '../src/core/commands.js';
 
 const CHANNEL = { id: '0', login: 'canale_demo' };
 const DEMO_SCENES = ['Inizio', 'Gioco', 'Chiacchiere', 'Pausa', 'Fine'];
@@ -127,7 +128,44 @@ class DemoBackend {
       this.#chat(this.bot ? this.bot.login : CHANNEL.login, text, true);
       this.log.info(`Chat (${this.bot ? this.bot.login : CHANNEL.login}): ${text}`);
     });
+    // comandi della chat: stesso codice del programma vero, con dati finti
+    const commandDeps = {
+      log: this.log,
+      vars: {
+        channel: () => CHANNEL.login,
+        scene: () => this.scene ?? DEMO_SCENES[1],
+        uptime: () => humanDuration(Date.now() - this.startedAt + 47 * 60000),
+        followage: (user) => (user?.login === CHANNEL.login ? 'sempre: è il canale!' : humanDuration((5 + (user?.login?.length ?? 3) * 23) * 86400000, { precise: true })),
+        game: () => 'Just Chatting',
+        title: () => 'Live demo di TwitchGestor',
+        lastfollow: () => this.manager.history.find((n) => n.type === 'follow')?.user?.name ?? 'nessuno, per ora',
+      },
+      actions: {
+        scene: async (wanted) => {
+          const w = wanted.toLowerCase();
+          const name = DEMO_SCENES.find((s) => s.toLowerCase().startsWith(w)) ?? DEMO_SCENES.find((s) => s.toLowerCase().includes(w));
+          if (!name) throw new Error(`Scena "${wanted}" non trovata`);
+          this.scene = name;
+          this.broadcastState();
+          return name;
+        },
+        credits: () => { this.credits.state.cmd = { type: 'restart', at: Date.now() }; this.credits.rev += 1; },
+      },
+    };
+    this.commandDeps = commandDeps;
+    this.commands = new ChatCommands({
+      ...commandDeps,
+      getConfig: () => this.config.commands,
+      send: (text) => this.#chat(this.bot ? this.bot.login : CHANNEL.login, text, true),
+    });
+    setInterval(() => this.commands.tick(), 30000);
     this.log.info('Demo avviata: nessun collegamento a Twitch, gli eventi sono simulati');
+  }
+
+  /** Un messaggio arrivato nella chat simulata: compare in chat e passa ai comandi. */
+  #incoming(login, text, badges = []) {
+    this.#chat(login, text);
+    this.commands.handle({ text, user: { id: login, login: login.toLowerCase(), name: login }, badges }).catch(() => {});
   }
 
   // ---------- Canale in tempo reale (sostituisce il WebSocket) ----------
@@ -177,6 +215,7 @@ class DemoBackend {
       twitch: { configured: true, user: CHANNEL, status: 'simulato', missingScopes: [], failedSubscriptions: [] },
       sources: { streamelements: 'disattivato', kofi: 'disattivato', webhook: 'disattivato' },
       ui: this.config.ui,
+      commands: { enabled: Boolean(this.config.commands?.enabled), missingScope: false, reading: true },
       overlays: this.clients.overlay.size,
       chatReplies: Boolean(this.config.chat?.enabled),
       chatAccount: this.chatAccount(),
@@ -211,7 +250,10 @@ class DemoBackend {
       this.simulation = setTimeout(next, 5000 + Math.random() * 7000);
     };
     const talk = () => {
-      this.#chat(pick(VIEWERS), pick(VIEWER_CHAT));
+      // ogni tanto uno spettatore usa un comando
+      const p = this.config.commands?.prefix || '!';
+      const text = Math.random() < 0.25 ? p + pick(['uptime', 'followage', 'comandi', 'social', 'discord']) : pick(VIEWER_CHAT);
+      this.#incoming(pick(VIEWERS), text);
       this.chatTimer = setTimeout(talk, 2500 + Math.random() * 3500);
     };
     this.simulation = setTimeout(next, 800);
@@ -245,6 +287,25 @@ class DemoBackend {
         this.broadcastState();
         this.log.info('Impostazioni salvate (solo in questo browser)');
         return ok({ config: this.config });
+      }
+      case 'PUT /api/commands': {
+        this.config = sanitizeConfig({ ...this.config, commands: body?.commands }, this.defaults);
+        storage.set('tg-demo-config', diffConfig(this.config, this.defaults) ?? {});
+        this.broadcastState();
+        return ok({ commands: this.config.commands });
+      }
+      case 'POST /api/commands/test': {
+        const settings = body?.commands ? sanitizeConfig({ ...this.config, commands: body.commands }, this.defaults).commands : this.config.commands;
+        const tester = new ChatCommands({ ...this.commandDeps, getConfig: () => settings, send: () => {} });
+        const role = body?.role ?? 'broadcaster';
+        const name = role === 'broadcaster' ? CHANNEL.login : 'spettatore_di_prova';
+        const reply = await tester.handle({ text: String(body?.text ?? ''), user: { id: name, login: name, name }, badges: role === 'everyone' ? [] : [{ set_id: role }] }, { dryRun: true });
+        return ok({ reply });
+      }
+      case 'POST /api/demo/chat': {
+        const text = String(body?.text ?? '').trim().slice(0, 500);
+        if (text) this.#incoming(CHANNEL.login, text, [{ set_id: 'broadcaster' }]);
+        return ok();
       }
       case 'PUT /api/ui': {
         if (body?.theme !== undefined && !UI_THEMES.includes(body.theme)) return fail(400, 'Tema sconosciuto');
