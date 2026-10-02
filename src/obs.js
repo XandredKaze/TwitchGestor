@@ -4,6 +4,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import WebSocket from 'ws';
 import { createLogger } from './logger.js';
+import { summarizeStream } from './core/streamHealth.js';
+
+export { summarizeStream, connectionQuality } from './core/streamHealth.js';
 
 const log = createLogger('obs');
 
@@ -15,6 +18,8 @@ const log = createLogger('obs');
  */
 const OP = { Hello: 0, Identify: 1, Identified: 2, Event: 5, Request: 6, RequestResponse: 7 };
 const EVENTS_SCENES = 1 << 2;
+const STATS_EVERY = 2000; // ms tra una lettura e l'altra di bitrate e statistiche
+const HISTORY = 90; // punti del grafico del bitrate (3 minuti)
 const HOST = /^[a-z0-9.\-]{1,100}$|^\[?[0-9a-f:]{2,45}\]?$/i;
 
 export const OBS_DEFAULTS = { enabled: false, host: '127.0.0.1', port: 4455, password: '' };
@@ -59,12 +64,15 @@ export class ObsClient extends EventEmitter {
     this.error = '';
     this.scenes = [];
     this.current = '';
+    this.stream = null; // stato della diretta (bitrate, connessione...), aggiornato ogni 2 secondi
+    this.samples = [];
+    this.history = [];
   }
 
   /** Stato per la dashboard (la password non esce mai dal programma). */
   state() {
     const { enabled, host, port, password } = this.settings;
-    return { enabled, host, port, hasPassword: Boolean(password), status: this.status, error: this.error, scenes: this.scenes, current: this.current };
+    return { enabled, host, port, hasPassword: Boolean(password), status: this.status, error: this.error, scenes: this.scenes, current: this.current, stream: this.stream };
   }
 
   start() {
@@ -72,6 +80,7 @@ export class ObsClient extends EventEmitter {
   }
 
   stop() {
+    this.#stopStats();
     clearTimeout(this.#timer);
     this.#timer = null;
     const ws = this.#ws;
@@ -144,6 +153,7 @@ export class ObsClient extends EventEmitter {
     ws.on('close', (code, reason) => {
       if (this.#ws !== ws) return;
       this.#ws = null;
+      this.#stopStats();
       this.#rejectPending(new Error('Collegamento a OBS chiuso'));
       this.scenes = [];
       this.current = '';
@@ -191,6 +201,7 @@ export class ObsClient extends EventEmitter {
       log.info(`Collegato a OBS (${this.settings.host}:${this.settings.port})`);
       this.#setStatus('connesso');
       this.#loadScenes();
+      this.#startStats();
     } else if (op === OP.RequestResponse) {
       const p = this.#pending.get(d?.requestId);
       if (!p) return;
@@ -203,6 +214,50 @@ export class ObsClient extends EventEmitter {
       if (type === 'CurrentProgramSceneChanged') this.#setCurrent(d.eventData?.sceneName ?? '');
       else if (['SceneListChanged', 'SceneCreated', 'SceneRemoved', 'SceneNameChanged'].includes(type)) this.#loadScenes();
     }
+  }
+
+  // --- bitrate e salute della diretta: GetStreamStatus + GetStats ogni 2 secondi
+  #statsTimer = null;
+  #startStats() {
+    this.#stopStats();
+    this.samples = [];
+    this.history = [];
+    const read = async () => {
+      if (this.status !== 'connesso') return;
+      try {
+        const [st, stats] = await Promise.all([this.request('GetStreamStatus'), this.request('GetStats')]);
+        this.samples.push({
+          t: Date.now(),
+          active: st.outputActive, reconnecting: st.outputReconnecting,
+          bytes: st.outputBytes ?? 0, skipped: st.outputSkippedFrames ?? 0, total: st.outputTotalFrames ?? 0,
+          congestion: st.outputCongestion ?? 0, durationMs: st.outputDuration ?? 0,
+          fps: stats.activeFps ?? 0, cpu: stats.cpuUsage ?? 0,
+          renderSkipped: stats.renderSkippedFrames ?? 0, renderTotal: stats.renderTotalFrames ?? 0,
+        });
+        if (this.samples.length > 10) this.samples.shift();
+        const last = this.samples.at(-1);
+        // una diretta nuova riparte da zero: i dati della precedente non contano
+        if (!last.active) this.history = [];
+        const s = summarizeStream(this.samples, this.history);
+        if (last.active && this.samples.at(-2)?.active) {
+          this.history.push(s.bitrateKbps);
+          if (this.history.length > HISTORY) this.history.shift();
+        }
+        this.stream = { ...s, history: [...this.history] };
+        this.emit('stream', this.stream);
+      } catch (err) {
+        if (this.status === 'connesso') this.error = `Statistiche di OBS non disponibili: ${err.message}`;
+      }
+    };
+    read();
+    this.#statsTimer = setInterval(read, STATS_EVERY);
+    this.#statsTimer.unref?.();
+  }
+
+  #stopStats() {
+    clearInterval(this.#statsTimer);
+    this.#statsTimer = null;
+    this.stream = null;
   }
 
   async #loadScenes() {

@@ -20,6 +20,7 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 - **Voce (text-to-speech)** gratuita e locale: legge gli alert e i messaggi degli spettatori con le voci di Windows, e la voce va in live tramite OBS.
 - **Anteprima della live e chat di Twitch** direttamente nella dashboard (scheda Live).
 - **Cambio scena di OBS** con un clic dalla dashboard (tramite OBS WebSocket, già incluso in OBS).
+- **Stato della diretta**: qualità della connessione, bitrate con grafico, fotogrammi persi, congestione, FPS e CPU, letti da OBS.
 - **Azioni rapide** come nel Gestore stream di Twitch (scheda Live): titolo e categoria, clip, segnalibro, raid, shoutout, annuncio, sondaggi, pronostici, pubblicità e impostazioni della chat.
 - **Comandi della chat** (scheda 💬 Comandi): `!discord`, `!uptime`, `!followage`, `!so`, `!scena`… con risposte, permessi, attese, contatori e messaggi a tempo; risponde il bot (es. Wolfery).
 - **Temi** (scheda 🖌 Tema): aspetto predefinito o **Brutalism** (nero, bianco e lilla) per tutta la dashboard, e stile Classico o Brutalism per l'animazione dei titoli di coda.
@@ -129,6 +130,17 @@ Per ogni comando scegli:
 - la **risposta**, con le variabili: `{user}` chi scrive, `{target}` il nome dopo il comando (es. `!so @nome`), `{args}`, `{1}`…`{9}`, `{channel}`, `{uptime}`, `{followage}`, `{game}`, `{title}`, `{lastfollow}`, `{count}` (quante volte è stato usato: salvato in `data/command-counts.json`), `{random:1-100}`, `{scene}`, `{result}`.
 
 Ci sono già alcuni comandi pronti (`!comandi`, `!uptime`, `!followage`, `!social`, `!discord`, `!so`, `!scena`, `!titoli`) da modificare a piacere. Con **Prova un comando** vedi la risposta senza scrivere in chat. I **messaggi a tempo** il bot li scrive da solo ogni N minuti, ma solo se in chat sono stati scritti abbastanza messaggi.
+
+## Stato della diretta (connessione e bitrate)
+
+Con OBS collegato (vedi sopra), nella scheda **📡 Live** il riquadro **Stato della diretta** mostra, aggiornati ogni 2 secondi:
+
+- **qualità della connessione** (ottima, buona, instabile, pessima, riconnessione) con le tacche del segnale e un consiglio quando qualcosa non va;
+- **bitrate** in kbps con il grafico degli ultimi 3 minuti (passa il mouse sul grafico per vedere i valori);
+- **fotogrammi persi per la rete** (negli ultimi secondi e in totale), **congestione**, **FPS** e **CPU** di OBS;
+- da quanto sei **in diretta**.
+
+Durante la diretta in alto, accanto al nome, compare anche **LIVE · bitrate · connessione**, sempre visibile da qualsiasi scheda.
 
 ## Temi
 

@@ -643,6 +643,10 @@
         renderAll();
         if (first) renderTestButtons();
       }
+      if (msg.type === 'stream' && state) {
+        state.obs = { ...state.obs, stream: msg.stream };
+        window.dispatchEvent(new CustomEvent('tg:stream', { detail: msg.stream }));
+      }
       if (msg.type === 'obs' && state) {
         state.obs = msg.obs;
         renderObs();

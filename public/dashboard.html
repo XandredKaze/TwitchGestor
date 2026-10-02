@@ -12,6 +12,7 @@
 <body>
   <header>
     <h1>TwitchGestor<span class="app-version" id="app-version"></span></h1>
+    <span id="stream-pill" class="stream-pill" hidden></span>
     <nav class="tabs" role="tablist">
       <button class="tab active" data-tab="live" role="tab">📡 Live</button>
       <button class="tab" data-tab="editor" role="tab">🎨 Personalizza alert</button>
@@ -31,6 +32,14 @@
 
   <main id="tab-live" class="live-grid">
     <div class="col col-side">
+    <section class="panel" id="health-panel">
+      <div class="panel-head">
+        <h2>Stato della diretta</h2>
+        <span id="health-live" class="health-live"></span>
+      </div>
+      <div id="health-body"></div>
+    </section>
+
     <section class="panel" id="obs-panel">
       <div class="panel-head">
         <h2>Scene OBS</h2>
@@ -266,5 +275,6 @@
   <script src="/editor.js"></script>
   <script src="/commands.js"></script>
   <script src="/actions.js"></script>
+  <script src="/stream.js"></script>
 </body>
 </html>

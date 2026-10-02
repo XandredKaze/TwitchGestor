@@ -5,4 +5,4 @@
 export const API_LEVEL = 7;
 
 /** Versione mostrata nella dashboard (da tenere uguale a package.json). */
-export const APP_VERSION = '1.9.0';
+export const APP_VERSION = '1.10.0';

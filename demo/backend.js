@@ -18,6 +18,7 @@ import { cleanText } from '../src/core/ttsText.js';
 import { API_LEVEL, APP_VERSION } from '../src/core/apiLevel.js';
 import { ChatCommands, humanDuration } from '../src/core/commands.js';
 import { createQuickActions } from '../src/quickActions.js';
+import { summarizeStream } from '../src/core/streamHealth.js';
 
 const CHANNEL = { id: '0', login: 'canale_demo' };
 const DEMO_SCENES = ['Inizio', 'Gioco', 'Chiacchiere', 'Pausa', 'Fine'];
@@ -154,6 +155,11 @@ class DemoBackend {
       },
     };
     this.commandDeps = commandDeps;
+    // diretta simulata: bitrate e salute come li manderebbe OBS ogni 2 secondi
+    this.streamSamples = [];
+    this.streamHistory = [];
+    this.stream = null;
+    setInterval(() => this.#tickStream(), 2000);
     this.quickActions = createQuickActions({ helix: this.#fakeTwitch(), getUser: () => CHANNEL });
     this.commands = new ChatCommands({
       ...commandDeps,
@@ -218,6 +224,37 @@ class DemoBackend {
     };
   }
 
+  #tickStream() {
+    const active = Boolean(this.simulation);
+    const prev = this.streamSamples.at(-1);
+    if (!active) {
+      this.streamSamples = [];
+      this.streamHistory = [];
+    } else if (!prev?.active) this.liveSince = Date.now();
+    // ogni tanto la rete fa i capricci (per vedere come cambia l'indicatore)
+    const wobble = active && Math.random() < 0.08;
+    const kbps = active ? (wobble ? 2500 + Math.random() * 1500 : 5800 + Math.random() * 400) : 0;
+    const frames = 120;
+    const sample = {
+      t: Date.now(), active, reconnecting: false,
+      bytes: (prev?.bytes ?? 0) + (kbps * 2000) / 8,
+      skipped: (prev?.skipped ?? 0) + (wobble ? Math.round(frames * 0.03) : 0),
+      total: (prev?.total ?? 0) + (active ? frames : 0),
+      congestion: wobble ? 0.3 : Math.random() * 0.04,
+      durationMs: active ? Date.now() - this.liveSince : 0,
+      fps: 60, cpu: 6 + Math.random() * 4, renderSkipped: 0, renderTotal: 0,
+    };
+    this.streamSamples.push(sample);
+    if (this.streamSamples.length > 10) this.streamSamples.shift();
+    const st = summarizeStream(this.streamSamples, this.streamHistory);
+    if (active && prev?.active) {
+      this.streamHistory.push(st.bitrateKbps);
+      if (this.streamHistory.length > 90) this.streamHistory.shift();
+    }
+    this.stream = { ...st, history: [...this.streamHistory] };
+    this.#send('dashboard', { type: 'stream', stream: this.stream });
+  }
+
   /** Un messaggio arrivato nella chat simulata: compare in chat e passa ai comandi. */
   #incoming(login, text, badges = []) {
     this.#chat(login, text);
@@ -280,7 +317,7 @@ class DemoBackend {
       queue: m.queueState(),
       stats: { ...m.stats, donors: undefined, topDonors: m.topDonors() },
       history: m.history.slice(0, 200),
-      obs: { enabled: true, host: '127.0.0.1', port: 4455, hasPassword: true, status: 'connesso', error: '', scenes: DEMO_SCENES, current: this.scene ?? DEMO_SCENES[1] },
+      obs: { enabled: true, host: '127.0.0.1', port: 4455, hasPassword: true, status: 'connesso', error: '', scenes: DEMO_SCENES, current: this.scene ?? DEMO_SCENES[1], stream: this.stream },
       demo: { simulating: Boolean(this.simulation), chat: this.chat.slice(-40) },
     };
   }

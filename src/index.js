@@ -244,6 +244,7 @@ config.on('change', (c) => {
 
 obs.on('status', () => app.broadcastState());
 obs.on('scenes', (state) => web.toDashboards({ type: 'obs', obs: state }));
+obs.on('stream', (stream) => web.toDashboards({ type: 'stream', stream }));
 
 function startEventSub() {
   eventsub?.stop();
