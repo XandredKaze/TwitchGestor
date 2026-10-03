@@ -60,6 +60,18 @@
     return wrap;
   }
 
+  // durata della diretta: dall'inizio della live su Twitch se lo conosciamo, altrimenti da OBS
+  function liveMs(s) {
+    if (s.liveSince) return Date.now() - s.liveSince;
+    if (s.twitchChecked) return null; // OBS trasmette ma Twitch non ti mostra ancora in live
+    return (s.durationMs ?? 0) + (Date.now() - (s.receivedAt ?? Date.now()));
+  }
+  function liveText(s) {
+    if (!s.active) return '○ Non in diretta';
+    const ms = liveMs(s);
+    return ms === null ? '◌ OBS trasmette · in attesa che Twitch ti mostri in live' : `● IN DIRETTA ${clock(ms)}`;
+  }
+
   function metric(label, value, note) {
     return el('div', { className: 'h-metric' }, el('span', { className: 'h-label' }, label), el('b', {}, value), note ? el('span', { className: 'h-note' }, note) : null);
   }
@@ -86,10 +98,10 @@
       const q = s.quality ?? { level: 0, label: '…' };
       pillEl.className = `stream-pill q-${q.level}`;
       pillEl.replaceChildren(el('span', { className: 'live-dot' }), 'LIVE ', el('b', {}, `${nf.format(s.bitrateKbps)} kbps`), bars(q.level, q.label), q.label);
-      pillEl.title = `Diretta da ${clock(s.durationMs)} · fotogrammi persi ${pct(s.droppedPct)} · congestione ${pct(s.congestion * 100, 0)}`;
+      pillEl.title = `${liveText(s)} · fotogrammi persi ${pct(s.droppedPct)} · congestione ${pct(s.congestion * 100, 0)}`;
     }
     live.className = `health-live ${s.active ? 'on' : ''}`;
-    live.replaceChildren(s.active ? `● IN DIRETTA ${clock(s.durationMs)}` : '○ Non in diretta');
+    live.replaceChildren(liveText(s));
 
     if (!s.active) {
       body.replaceChildren(
@@ -118,5 +130,7 @@
   }
 
   window.addEventListener('tg:state', (e) => { obs = e.detail.obs; render(); });
-  window.addEventListener('tg:stream', (e) => { if (obs) obs = { ...obs, stream: e.detail }; render(); });
+  window.addEventListener('tg:stream', (e) => { if (obs) obs = { ...obs, stream: { ...e.detail, receivedAt: Date.now() } }; render(); });
+  // il contatore della diretta avanza ogni secondo (i dati da OBS arrivano ogni 2)
+  setInterval(() => { const s = obs?.stream; if (s?.active) $('health-live').textContent = liveText(s); }, 1000);
 })();

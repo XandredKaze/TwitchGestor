@@ -251,7 +251,9 @@ class DemoBackend {
       this.streamHistory.push(st.bitrateKbps);
       if (this.streamHistory.length > 90) this.streamHistory.shift();
     }
-    this.stream = { ...st, history: [...this.streamHistory] };
+    // come nella realtà: Twitch ti mostra in live qualche secondo dopo che OBS ha iniziato a trasmettere
+    const twitchSince = active && Date.now() - this.liveSince > 6000 ? this.liveSince + 6000 : null;
+    this.stream = { ...st, history: [...this.streamHistory], liveSince: twitchSince, twitchLive: Boolean(twitchSince), twitchChecked: true };
     this.#send('dashboard', { type: 'stream', stream: this.stream });
   }
 

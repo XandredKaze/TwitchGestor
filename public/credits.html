@@ -489,6 +489,8 @@ const DEFAULTS = {
   nameAlign: 'center', nameGap: 4, nameWeight: 400, nameUppercase: false, nameSpacing: 0.04, nameEffect: 'none',
   // alla fine dello scorrimento: 'loop' ricomincia, 'stop' si ferma con il testo finale a metà schermo
   endMode: 'loop',
+  // in OBS: quando la scena dei titoli va in onda ripartono da capo, quando esce si fermano (musica compresa)
+  restartOnShow: true,
   // stile dell'animazione: 'classic' oppure 'brutal' (Brutalism: nero, bianco e lilla)
   rollTheme: 'classic'
 };
@@ -562,6 +564,7 @@ function sectionOrder(s) {
 /** Carica da Google Fonts il primo font indicato (se non è un font generico o di sistema). */
 const loadedFonts = new Set();
 const GENERIC_FONTS = ['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'segoe ui', 'arial', 'impact', 'georgia', 'verdana', 'tahoma', 'times new roman', 'courier new', 'comic sans ms'];
+const fontSheets = []; // fogli di stile dei font in caricamento: si aspettano prima di misurare i titoli
 function ensureFont(css) {
   const name = String(css || '').split(',')[0].replace(/['"]/g, '').trim();
   if (!name || loadedFonts.has(name) || GENERIC_FONTS.includes(name.toLowerCase())) return;
@@ -569,7 +572,19 @@ function ensureFont(css) {
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(name).replace(/%20/g, '+') + '&display=swap';
+  fontSheets.push(new Promise(resolve => { link.onload = link.onerror = resolve; }));
   document.head.append(link);
+}
+/**
+ * Aspetta che i font usati siano davvero pronti (al massimo 4 secondi, poi si parte comunque):
+ * l'altezza dei titoli cambia con il font, e con un font sbagliato il testo finale non si ferma a metà schermo.
+ */
+async function fontsSettled(timeout = 4000) {
+  const ready = Promise.all(fontSheets).then(() => {
+    document.body.offsetHeight; // fa partire il caricamento dei font appena dichiarati
+    return document.fonts.ready;
+  });
+  await Promise.race([ready, sleep(timeout)]);
 }
 
 // file caricato (media/...), indirizzo web o file in memoria (demo)
@@ -974,7 +989,9 @@ function startRollPlayer() {
     }, delay));
   }
 
-  function cycle(first) {
+  let generation = 0; // ogni nuovo giro annulla quelli ancora in preparazione
+  async function cycle(first) {
+    const gen = ++generation;
     timers.forEach(clearTimeout); timers = [];
     const s = getSettings();
     // al giro successivo la musica che deve continuare non riparte da capo
@@ -992,7 +1009,10 @@ function startRollPlayer() {
       }, { root: stage, rootMargin: `0px 0px -${100 - s.entryLine}% 0px` });
       roll.querySelectorAll('.cr-name').forEach(n => observer.observe(n));
     }
+    await fontsSettled();
+    if (gen !== generation) return;
     requestAnimationFrame(() => {
+      if (gen !== generation) return;
       const H = stage.clientHeight, h = roll.offsetHeight;
       // i nomi partono dalla linea di entrata e finiscono quando l'ultima riga passa la linea di uscita
       const startY = H * s.entryLine / 100;
@@ -1018,6 +1038,19 @@ function startRollPlayer() {
 
   let restartT = 0;
   const restartSoon = () => { clearTimeout(restartT); restartT = setTimeout(() => cycle(true), 300); };
+
+  // Sorgente browser di OBS: OBS avvisa la pagina quando la sua scena va in onda o esce.
+  // Senza questo i titoli partirebbero quando OBS carica la sorgente, anche se la scena non è in onda.
+  if (MODE === 'live' && window.obsstudio) {
+    window.addEventListener('obsSourceActiveChanged', (e) => {
+      if (getSettings().restartOnShow === false) return;
+      if (e.detail?.active) { clearTimeout(restartT); cycle(true); return; }
+      generation++; // annulla un giro in preparazione
+      timers.forEach(clearTimeout); timers = [];
+      anim?.pause();
+      stopMusic();
+    });
+  }
 
   onChange(k => {
     if (k === K.settings) { applyStyle(getSettings()); if (MODE === 'preview') restartSoon(); }
@@ -1125,6 +1158,7 @@ function panelHTML() {
         <p class="p-hint" id="speed-hint"></p>
       </div>
       <div class="p-row"><label>Attesa prima che arrivino i nomi (s)</label><input type="number" min="0" step="0.5" data-k="startDelay"></div>
+      <div class="p-row"><label>In OBS: ripartono da capo quando la scena va in onda (e si fermano quando esce)</label><input type="checkbox" data-k="restartOnShow"></div>
       <div class="p-row"><label>Alla fine dello scorrimento</label><select data-k="endMode"><option value="loop">Ricomincia da capo</option><option value="stop">Fermati con il testo finale a metà schermo</option></select></div>
       <div class="p-row"><label>Pausa prima di ricominciare (s)</label><input type="number" min="0" step="1" data-k="gap"></div>
       <p class="p-hint">L'attesa vale quando la sorgente parte e con "Riavvia". La musica conta i secondi dal momento in cui parte la sorgente, non da quando arrivano i nomi.</p>

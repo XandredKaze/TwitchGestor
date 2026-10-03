@@ -138,7 +138,7 @@ Con OBS collegato (vedi sopra), nella scheda **📡 Live** il riquadro **Stato d
 - **qualità della connessione** (ottima, buona, instabile, pessima, riconnessione) con le tacche del segnale e un consiglio quando qualcosa non va;
 - **bitrate** in kbps con il grafico degli ultimi 3 minuti (passa il mouse sul grafico per vedere i valori);
 - **fotogrammi persi per la rete** (negli ultimi secondi e in totale), **congestione**, **FPS** e **CPU** di OBS;
-- da quanto sei **in diretta**.
+- da quanto sei **in diretta**: conta dal momento in cui Twitch ti mette in live (come il contatore di Twitch), non da quando OBS inizia a trasmettere. Nei primi secondi, quando OBS trasmette ma Twitch non ti mostra ancora in live, lo dice.
 
 Durante la diretta in alto, accanto al nome, compare anche **LIVE · bitrate · connessione**, sempre visibile da qualsiasi scheda.
 
@@ -180,7 +180,7 @@ Su Linux funzionano Piper ed `espeak-ng` (se installato); senza nessuna voce vie
 
 Titoli di coda animati per la fine della live con **abbonati** (paganti e regalati), **chi ha regalato sub** (con badge dorato al Top Gifter) e **follower**. I nomi li scarica TwitchGestor con l'account del canale: all'avvio, ogni N minuti e poco dopo ogni follow, sub o gift ricevuto in live.
 
-1. In OBS, nella scena dei titoli di coda: **+ → Browser**, URL `http://localhost:3000/credits`, 1920×1080, spunta **Controlla l'audio tramite OBS** (per la musica) e, se vuoi, **Aggiorna il browser quando la scena diventa attiva** (così ripartono dall'inizio).
+1. In OBS, nella scena dei titoli di coda: **+ → Browser**, URL `http://localhost:3000/credits`, 1920×1080, spunta **Controlla l'audio tramite OBS** (per la musica). I titoli **ripartono da capo da soli quando la scena va in onda** e si fermano (musica compresa) quando esce: si può disattivare nel riquadro Animazione.
 2. Si configurano dalla scheda **🎬 Titoli di coda** della dashboard: testi, categorie, velocità, zona di comparsa dei nomi, colori, font, particelle, musica (trascina il brano), nomi da escludere (es. i bot), nomi di prova e anteprima. In più:
    - **Sezioni**: ordine con le frecce ↑↓, **sezioni tue** con testo libero e, per ogni sezione, **stile proprio** (colori, font, dimensioni, colonne, allineamento) e un'**icona** accanto ai nomi. I nomi di una sezione aggiunta possono venire da:
      - **nomi scritti a mano**;

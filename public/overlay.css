@@ -33,6 +33,7 @@ html, body {
   border-radius: 18px;
   background: var(--bg);
   border: 3px solid var(--accent);
+  box-shadow: 0 0 32px var(--accent); /* per le versioni di OBS con un motore del browser più vecchio */
   box-shadow: 0 0 32px color-mix(in srgb, var(--accent) 55%, transparent);
   color: var(--text);
   text-align: center;

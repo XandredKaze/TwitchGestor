@@ -244,7 +244,29 @@ config.on('change', (c) => {
 
 obs.on('status', () => app.broadcastState());
 obs.on('scenes', (state) => web.toDashboards({ type: 'obs', obs: state }));
-obs.on('stream', (stream) => web.toDashboards({ type: 'stream', stream }));
+// Inizio della diretta: quello di Twitch (come il contatore di Twitch), non quello di OBS.
+// OBS inizia a contare quando parte l'invio del video, che può essere prima che Twitch ti mostri in live.
+const twitchLive = { checkedAt: 0, startedAt: null };
+async function checkTwitchLive() {
+  if (!auth.user) return;
+  // ogni 15 secondi finché Twitch non ti mostra in live, poi ogni minuto
+  if (Date.now() - twitchLive.checkedAt < (twitchLive.startedAt ? 60000 : 15000)) return;
+  twitchLive.checkedAt = Date.now();
+  try {
+    const live = (await helix.request('GET', `/streams?user_id=${auth.user.id}`)).data?.[0];
+    twitchLive.startedAt = live ? Date.parse(live.started_at) : null;
+  } catch (err) {
+    log.warn(`Stato della live su Twitch non disponibile: ${err.message}`);
+  }
+}
+obs.on('stream', (stream) => {
+  if (stream.active) checkTwitchLive();
+  else Object.assign(twitchLive, { checkedAt: 0, startedAt: null });
+  stream.liveSince = stream.active ? twitchLive.startedAt ?? null : null; // ms (orologio del PC)
+  stream.twitchLive = Boolean(stream.active && twitchLive.startedAt);
+  stream.twitchChecked = Boolean(auth.user);
+  web.toDashboards({ type: 'stream', stream });
+});
 
 function startEventSub() {
   eventsub?.stop();
