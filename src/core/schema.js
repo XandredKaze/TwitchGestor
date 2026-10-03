@@ -5,6 +5,7 @@
  */
 
 import { PERMISSIONS, ACTIONS } from './commands.js';
+import { MOD_ACTIONS, normalizeText } from './moderation.js';
 
 export const ANIMATIONS = ['pop', 'fade', 'slide-down', 'slide-up', 'slide-left', 'slide-right', 'zoom', 'bounce', 'flip', 'shake'];
 export const POSITIONS = ['top-left', 'top-center', 'top-right', 'center', 'bottom-left', 'bottom-center', 'bottom-right'];
@@ -163,6 +164,29 @@ function sanitizeCommands(input, base) {
   return out;
 }
 
+/** Parole bannate: al massimo 500, senza doppioni (anche scritte in modo diverso). */
+function sanitizeModeration(input, base) {
+  const out = { ...base };
+  if (!isObject(input)) return out;
+  for (const k of ['enabled', 'exemptVip', 'exemptSubs']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  if (typeof input.warning === 'string') out.warning = input.warning.slice(0, 300);
+  if (Array.isArray(input.words)) {
+    const seen = new Set();
+    out.words = input.words.filter(isObject).map((w) => ({
+      text: typeof w.text === 'string' ? w.text.trim().slice(0, 60) : '',
+      action: oneOf(MOD_ACTIONS)(w.action) ?? 'delete',
+      duration: num(1, 1209600)(w.duration) ?? 600,
+      inside: w.inside === true,
+    })).filter((w) => {
+      const key = normalizeText(w.text);
+      if (!key || key === '*' || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 500);
+  }
+  return out;
+}
+
 /** Ritorna la configurazione completa e valida, partendo dai predefiniti. */
 export function sanitizeConfig(input, defaults) {
   const out = structuredClone(defaults);
@@ -173,6 +197,7 @@ export function sanitizeConfig(input, defaults) {
   if (isObject(input.chat)) out.chat.enabled = bool(input.chat.enabled) ?? out.chat.enabled;
   if (out.ui && isObject(input.ui)) out.ui.theme = oneOf(UI_THEMES)(input.ui.theme) ?? out.ui.theme;
   if (out.commands) out.commands = sanitizeCommands(input.commands, out.commands);
+  if (out.moderation) out.moderation = sanitizeModeration(input.moderation, out.moderation);
   if (out.tts) {
     out.tts = pick(input.tts, TTS_FIELDS, out.tts);
     if (Array.isArray(input.tts?.bannedWords)) {

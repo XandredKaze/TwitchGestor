@@ -241,6 +241,53 @@
       <div id="timer-list" class="timer-list"></div>
     </section>
 
+    <section class="panel mod-panel" id="mod-panel">
+      <div class="panel-head">
+        <h2>Parole bannate</h2>
+        <label class="switch"><input type="checkbox" id="mod-enabled"> Attiva</label>
+      </div>
+      <div id="mod-status"></div>
+      <div class="mod-layout">
+        <div>
+          <form id="mod-add" class="mod-add">
+            <input type="text" id="mod-word" placeholder="parola o frase (più parole separate da virgola)" maxlength="400" autocomplete="off">
+            <select id="mod-action">
+              <option value="delete">Cancella il messaggio</option>
+              <option value="timeout">Timeout</option>
+              <option value="ban">Ban</option>
+            </select>
+            <select id="mod-duration" title="Durata del timeout">
+              <option value="10">10 secondi</option><option value="60">1 minuto</option><option value="300">5 minuti</option>
+              <option value="600" selected>10 minuti</option><option value="3600">1 ora</option><option value="86400">1 giorno</option><option value="604800">1 settimana</option>
+            </select>
+            <label class="inline small" title="Trova la parola anche dentro altre parole e con spazi tra le lettere (es. p a r o l a)"><input type="checkbox" id="mod-inside"> anche dentro altre parole</label>
+            <button type="submit" class="primary">＋ Aggiungi</button>
+          </form>
+          <p class="muted small">Riconosce anche maiuscole, accenti, numeri e simboli al posto delle lettere (5tup1d0, $tupido) e lettere ripetute (stuuupido). Con <code>*</code> alla fine prende tutte le parole che iniziano così (es. <code>idiot*</code>).</p>
+          <div id="mod-words" class="mod-words"></div>
+        </div>
+        <div class="mod-side">
+          <label class="field"><span class="field-label">Avviso in chat (vuoto = nessun avviso)</span>
+            <input type="text" id="mod-warning" maxlength="300" placeholder="{user}, quella parola qui non è permessa ({action}).">
+            <span class="hint">{user} chi l'ha scritta · {action} cosa è successo. Al massimo un avviso ogni 10 secondi.</span>
+          </label>
+          <div class="mod-exempt">
+            <span class="field-label">Non moderare</span>
+            <span class="muted small">Tu e i moderatori non venite mai moderati.</span>
+            <label class="inline small"><input type="checkbox" id="mod-exempt-vip"> i VIP</label>
+            <label class="inline small"><input type="checkbox" id="mod-exempt-subs"> gli abbonati</label>
+          </div>
+          <form id="mod-test" class="cmd-test">
+            <input type="text" id="mod-test-text" placeholder="Prova un messaggio…" autocomplete="off">
+            <button type="submit">Prova</button>
+          </form>
+          <div id="mod-test-out" class="cmd-test-out muted small">Scrivi un messaggio per vedere cosa farebbe il bot.</div>
+        </div>
+      </div>
+      <h3>Registro</h3>
+      <div id="mod-log" class="mod-log"></div>
+    </section>
+
     <div class="save-bar" id="cmd-save-bar" hidden>
       <span>Comandi non salvati</span>
       <button id="cmd-discard">Annulla modifiche</button>
@@ -276,5 +323,6 @@
   <script src="/commands.js"></script>
   <script src="/actions.js"></script>
   <script src="/stream.js"></script>
+  <script src="/moderation.js"></script>
 </body>
 </html>

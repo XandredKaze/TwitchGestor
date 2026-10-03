@@ -13,6 +13,7 @@ import { CreditsStore, startCreditsScheduler } from './credits.js';
 import { TtsService, PiperManager } from './tts.js';
 import { ObsClient } from './obs.js';
 import { createQuickActions } from './quickActions.js';
+import { ChatModerator } from './core/moderation.js';
 import { ChatCommands, humanDuration } from './core/commands.js';
 import { sanitizeConfig } from './core/schema.js';
 import { createLogger } from './logger.js';
@@ -158,6 +159,46 @@ function testCommand(text, role = 'broadcaster', draft) {
 
 const quickActions = createQuickActions({ helix, getUser: () => auth.user });
 
+// --- Parole bannate: il bot (o il tuo account) cancella, dà timeout o banna ---
+function modAccount() {
+  if (botAuth.user && botAuth.user.id !== auth.user?.id) return { helix: botHelix, id: botAuth.user.id, name: botAuth.user.login, bot: true };
+  return { helix, id: auth.user?.id, name: auth.user?.login, bot: false };
+}
+async function modRequest(method, path, body) {
+  if (!auth.user) throw new Error('account Twitch non collegato');
+  const m = modAccount();
+  const sep = path.includes('?') ? '&' : '?';
+  try {
+    return await m.helix.request(method, `${path}${sep}broadcaster_id=${auth.user.id}&moderator_id=${m.id}`, body);
+  } catch (err) {
+    if (err.status === 403 || /moderator/i.test(err.message)) throw new Error(`${m.name} non è moderatore del canale: scrivi /mod ${m.name} nella tua chat`);
+    if (err.status === 401) throw new Error(`manca un permesso a ${m.name}: ${m.bot ? 'ricollega il bot' : 'esci e accedi di nuovo'} dalla dashboard`);
+    throw err;
+  }
+}
+const moderator = new ChatModerator({
+  getConfig: () => config.get().moderation,
+  log,
+  warn: (text) => sendChat(text),
+  act: {
+    delete: (messageId) => modRequest('DELETE', `/moderation/chat?message_id=${encodeURIComponent(messageId)}`),
+    timeout: (userId, seconds, reason) => modRequest('POST', '/moderation/bans', { data: { user_id: userId, duration: seconds, reason } }),
+    ban: (userId, reason) => modRequest('POST', '/moderation/bans', { data: { user_id: userId, reason } }),
+    unban: (userId) => modRequest('DELETE', `/moderation/bans?user_id=${encodeURIComponent(userId)}`),
+  },
+  onAction: (r) => {
+    log.info(`Moderazione: ${r.user} → ${r.label} (parola "${r.word}")${r.error ? ` NON riuscita: ${r.error}` : ''}`);
+    web.toDashboards({ type: 'moderation', history: moderator.history });
+  },
+});
+
+/** Prova della moderazione dalla dashboard: non fa nulla in chat. */
+function testModeration(text, role = 'everyone', draft) {
+  const settings = draft ? sanitizeConfig({ ...config.get(), moderation: draft }, config.defaults()).moderation : config.get().moderation;
+  const tester = new ChatModerator({ getConfig: () => settings });
+  return tester.handle({ text, user: { id: 'prova', login: 'prova', name: 'prova' }, badges: role === 'everyone' ? [] : [{ set_id: role }] }, { dryRun: true });
+}
+
 let eventsub = null;
 const streamelements = env.STREAMELEMENTS_JWT ? new StreamElementsSource({ jwt: env.STREAMELEMENTS_JWT }) : null;
 
@@ -172,6 +213,8 @@ const app = {
   obs,
   testCommand,
   quickActions,
+  moderator,
+  testModeration,
   chatAccount,
   getState() {
     return {
@@ -193,6 +236,14 @@ const app = {
       ui: config.get().ui,
       overlays: web?.clients.overlay.size ?? 0,
       obs: obs.state(),
+      moderation: {
+        enabled: Boolean(config.get().moderation?.enabled),
+        by: auth.user ? modAccount().name : null,
+        byBot: auth.user ? modAccount().bot : false,
+        missingScope: Boolean(auth.user && (modAccount().bot
+          ? ['moderator:manage:chat_messages', 'moderator:manage:banned_users'].some((s) => botAuth.missingScopes.includes(s))
+          : auth.missingScopes.includes('moderator:manage:banned_users'))),
+      },
       commands: {
         enabled: Boolean(config.get().commands?.enabled),
         missingScope: Boolean(auth.user && auth.missingScopes.includes('user:read:chat')),
@@ -275,11 +326,16 @@ function startEventSub() {
   eventsub.on('event', (type, payload, messageId) => {
     if (type === 'channel.chat.message') {
       if (payload.chatter_user_id === botAuth.user?.id) return; // il bot non risponde a sé stesso
-      commands.handle({
+      const msg = {
+        id: payload.message_id,
         text: payload.message?.text,
         user: { id: payload.chatter_user_id, login: payload.chatter_user_login, name: payload.chatter_user_name },
         badges: payload.badges,
-      }).catch((err) => log.warn(`Comando non riuscito: ${err.message}`));
+      };
+      // prima le parole bannate: un messaggio moderato non esegue comandi
+      moderator.handle(msg)
+        .then((moderated) => (moderated ? null : commands.handle(msg)))
+        .catch((err) => log.warn(`Messaggio della chat non gestito: ${err.message}`));
       return;
     }
     const n = fromEventSub(type, payload, messageId);

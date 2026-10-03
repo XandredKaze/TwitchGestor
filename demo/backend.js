@@ -19,6 +19,7 @@ import { API_LEVEL, APP_VERSION } from '../src/core/apiLevel.js';
 import { ChatCommands, humanDuration } from '../src/core/commands.js';
 import { createQuickActions } from '../src/quickActions.js';
 import { summarizeStream } from '../src/core/streamHealth.js';
+import { ChatModerator } from '../src/core/moderation.js';
 
 const CHANNEL = { id: '0', login: 'canale_demo' };
 const DEMO_SCENES = ['Inizio', 'Gioco', 'Chiacchiere', 'Pausa', 'Fine'];
@@ -105,6 +106,7 @@ class DemoBackend {
     this.clients = { overlay: new Set(), dashboard: new Set() };
     this.media = { sounds: [], images: [], music: [] };
     this.chat = [];
+    this.chatSeq = 0;
     this.bot = { ...BOT };
     this.simulation = null;
     this.credits = {
@@ -160,6 +162,20 @@ class DemoBackend {
     this.streamHistory = [];
     this.stream = null;
     setInterval(() => this.#tickStream(), 2000);
+    // parole bannate nella chat simulata: il bot cancella davvero i messaggi
+    const hide = (pred) => { this.chat = this.chat.filter((m) => !pred(m)); this.broadcastState(); };
+    this.moderator = new ChatModerator({
+      getConfig: () => this.config.moderation,
+      log: this.log,
+      warn: (text) => this.#chat(this.bot ? this.bot.login : CHANNEL.login, text, true),
+      act: {
+        delete: async (id) => hide((m) => m.id === id),
+        timeout: async (userId) => hide((m) => m.user === userId),
+        ban: async (userId) => hide((m) => m.user === userId),
+        unban: async () => {},
+      },
+      onAction: () => this.#send('dashboard', { type: 'moderation', history: this.moderator.history }),
+    });
     this.quickActions = createQuickActions({ helix: this.#fakeTwitch(), getUser: () => CHANNEL });
     this.commands = new ChatCommands({
       ...commandDeps,
@@ -259,8 +275,9 @@ class DemoBackend {
 
   /** Un messaggio arrivato nella chat simulata: compare in chat e passa ai comandi. */
   #incoming(login, text, badges = []) {
-    this.#chat(login, text);
-    this.commands.handle({ text, user: { id: login, login: login.toLowerCase(), name: login }, badges }).catch(() => {});
+    const id = this.#chat(login, text);
+    const msg = { id, text, user: { id: login, login: login.toLowerCase(), name: login }, badges };
+    this.moderator.handle(msg).then((moderated) => (moderated ? null : this.commands.handle(msg))).catch(() => {});
   }
 
   // ---------- Canale in tempo reale (sostituisce il WebSocket) ----------
@@ -293,9 +310,11 @@ class DemoBackend {
   }
 
   #chat(user, text, fromBot = false) {
-    this.chat.push({ user, text, bot: fromBot, at: Date.now() });
+    const id = `msg${++this.chatSeq}`;
+    this.chat.push({ id, user, text, bot: fromBot, at: Date.now() });
     if (this.chat.length > 60) this.chat.shift();
     this.broadcastState();
+    return id;
   }
 
   chatAccount() {
@@ -311,6 +330,7 @@ class DemoBackend {
       sources: { streamelements: 'disattivato', kofi: 'disattivato', webhook: 'disattivato' },
       ui: this.config.ui,
       commands: { enabled: Boolean(this.config.commands?.enabled), missingScope: false, reading: true },
+      moderation: { enabled: Boolean(this.config.moderation?.enabled), by: this.bot ? this.bot.login : CHANNEL.login, byBot: Boolean(this.bot), missingScope: false },
       overlays: this.clients.overlay.size,
       chatReplies: Boolean(this.config.chat?.enabled),
       chatAccount: this.chatAccount(),
@@ -347,6 +367,13 @@ class DemoBackend {
     const talk = () => {
       // ogni tanto uno spettatore usa un comando
       const p = this.config.commands?.prefix || '!';
+      const banned = this.config.moderation?.enabled ? this.config.moderation.words ?? [] : [];
+      // ogni tanto qualcuno scrive una parola bannata (per vedere il bot all'opera)
+      if (banned.length && Math.random() < 0.12) {
+        this.#incoming(pick(VIEWERS), `ma che ${pick(banned).text.replace(/\*$/, 'a')} questa partita`);
+        this.chatTimer = setTimeout(talk, 2500 + Math.random() * 3500);
+        return;
+      }
       const text = Math.random() < 0.25 ? p + pick(['uptime', 'followage', 'comandi', 'social', 'discord']) : pick(VIEWER_CHAT);
       this.#incoming(pick(VIEWERS), text);
       this.chatTimer = setTimeout(talk, 2500 + Math.random() * 3500);
@@ -385,6 +412,21 @@ class DemoBackend {
       }
       case 'GET /api/actions/state': return ok(await this.quickActions.state());
       case 'GET /api/actions/categories': return ok(await this.quickActions.run('categories', { query: url.searchParams.get('q') }));
+      case 'PUT /api/moderation': {
+        this.config = sanitizeConfig({ ...this.config, moderation: body?.moderation }, this.defaults);
+        storage.set('tg-demo-config', diffConfig(this.config, this.defaults) ?? {});
+        this.broadcastState();
+        return ok({ moderation: this.config.moderation });
+      }
+      case 'POST /api/moderation/test': {
+        const settings = body?.moderation ? sanitizeConfig({ ...this.config, moderation: body.moderation }, this.defaults).moderation : this.config.moderation;
+        const tester = new ChatModerator({ getConfig: () => settings });
+        return ok({ result: await tester.handle({ text: String(body?.text ?? ''), user: { id: 'prova', name: 'prova' }, badges: [] }, { dryRun: true }) });
+      }
+      case 'GET /api/moderation/log': return ok({ history: this.moderator.history });
+      case 'POST /api/moderation/undo':
+        try { await this.moderator.undo(Number(body?.index)); } catch (err) { return fail(400, err.message); }
+        return ok({ history: this.moderator.history });
       case 'PUT /api/commands': {
         this.config = sanitizeConfig({ ...this.config, commands: body?.commands }, this.defaults);
         storage.set('tg-demo-config', diffConfig(this.config, this.defaults) ?? {});

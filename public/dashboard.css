@@ -722,6 +722,38 @@ input, select, textarea { transition: border-color 0.15s, box-shadow 0.15s; }
 [data-ui="brutal"] .cmd-test-out, [data-ui="brutal"] .timer-item { background: #0f0f0f; border: 1.5px dashed #6a6a6a; }
 [data-ui="brutal"] .cmd-editor-head { border-bottom: 1.5px solid #6a6a6a; }
 
+/* ---------- Parole bannate (scheda Comandi) ---------- */
+.mod-panel { grid-column: 1 / -1; }
+.mod-layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(260px, 2fr); gap: 20px; margin-top: 12px; }
+@media (max-width: 900px) { .mod-layout { grid-template-columns: minmax(0, 1fr); } }
+.mod-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mod-add input[type=text] { flex: 1 1 220px; }
+.mod-words { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; max-height: 260px; overflow-y: auto; }
+.mod-word { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--inset); font-size: 13px; }
+.mod-word small { color: var(--muted); font-size: 11px; }
+.mod-word.act-timeout { border-color: color-mix(in srgb, var(--warn) 50%, var(--border)); }
+.mod-word.act-ban { border-color: color-mix(in srgb, var(--danger) 55%, var(--border)); }
+.mod-x { padding: 0 7px; border: 0; background: transparent; border-radius: 999px; font-size: 12px; line-height: 20px; }
+.mod-x:hover { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); }
+.mod-side { display: grid; gap: 12px; align-content: start; }
+.mod-side .field { margin-top: 0; }
+.mod-exempt { display: grid; gap: 4px; }
+.mod-log { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; }
+.mod-entry { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 10px; background: var(--inset); border: 1px solid var(--border); font-size: 13px; }
+.mod-entry.err { border-color: var(--danger); }
+.mod-time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.mod-what { min-width: 0; overflow-wrap: anywhere; }
+.mod-what small { color: var(--muted); }
+.mod-text { display: block; color: var(--muted); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mod-error { color: var(--danger); }
+[data-ui="brutal"] .mod-word { background: transparent; border: 1.5px solid #6a6a6a; font-family: var(--mono); }
+[data-ui="brutal"] .mod-word.act-timeout { border-style: dashed; border-color: var(--line); }
+[data-ui="brutal"] .mod-word.act-ban { border-color: var(--lilac); }
+[data-ui="brutal"] .mod-x { border: 0; box-shadow: none; }
+[data-ui="brutal"] .mod-entry { background: #0f0f0f; border: 1.5px solid #5a5a5a; }
+[data-ui="brutal"] .mod-entry.err { border-color: var(--lilac); border-style: dashed; }
+[data-ui="brutal"] .mod-error { color: var(--lilac); }
+
 /* Miniature dei temi (disegnate, non immagini) */
 .theme-mock { position: relative; display: block; height: 120px; overflow: hidden; border-radius: 10px; }
 .theme-mock i { display: block; }

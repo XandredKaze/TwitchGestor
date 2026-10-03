@@ -21,6 +21,7 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 - **Anteprima della live e chat di Twitch** direttamente nella dashboard (scheda Live).
 - **Cambio scena di OBS** con un clic dalla dashboard (tramite OBS WebSocket, già incluso in OBS).
 - **Stato della diretta**: qualità della connessione, bitrate con grafico, fotogrammi persi, congestione, FPS e CPU, letti da OBS.
+- **Parole bannate** (scheda 💬 Comandi): il bot cancella il messaggio, dà un timeout o banna chi le scrive, anche se scritte con numeri, simboli o lettere ripetute.
 - **Azioni rapide** come nel Gestore stream di Twitch (scheda Live): titolo e categoria, clip, segnalibro, raid, shoutout, annuncio, sondaggi, pronostici, pubblicità e impostazioni della chat.
 - **Comandi della chat** (scheda 💬 Comandi): `!discord`, `!uptime`, `!followage`, `!so`, `!scena`… con risposte, permessi, attese, contatori e messaggi a tempo; risponde il bot (es. Wolfery).
 - **Temi** (scheda 🖌 Tema): aspetto predefinito o **Brutalism** (nero, bianco e lilla) per tutta la dashboard, e stile Classico o Brutalism per l'animazione dei titoli di coda.
@@ -102,6 +103,18 @@ Nella scheda **📡 Live** della dashboard trovi il player della tua live (senza
 - Per scrivere in chat devi essere collegato a twitch.tv nello stesso browser; se il riquadro non te lo permette usa **Finestra ↗**.
 - Con **Nascondi** togli player o chat e risparmi risorse del PC durante la live.
 - La chat si adatta all'altezza della finestra. Per sceglierla tu, **trascina la maniglia** sotto la chat (o usala con le frecce ↑ ↓ della tastiera); doppio clic sulla maniglia per tornare all'altezza automatica. Ogni PC o browser ricorda la sua.
+
+## Parole bannate
+
+Nella scheda **💬 Comandi**, riquadro **Parole bannate**, scrivi le parole (o frasi) da non permettere in chat e per ognuna scegli cosa fa il bot:
+
+- **cancella il messaggio**, **timeout** (da 10 secondi a 1 settimana) o **ban**;
+- **anche dentro altre parole**: la trova anche attaccata ad altre parole e con spazi tra le lettere (`p a r o l a`);
+- con `*` alla fine prende tutte le parole che iniziano così (es. `idiot*`).
+
+Il bot non si lascia ingannare da maiuscole, accenti, numeri e simboli al posto delle lettere (`5tup1d0`, `$tupido`) e lettere ripetute (`stuuupido`). Tu e i moderatori non venite mai moderati; puoi escludere anche VIP e abbonati. Puoi scrivere un **avviso in chat** (`{user}` e `{action}`), **provare** un messaggio prima e vedere nel **registro** cosa ha fatto il bot, con **Annulla** per togliere un timeout o un ban.
+
+Il bot deve essere **moderatore del canale** (scrivi `/mod NomeDelBot` nella tua chat) e la prima volta va **ricollegato** per i nuovi permessi (Personalizza alert → Impostazioni generali → Chat). Senza bot modera il tuo account.
 
 ## Azioni rapide
 

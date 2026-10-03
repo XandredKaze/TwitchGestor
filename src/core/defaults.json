@@ -309,5 +309,12 @@
     "maxLength": 200,
     "bannedWords": [],
     "skipLinks": true
+  },
+  "moderation": {
+    "enabled": false,
+    "words": [],
+    "warning": "{user}, quella parola qui non è permessa ({action}).",
+    "exemptVip": false,
+    "exemptSubs": false
   }
 }

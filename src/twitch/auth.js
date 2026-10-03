@@ -20,10 +20,15 @@ export const SCOPES = [
   'moderator:read:chatters', // titoli di coda: chi era in chat
   'user:read:chat', // comandi della chat (!discord, !uptime...)
   ...QUICK_ACTION_SCOPES, // azioni rapide (titolo, clip, raid, sondaggi, chat...)
+  'moderator:manage:banned_users', // parole bannate: timeout e ban (se non c'è un account bot)
 ];
 
-/** Permessi dell'account bot: gli serve solo scrivere in chat. */
-export const BOT_SCOPES = ['user:write:chat'];
+/** Permessi dell'account bot: scrive in chat e modera le parole bannate (il bot deve essere moderatore del canale). */
+export const BOT_SCOPES = [
+  'user:write:chat',
+  'moderator:manage:chat_messages', // parole bannate: cancella i messaggi
+  'moderator:manage:banned_users', // parole bannate: timeout e ban
+];
 
 /**
  * Accesso con il tuo account Twitch (Authorization Code Flow).

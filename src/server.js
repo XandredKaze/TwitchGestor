@@ -326,6 +326,27 @@ export function createServer(app) {
           if (name === 'info' || name.startsWith('chat') || name === 'shield') app.broadcastState();
           return send(res, 200, result);
         }
+        // --- Parole bannate ---
+        if (route === 'PUT /api/moderation') {
+          const body = await readBody(req, 1_000_000);
+          const config = app.config.save({ ...app.config.get(), moderation: body.moderation });
+          app.broadcastState();
+          return send(res, 200, { moderation: config.moderation });
+        }
+        if (route === 'POST /api/moderation/test') {
+          const body = await readBody(req, 1_000_000);
+          return send(res, 200, { result: (await app.testModeration?.(String(body.text ?? '').slice(0, 500), body.role, body.moderation)) ?? null });
+        }
+        if (route === 'GET /api/moderation/log') return send(res, 200, { history: app.moderator?.history ?? [] });
+        if (route === 'POST /api/moderation/undo') {
+          const body = await readBody(req);
+          try {
+            await app.moderator.undo(Number(body.index));
+          } catch (err) {
+            throw Object.assign(new Error(err.message), { status: err.status ?? 400 });
+          }
+          return send(res, 200, { history: app.moderator.history });
+        }
         if (route === 'PUT /api/commands') {
           // Solo i comandi della chat: non tocca le altre impostazioni.
           const body = await readBody(req, 1_000_000);
