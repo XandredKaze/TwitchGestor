@@ -102,3 +102,80 @@ html, body {
   20%, 60% { transform: translateX(-10px) rotate(-2deg); }
   40%, 80% { transform: translateX(10px) rotate(2deg); }
 }
+
+/* ---------- Stile Brutalism: come il tema di TwitchGestor (nero carbone, bianco, lilla) ---------- */
+.alert.style-brutal {
+  --lilac: #b39bd3;
+  --line: #e6e6e6;
+  align-items: stretch;
+  gap: 0;
+  min-width: 420px;
+  padding: 0;
+  border-radius: 0;
+  border: 2px solid var(--line);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    rgba(21, 21, 21, 0.94);
+  box-shadow: 8px 8px 0 rgba(179, 155, 211, 0.35);
+  color: var(--line);
+  text-align: left;
+  font-family: 'Outfit', 'Segoe UI', sans-serif;
+}
+.style-brutal .b-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 7px 14px;
+  border-bottom: 2px solid var(--line);
+  font: 400 calc(var(--size) * 0.62) / 1.2 'Share Tech Mono', 'Courier New', monospace;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.style-brutal .b-tools { letter-spacing: 0.3em; opacity: 0.85; }
+.style-brutal .hl { color: var(--lilac); }
+.style-brutal .b-media {
+  display: block;
+  align-self: center;
+  max-width: 300px;
+  max-height: 240px;
+  margin: 18px 22px 0;
+  border-radius: 0;
+}
+.style-brutal .b-body { display: flex; flex-direction: column; gap: 10px; padding: 18px 26px 22px; }
+.style-brutal .title {
+  font-family: 'Bungee', 'Impact', sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--line);
+  text-shadow: none;
+  line-height: 1.1;
+}
+.style-brutal .text { font-weight: 500; text-shadow: none; color: var(--line); }
+.style-brutal .b-msg { display: flex; align-items: flex-start; gap: 12px; margin-top: 4px; }
+.style-brutal .b-rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  width: 72px;
+  color: var(--lilac);
+  font: 400 var(--msg-size, calc(var(--size) * 0.77)) / 1.35 'Share Tech Mono', monospace;
+}
+.style-brutal .b-rule::after { content: ''; flex: 1; height: 1.5px; background: var(--lilac); }
+.style-brutal .message {
+  font-family: 'Share Tech Mono', 'Courier New', monospace;
+  font-style: normal;
+  opacity: 1;
+  line-height: 1.35;
+  max-width: 520px;
+}
+.style-brutal .message::before, .style-brutal .message::after { content: none; }
+/* entrata a scatti, come una finestra che si apre */
+.style-brutal.anim-pop { --in: brutal-in 0.45s steps(5, end); }
+@keyframes brutal-in {
+  0% { opacity: 0; clip-path: inset(0 100% 100% 0); }
+  1% { opacity: 1; }
+  100% { opacity: 1; clip-path: inset(0 0 0 0); }
+}

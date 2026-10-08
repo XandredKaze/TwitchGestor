@@ -69,3 +69,10 @@ test('tema della dashboard: solo i temi conosciuti, salvato solo se diverso dal 
   assert.deepEqual(diffConfig(sanitizeConfig({ ui: { theme: 'brutal' } }, defaults), defaults), { ui: { theme: 'brutal' } });
   assert.equal(diffConfig(sanitizeConfig({}, defaults), defaults), undefined);
 });
+
+test('stile degli alert: solo valori conosciuti', () => {
+  const out = sanitizeConfig({ overlay: { alertStyle: 'brutal' }, types: { follow: { alertStyle: 'boh' }, sub: { alertStyle: 'brutal' } } }, defaults);
+  assert.equal(out.overlay.alertStyle, 'brutal');
+  assert.equal(out.types.follow.alertStyle, undefined);
+  assert.equal(out.types.sub.alertStyle, 'brutal');
+});

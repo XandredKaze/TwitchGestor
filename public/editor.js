@@ -8,6 +8,9 @@
     'slide-left': 'Entra da destra', 'slide-right': 'Entra da sinistra', zoom: 'Zoom', bounce: 'Rimbalzo',
     flip: 'Ribaltamento', shake: 'Scossa',
   };
+  const ALERT_STYLE_LABELS = { classic: 'Classico', brutal: 'Brutalism (come il tema)' };
+  const styleOptions = () => Object.entries(ALERT_STYLE_LABELS).map(([value, label]) => ({ value, label }));
+  const BRUTAL_HINT = 'Brutalism usa i colori (nero, bianco, lilla) e i font del tema: colori e font qui sotto non si applicano. Dimensioni, animazione e posizione sì.';
   const POSITION_LABELS = {
     'top-left': 'In alto a sinistra', 'top-center': 'In alto al centro', 'top-right': 'In alto a destra', center: 'Al centro',
     'bottom-left': 'In basso a sinistra', 'bottom-center': 'In basso al centro', 'bottom-right': 'In basso a destra',
@@ -99,6 +102,13 @@
       }
     }
     else schedulePreview();
+  });
+  // stile degli alert scelto nella scheda Tema (già salvato): aggiorna la copia dell'editor senza perdere le modifiche in corso
+  window.addEventListener('alerts:style', (e) => {
+    if (!saved) return;
+    saved.overlay.alertStyle = e.detail;
+    draft.overlay.alertStyle = e.detail;
+    render();
   });
   window.addEventListener('beforeunload', (e) => {
     if (draft && isDirty()) e.preventDefault();
@@ -316,6 +326,8 @@
         MESSAGE_TYPES.includes(type) ? checkbox(t, 'showMessage', 'Mostra il messaggio scritto dallo spettatore') : null),
 
       section('Aspetto',
+        field('Stile del riquadro', select(t, 'alertStyle', styleOptions(), { inheritLabel: `Come generale (${ALERT_STYLE_LABELS[general.alertStyle ?? 'classic']})`, onchange: () => {} })),
+        (t.alertStyle ?? general.alertStyle) === 'brutal' ? el('p', { className: 'hint' }, BRUTAL_HINT) : null,
         el('div', { className: 'grid-2' },
           field('Font', fontSelect(t, 'font', `Come generale (${general.font})`)),
           field('Dimensione titolo', range(t, 'titleSize', { min: 14, max: 140, step: 1, fallback: general.titleSize ?? Math.round((t.fontSize ?? general.fontSize) * 1.4), format: (v) => `${v}px` }), { onReset: inheritedReset('titleSize') }),
@@ -394,6 +406,7 @@
             oninput: (e) => { if (e.target.value === '') delete v.duration; else v.duration = Number(e.target.value) * 1000; markChanged(); },
           })),
           field('Animazione', select(v, 'animation', Object.entries(ANIMATION_LABELS).map(([value, label]) => ({ value, label })), { inheritLabel: 'Come sopra' })),
+          field('Stile del riquadro', select(v, 'alertStyle', styleOptions(), { inheritLabel: 'Come sopra' })),
           field('Suono', soundPicker(v, 'sound', { inheritLabel: 'Come sopra' })),
           field('Immagine', imagePicker(v, 'image', { inheritLabel: 'Come sopra' })),
           field('Voce', (() => {
@@ -552,6 +565,8 @@
       el('div', { className: 'form-head' }, el('h2', {}, '⚙️ Impostazioni generali')),
       el('p', { className: 'hint' }, 'Valgono per tutti gli alert, a meno che un alert non abbia un valore suo.'),
       section('Overlay',
+        field('Stile del riquadro', select(o, 'alertStyle', styleOptions(), { onchange: () => {} }), { hint: 'Si sceglie anche dalla scheda Tema.' }),
+        (o.alertStyle ?? 'classic') === 'brutal' ? el('p', { className: 'hint' }, BRUTAL_HINT) : null,
         el('div', { className: 'grid-2' },
           field('Posizione sullo schermo', select(o, 'position', Object.entries(POSITION_LABELS).map(([value, label]) => ({ value, label })))),
           field('Animazione', select(o, 'animation', Object.entries(ANIMATION_LABELS).map(([value, label]) => ({ value, label })))),

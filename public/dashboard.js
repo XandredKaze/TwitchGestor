@@ -531,12 +531,19 @@
     { id: 'classic', name: 'Classico', desc: 'Elegante: titoli con linee luminose e i colori scelti nel pannello.' },
     { id: 'brutal', name: 'Brutalism', desc: 'Titoli delle sezioni come "▢ SUBSCRIBERS ────", titolo iniziale e testo finale a blocchi in bianco e lilla.' },
   ];
+  const ALERT_THEMES = [
+    { id: 'classic', name: 'Classico', desc: 'Riquadro arrotondato con bordo luminoso, nei colori e nel font scelti per ogni alert.' },
+    { id: 'brutal', name: 'Brutalism', desc: 'Finestra "// FOLLOW _ ▢ ✕" nero carbone con grana, linee bianche e lilla, titolo a blocchi.' },
+  ];
   let rollTheme = null;
+  let alertTheme = null;
 
   function themeCard(t, current, kind, onPick) {
     const active = t.id === current;
     const mock = el('div', { className: `theme-mock ${kind}-${t.id}`, 'aria-hidden': 'true' },
-      kind === 'ui'
+      kind === 'alert'
+        ? [el('i', { className: 'm-box' }, el('i', { className: 'm-bar' }), el('i', { className: 'm-title' }), el('i', { className: 'm-name' }))]
+        : kind === 'ui'
         ? [el('i', { className: 'm-bar' }), el('i', { className: 'm-card' }, el('i', { className: 'm-line' }), el('i', { className: 'm-btn' })), el('i', { className: 'm-card' }, el('i', { className: 'm-line' }), el('i', { className: 'm-line short' }))]
         : [el('i', { className: 'm-title' }), el('i', { className: 'm-name' }), el('i', { className: 'm-name' }), el('i', { className: 'm-name' })]);
     return el('button', {
@@ -557,6 +564,7 @@
       renderThemes();
       await window.TG.api('/api/ui', { method: 'PUT', body: { theme: id } });
     })));
+    $('alert-themes').replaceChildren(...ALERT_THEMES.map((t) => themeCard(t, alertTheme ?? 'classic', 'alert', setAlertTheme)));
     $('roll-themes').replaceChildren(...ROLL_THEMES.map((t) => themeCard(t, rollTheme ?? 'classic', 'roll', setRollTheme)));
   }
 
@@ -574,9 +582,27 @@
     await window.TG.api('/api/credits/state/settings', { method: 'PUT', body: settings });
   }
 
+  // Lo stile degli alert sta nelle impostazioni generali degli alert (overlay.alertStyle).
+  async function loadAlertTheme() {
+    const data = await window.TG.api('/api/config', { method: 'GET', quiet: true });
+    alertTheme = data?.config?.overlay?.alertStyle ?? 'classic';
+    renderThemes();
+  }
+  async function setAlertTheme(id) {
+    alertTheme = id;
+    renderThemes();
+    const data = await window.TG.api('/api/config', { method: 'GET', quiet: true });
+    if (!data?.config) return;
+    const config = { ...data.config, overlay: { ...data.config.overlay, alertStyle: id } };
+    if (await window.TG.api('/api/config', { method: 'PUT', body: { config } })) {
+      window.dispatchEvent(new CustomEvent('alerts:style', { detail: id })); // l'editor aggiorna la sua copia
+    }
+  }
+
   function openThemeTab() {
     renderThemes();
     loadRollTheme();
+    loadAlertTheme();
     const frame = $('theme-roll-frame');
     if (!frame.src) {
       frame.src = `/credits?anteprima${token ? `&token=${encodeURIComponent(token)}` : ''}`;

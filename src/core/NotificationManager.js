@@ -124,6 +124,9 @@ export class NotificationManager extends EventEmitter {
       background: style.background ?? overlay.background ?? '#121218',
       backgroundOpacity: style.backgroundOpacity ?? overlay.backgroundOpacity ?? 0.88,
       animation: style.animation || overlay.animation || 'pop',
+      // stile del riquadro: classico o Brutalism (come il tema di TwitchGestor)
+      alertStyle: style.alertStyle || overlay.alertStyle || 'classic',
+      label: style.label ?? this.typeConfig(n.type)?.label ?? n.type,
       ...this.#tts(n, style, vars),
     };
   }

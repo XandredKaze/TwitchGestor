@@ -777,6 +777,16 @@ input, select, textarea { transition: border-color 0.15s, box-shadow 0.15s; }
 .roll-brutal .m-title { width: 62%; height: 10px; margin-bottom: 4px; background: linear-gradient(#b39bd3, #b39bd3) 0 50% / 9px 9px no-repeat, linear-gradient(#b39bd3, #b39bd3) 14px 50% / 34% 5px no-repeat, linear-gradient(#e6e6e6, #e6e6e6) 100% 50% / 50% 2px no-repeat; }
 .roll-brutal .m-name { width: 30%; height: 6px; background: #e6e6e6; }
 .roll-brutal .m-name:nth-child(3) { width: 24%; }
+/* anteprime dello stile degli alert */
+.alert-classic, .alert-brutal { display: flex !important; align-items: center; justify-content: center; background: linear-gradient(135deg, #3b4a5c, #1d2430); }
+.alert-classic .m-box { display: flex; flex-direction: column; align-items: center; gap: 7px; width: 58%; padding: 12px 0; border-radius: 10px; background: #121218e0; border: 2px solid #9147ff; box-shadow: 0 0 14px #9147ff88; }
+.alert-classic .m-bar { display: none; }
+.alert-classic .m-title { width: 60%; height: 9px; border-radius: 4px; background: #9147ff; }
+.alert-classic .m-name { width: 75%; height: 6px; border-radius: 3px; background: #e6e6e6; }
+.alert-brutal .m-box { width: 62%; border: 2px solid #e6e6e6; background: #151515; box-shadow: 5px 5px 0 #b39bd35c; padding-bottom: 10px; }
+.alert-brutal .m-bar { height: 14px; border-bottom: 2px solid #e6e6e6; background: linear-gradient(#e6e6e6, #e6e6e6) 6px 50% / 22% 3px no-repeat, linear-gradient(#b39bd3, #b39bd3) calc(6px + 26%) 50% / 18% 3px no-repeat, linear-gradient(#e6e6e6, #e6e6e6) calc(100% - 6px) 50% / 6px 6px no-repeat; }
+.alert-brutal .m-title { height: 10px; margin: 9px 10px 7px; background: linear-gradient(#b39bd3, #b39bd3) 0 0 / 30% 100% no-repeat, linear-gradient(#e6e6e6, #e6e6e6) 36% 0 / 45% 100% no-repeat; }
+.alert-brutal .m-name { height: 5px; margin: 0 10px; width: 70%; background: #8a8a8a; }
 
 /* =====================================================================
    TEMA "BRUTALISM" (stile retro-computer): nero carbone con grana,
@@ -807,9 +817,9 @@ html:root[data-ui="brutal"] {
   color-scheme: dark;
 }
 /* niente angoli arrotondati (tranne nelle miniature dei temi "morbidi") */
-[data-ui="brutal"] :not(.ui-default, .ui-default *, .roll-classic, .roll-classic *),
-[data-ui="brutal"] :not(.ui-default *, .roll-classic *)::before,
-[data-ui="brutal"] :not(.ui-default *, .roll-classic *)::after { border-radius: 0 !important; }
+[data-ui="brutal"] :not(.ui-default, .ui-default *, .roll-classic, .roll-classic *, .alert-classic *),
+[data-ui="brutal"] :not(.ui-default *, .roll-classic *, .alert-classic *)::before,
+[data-ui="brutal"] :not(.ui-default *, .roll-classic *, .alert-classic *)::after { border-radius: 0 !important; }
 [data-ui="brutal"] body {
   background-color: #141414;
   background-image:

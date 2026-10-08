@@ -13,7 +13,8 @@
     "textColor": "#ffffff",
     "background": "#121218",
     "backgroundOpacity": 0.88,
-    "animation": "pop"
+    "animation": "pop",
+    "alertStyle": "classic"
   },
   "chat": {
     "enabled": false

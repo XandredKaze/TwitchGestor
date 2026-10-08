@@ -25,6 +25,55 @@
     return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
   }
 
+  // font dello stile Brutalism (gli stessi del tema di TwitchGestor)
+  let brutalFonts = false;
+  function loadBrutalFonts() {
+    if (brutalFonts) return;
+    brutalFonts = true;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Bungee&family=Share+Tech+Mono&family=Outfit:wght@400;500;700&display=swap';
+    document.head.append(link);
+  }
+
+  /** Testo con l'ultima (o la prima) parola in lilla, come le finestre del tema Brutalism. */
+  function highlighted(className, value, which) {
+    const node = el('div', className);
+    const words = String(value).trim().split(/\s+/);
+    const i = which === 'first' ? 0 : words.length - 1;
+    words.forEach((w, k) => {
+      if (k) node.append(' ');
+      if (k === i && words.length > 1) node.append(el('span', 'hl', w));
+      else node.append(w);
+    });
+    return node;
+  }
+
+  function brutalBox(alert, box) {
+    loadBrutalFonts();
+    box.classList.add('style-brutal');
+    const bar = el('div', 'b-bar');
+    bar.append(highlighted('b-name', `// ${String(alert.label || alert.type || 'alert').toUpperCase()}`, 'last'), el('div', 'b-tools', '_ ▢ ✕'));
+    const body = el('div', 'b-body');
+    if (alert.title) body.append(highlighted('title', alert.title, 'first'));
+    if (alert.text) body.append(el('div', 'text', alert.text));
+    if (alert.message) {
+      const msg = el('div', 'b-msg');
+      msg.append(el('div', 'b-rule', '▢'), el('div', 'message', alert.message));
+      body.append(msg);
+    }
+    box.append(bar);
+    if (alert.image) box.append(mediaNode(alert.image, 'b-media'));
+    box.append(body);
+  }
+
+  function mediaNode(src, className) {
+    const media = el(isVideo(src) ? 'video' : 'img', className);
+    media.src = mediaSrc(src);
+    if (media.tagName === 'VIDEO') Object.assign(media, { autoplay: true, muted: true, loop: true });
+    return media;
+  }
+
   function hide(node) {
     if (!node) return;
     node.classList.add('leaving');
@@ -39,7 +88,8 @@
     stopVoice();
     hide(current);
 
-    window.loadFont(alert.font);
+    const brutal = alert.alertStyle === 'brutal';
+    if (!brutal) window.loadFont(alert.font);
     const box = el('div', `alert anim-${alert.animation || 'pop'}`);
     const opacity = alert.backgroundOpacity ?? 0.88;
     box.style.setProperty('--accent', alert.color);
@@ -48,18 +98,16 @@
     box.style.setProperty('--size', `${alert.fontSize || 26}px`);
     if (alert.titleSize) box.style.setProperty('--title-size', `${alert.titleSize}px`);
     if (alert.messageSize) box.style.setProperty('--msg-size', `${alert.messageSize}px`);
-    box.style.fontFamily = window.fontStack(alert.font);
-    if (opacity === 0) box.classList.add('no-box');
-
-    if (alert.image) {
-      const media = el(isVideo(alert.image) ? 'video' : 'img');
-      media.src = mediaSrc(alert.image);
-      if (media.tagName === 'VIDEO') Object.assign(media, { autoplay: true, muted: true, loop: true });
-      box.append(media);
+    if (brutal) {
+      brutalBox(alert, box);
+    } else {
+      box.style.fontFamily = window.fontStack(alert.font);
+      if (opacity === 0) box.classList.add('no-box');
+      if (alert.image) box.append(mediaNode(alert.image));
+      if (alert.title) box.append(el('div', 'title', alert.title));
+      if (alert.text) box.append(el('div', 'text', alert.text));
+      if (alert.message) box.append(el('div', 'message', alert.message));
     }
-    if (alert.title) box.append(el('div', 'title', alert.title));
-    if (alert.text) box.append(el('div', 'text', alert.text));
-    if (alert.message) box.append(el('div', 'message', alert.message));
     box.dataset.id = alert.id;
     stage.append(box);
     current = box;

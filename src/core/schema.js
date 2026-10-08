@@ -12,6 +12,8 @@ export const ANIMATIONS = ['pop', 'fade', 'slide-down', 'slide-up', 'slide-left'
 export const POSITIONS = ['top-left', 'top-center', 'top-right', 'center', 'bottom-left', 'bottom-center', 'bottom-right'];
 /** Temi della dashboard (scheda Tema). */
 export const UI_THEMES = ['default', 'brutal'];
+/** Stili degli alert in OBS. */
+export const ALERT_STYLES = ['classic', 'brutal'];
 export const SOUND_PRESETS = ['chime', 'coin', 'pop', 'fanfare', 'bell', 'levelup', 'laser'];
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -56,6 +58,7 @@ const STYLE_FIELDS = {
   titleSize: num(12, 200),
   messageSize: num(10, 120),
   animation: oneOf(ANIMATIONS),
+  alertStyle: oneOf(ALERT_STYLES),
   title: text(200),
   text: text(300),
   chatReply: text(450),
@@ -104,6 +107,7 @@ const OVERLAY_FIELDS = {
   background: color,
   backgroundOpacity: num(0, 1),
   animation: oneOf(ANIMATIONS),
+  alertStyle: oneOf(ALERT_STYLES),
 };
 
 function pick(input, fields, base = {}) {

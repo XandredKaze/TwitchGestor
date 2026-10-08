@@ -113,3 +113,17 @@ test('ringraziamento in chat solo se attivo', () => {
   assert.deepEqual(msgs, ['Benvenuti raiders di Luca! Andate a seguirlo su twitch.tv/luca 🚀']);
   on.m.stop();
 });
+
+test('stile del riquadro: generale, per tipo e per variante (Brutalism)', () => {
+  const { m } = setup({
+    overlay: { ...config.overlay, alertStyle: 'brutal' },
+    types: { ...config.types, cheer: { ...config.types.cheer, alertStyle: 'classic', variants: [{ minAmount: 1000, alertStyle: 'brutal' }] } },
+  });
+  const follow = m.buildAlert(fromEventSub('channel.follow', u, 's1'));
+  assert.equal(follow.alertStyle, 'brutal');
+  assert.equal(follow.label, 'Follow');
+  const cheer = (bits, id) => m.buildAlert({ ...fromEventSub('channel.cheer', { ...u, bits, message: '' }, id) });
+  assert.equal(cheer(100, 's2').alertStyle, 'classic');
+  assert.equal(cheer(1000, 's3').alertStyle, 'brutal');
+  assert.equal(new NotificationManager({ config: { ...config, overlay: {} } }).buildAlert(fromEventSub('channel.follow', u, 's4')).alertStyle, 'classic');
+});
