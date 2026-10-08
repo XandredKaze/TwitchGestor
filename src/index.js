@@ -14,6 +14,7 @@ import { TtsService, PiperManager } from './tts.js';
 import { ObsClient } from './obs.js';
 import { createQuickActions } from './quickActions.js';
 import { ChatModerator } from './core/moderation.js';
+import { ChatFeed, toChatMessage, shouldShow, badgeMap } from './core/chatOverlay.js';
 import { ChatCommands, humanDuration } from './core/commands.js';
 import { sanitizeConfig } from './core/schema.js';
 import { createLogger } from './logger.js';
@@ -159,6 +160,24 @@ function testCommand(text, role = 'broadcaster', draft) {
 
 const quickActions = createQuickActions({ helix, getUser: () => auth.user });
 
+// --- Chat per OBS (pagina /chat): messaggi della chat, senza bot, comandi e messaggi moderati ---
+const chatFeed = new ChatFeed({ send: (m) => web?.toChat(m) });
+chatFeed.badges = {};
+async function loadBadges() {
+  if (!auth.user) return;
+  try {
+    const [global, channel] = await Promise.all([
+      helix.request('GET', '/chat/badges/global'),
+      helix.request('GET', `/chat/badges?broadcaster_id=${auth.user.id}`),
+    ]);
+    chatFeed.badges = badgeMap(global, channel);
+    web?.toChat({ type: 'badges', badges: chatFeed.badges });
+  } catch (err) {
+    log.warn(`Badge della chat non disponibili: ${err.message}`);
+  }
+}
+setInterval(loadBadges, 6 * 3600 * 1000).unref();
+
 // --- Parole bannate: il bot (o il tuo account) cancella, dà timeout o banna ---
 function modAccount() {
   if (botAuth.user && botAuth.user.id !== auth.user?.id) return { helix: botHelix, id: botAuth.user.id, name: botAuth.user.login, bot: true };
@@ -215,6 +234,7 @@ const app = {
   quickActions,
   moderator,
   testModeration,
+  chatFeed,
   chatAccount,
   getState() {
     return {
@@ -290,6 +310,7 @@ manager.on('chat', (text) => {
 });
 config.on('change', (c) => {
   web.toOverlays({ type: 'hello', overlay: c.overlay });
+  web.toChat({ type: 'settings', settings: c.chatOverlay });
   app.broadcastState();
 });
 
@@ -325,18 +346,32 @@ function startEventSub() {
   eventsub = new EventSubClient({ helix, userId: auth.user.id, url: env.EVENTSUB_WS_URL });
   eventsub.on('event', (type, payload, messageId) => {
     if (type === 'channel.chat.message') {
-      if (payload.chatter_user_id === botAuth.user?.id) return; // il bot non risponde a sé stesso
+      if (payload.chatter_user_id === botAuth.user?.id) {
+        // il bot non risponde a sé stesso; nella chat di OBS compare solo se non è nascosto
+        const shown = toChatMessage(payload, { botId: botAuth.user.id });
+        if (shouldShow(shown, config.get().chatOverlay)) chatFeed.push(shown);
+        return;
+      }
       const msg = {
         id: payload.message_id,
         text: payload.message?.text,
         user: { id: payload.chatter_user_id, login: payload.chatter_user_login, name: payload.chatter_user_name },
         badges: payload.badges,
       };
-      // prima le parole bannate: un messaggio moderato non esegue comandi
+      // prima le parole bannate: un messaggio moderato non esegue comandi e non compare nella chat di OBS
       moderator.handle(msg)
-        .then((moderated) => (moderated ? null : commands.handle(msg)))
+        .then((moderated) => {
+          if (moderated) return null;
+          const shown = toChatMessage(payload, { botId: botAuth.user?.id });
+          if (shouldShow(shown, config.get().chatOverlay, { commandPrefix: config.get().commands?.prefix })) chatFeed.push(shown);
+          return commands.handle(msg);
+        })
         .catch((err) => log.warn(`Messaggio della chat non gestito: ${err.message}`));
       return;
+    }
+    if (type === 'channel.chat.message_delete') { chatFeed.remove(payload.message_id); return; }
+    if (type === 'channel.chat.clear_user_messages') { chatFeed.removeUser(payload.target_user_id); return; }
+    if (type === 'channel.chat.clear') { chatFeed.clear(); return;
     }
     const n = fromEventSub(type, payload, messageId);
     if (n) manager.ingest(n);
@@ -351,6 +386,7 @@ auth.on('authorized', (user) => {
   startEventSub();
   auth.startPeriodicValidation();
   creditsScheduler.refresh('accesso');
+  loadBadges();
   app.broadcastState();
 });
 botAuth.on('authorized', (user) => {
@@ -399,6 +435,7 @@ web.server.listen(port, host, async () => {
     if (await auth.validate()) {
       startEventSub();
       creditsScheduler.onStart();
+      loadBadges();
     }
   } catch (err) {
     log.error(`Impossibile verificare il token Twitch: ${err.message}`);

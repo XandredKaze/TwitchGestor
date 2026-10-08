@@ -1,0 +1,48 @@
+/* Chat per OBS: sfondo trasparente, i messaggi si impilano dal basso (o dall'alto). */
+html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+* { box-sizing: border-box; }
+.chat {
+  --font: 'Poppins', sans-serif; --size: 22px; --text: #fff; --bg: rgba(0, 0, 0, .45); --name: #b39bd3; --lilac: #b39bd3;
+  position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px;
+  padding: 10px; font: 500 var(--size)/1.35 var(--font); color: var(--text);
+}
+.chat.top { flex-direction: column-reverse; justify-content: flex-end; }
+.chat.right { align-items: flex-end; text-align: right; }
+.chat.shadow .msg { text-shadow: 0 1px 2px rgba(0, 0, 0, .9), 0 0 6px rgba(0, 0, 0, .6); }
+.msg { max-width: 100%; overflow-wrap: anywhere; }
+.msg .badges { display: inline-flex; gap: 3px; margin-right: 5px; vertical-align: -0.12em; }
+.msg .badges img { width: 1.05em; height: 1.05em; }
+.msg .name { font-weight: 700; color: var(--user, var(--name)); }
+.msg .sep { margin-right: .1em; }
+.msg .emote { height: 1.6em; vertical-align: middle; margin: -0.3em 0.05em; }
+.msg.highlight { outline: 2px solid var(--lilac); outline-offset: 2px; }
+
+/* Classico: testo con ombra, sfondo facoltativo */
+.style-classic .msg { padding: 2px 8px; border-radius: 8px; background: var(--bg); }
+
+/* Riquadri: ogni messaggio in un riquadro, il nome sopra */
+.style-boxes .msg { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-radius: 12px; background: var(--bg); border-left: 4px solid var(--user, var(--name)); }
+.style-boxes.right .msg { border-left: 0; border-right: 4px solid var(--user, var(--name)); }
+.style-boxes .msg .sep { display: none; }
+.style-boxes .msg .who { font-size: .8em; }
+
+/* Brutalism: come il tema della dashboard e l'overlay "// CHAT" */
+.style-brutal { --font: 'Share Tech Mono', monospace; gap: 8px; }
+.style-brutal .msg { padding: 4px 10px 6px; border-left: 2px solid #e6e6e6; background: var(--bg); }
+.style-brutal.right .msg { border-left: 0; border-right: 2px solid #e6e6e6; }
+.style-brutal .msg .who { display: flex; align-items: center; gap: 8px; font-size: .78em; letter-spacing: .08em; text-transform: uppercase; }
+.style-brutal.right .msg .who { justify-content: flex-end; }
+.style-brutal .msg .who::before { content: ''; flex: none; width: 8px; height: 8px; background: var(--user, var(--name)); }
+.style-brutal .msg .name { font-weight: 400; color: var(--user, var(--name)); }
+.style-brutal .msg .sep { display: none; }
+.style-brutal .msg .text { display: block; font-family: 'Outfit', sans-serif; font-weight: 500; }
+
+/* entrata e uscita */
+.anim-slide .msg { animation: in-slide .35s ease-out; }
+.anim-slide.right .msg { animation-name: in-slide-r; }
+.anim-fade .msg { animation: in-fade .4s ease-out; }
+.msg.out { transition: opacity .6s, transform .6s; opacity: 0; transform: translateY(-6px); }
+@keyframes in-slide { from { opacity: 0; transform: translateX(-24px); } }
+@keyframes in-slide-r { from { opacity: 0; transform: translateX(24px); } }
+@keyframes in-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .msg { animation: none !important; } }

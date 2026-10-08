@@ -20,6 +20,7 @@ import { ChatCommands, humanDuration } from '../src/core/commands.js';
 import { createQuickActions } from '../src/quickActions.js';
 import { summarizeStream } from '../src/core/streamHealth.js';
 import { ChatModerator } from '../src/core/moderation.js';
+import { ChatFeed, shouldShow } from '../src/core/chatOverlay.js';
 
 const CHANNEL = { id: '0', login: 'canale_demo' };
 const DEMO_SCENES = ['Inizio', 'Gioco', 'Chiacchiere', 'Pausa', 'Fine'];
@@ -103,7 +104,8 @@ class DemoBackend {
     this.defaults = defaults;
     this.config = sanitizeConfig(deepMerge(defaults, storage.get('tg-demo-config', {})), defaults);
     this.manager = new NotificationManager({ config: this.config });
-    this.clients = { overlay: new Set(), dashboard: new Set() };
+    this.clients = { overlay: new Set(), dashboard: new Set(), chat: new Set() };
+    this.chatFeed = new ChatFeed({ send: (m) => this.#send('chat', m) });
     this.media = { sounds: [], images: [], music: [] };
     this.chat = [];
     this.chatSeq = 0;
@@ -169,9 +171,9 @@ class DemoBackend {
       log: this.log,
       warn: (text) => this.#chat(this.bot ? this.bot.login : CHANNEL.login, text, true),
       act: {
-        delete: async (id) => hide((m) => m.id === id),
-        timeout: async (userId) => hide((m) => m.user === userId),
-        ban: async (userId) => hide((m) => m.user === userId),
+        delete: async (id) => { hide((m) => m.id === id); this.chatFeed.remove(id); },
+        timeout: async (userId) => { hide((m) => m.user === userId); this.chatFeed.removeUser(userId); },
+        ban: async (userId) => { hide((m) => m.user === userId); this.chatFeed.removeUser(userId); },
         unban: async () => {},
       },
       onAction: () => this.#send('dashboard', { type: 'moderation', history: this.moderator.history }),
@@ -217,7 +219,7 @@ class DemoBackend {
           case 'PATCH /chat/settings': Object.assign(tw.chat, body); return { data: [tw.chat] };
           case 'GET /moderation/shield_mode': return { data: [{ is_active: tw.shield }] };
           case 'PUT /moderation/shield_mode': tw.shield = body.is_active; return {};
-          case 'DELETE /moderation/chat': this.chat = []; this.broadcastState(); return {};
+          case 'DELETE /moderation/chat': this.chat = []; this.chatFeed.clear(); this.broadcastState(); return {};
           case 'POST /chat/announcements': this.#chat(CHANNEL.login, `📢 ${body.message}`); return {};
           case 'POST /streams/markers': return { data: [{ id: 'm1' }] };
           case 'POST /clips': return { data: [{ id: 'clip', edit_url: 'https://www.twitch.tv/' }] };
@@ -273,11 +275,24 @@ class DemoBackend {
     this.#send('dashboard', { type: 'stream', stream: this.stream });
   }
 
+  #toObsChat(id, user, text, bot = false) {
+    const COLORS = ['#ff69b4', '#1e90ff', '#2fbf4a', '#ff7f50', '#daa520', '#8a2be2'];
+    const msg = {
+      id, userId: user, login: user.toLowerCase(), name: user, color: COLORS[user.length % COLORS.length], badges: [],
+      fragments: [{ type: 'text', text }], text, bot, at: Date.now(),
+    };
+    if (shouldShow(msg, this.config.chatOverlay, { commandPrefix: this.config.commands?.prefix })) this.chatFeed.push(msg);
+  }
+
   /** Un messaggio arrivato nella chat simulata: compare in chat e passa ai comandi. */
   #incoming(login, text, badges = []) {
     const id = this.#chat(login, text);
     const msg = { id, text, user: { id: login, login: login.toLowerCase(), name: login }, badges };
-    this.moderator.handle(msg).then((moderated) => (moderated ? null : this.commands.handle(msg))).catch(() => {});
+    this.moderator.handle(msg).then((moderated) => {
+      if (moderated) return null;
+      this.#toObsChat(id, login, text);
+      return this.commands.handle(msg);
+    }).catch(() => {});
   }
 
   // ---------- Canale in tempo reale (sostituisce il WebSocket) ----------
@@ -285,7 +300,9 @@ class DemoBackend {
   connect(socket) {
     const role = socket.role in this.clients ? socket.role : 'dashboard';
     this.clients[role].add(socket);
-    socket.deliver(role === 'overlay' ? { type: 'hello', overlay: this.config.overlay } : { type: 'state', state: this.getState() });
+    socket.deliver(role === 'overlay' ? { type: 'hello', overlay: this.config.overlay }
+      : role === 'chat' ? { type: 'hello', settings: this.config.chatOverlay, badges: {}, messages: this.chatFeed.messages }
+        : { type: 'state', state: this.getState() });
     this.broadcastState();
   }
 
@@ -312,6 +329,8 @@ class DemoBackend {
   #chat(user, text, fromBot = false) {
     const id = `msg${++this.chatSeq}`;
     this.chat.push({ id, user, text, bot: fromBot, at: Date.now() });
+    // i messaggi del bot vanno nella chat per OBS solo se non sono nascosti; gli altri dopo la moderazione
+    if (fromBot) this.#toObsChat(id, user, text, true);
     if (this.chat.length > 60) this.chat.shift();
     this.broadcastState();
     return id;
@@ -412,6 +431,12 @@ class DemoBackend {
       }
       case 'GET /api/actions/state': return ok(await this.quickActions.state());
       case 'GET /api/actions/categories': return ok(await this.quickActions.run('categories', { query: url.searchParams.get('q') }));
+      case 'PUT /api/chat-overlay': {
+        this.config = sanitizeConfig({ ...this.config, chatOverlay: body?.chatOverlay }, this.defaults);
+        storage.set('tg-demo-config', diffConfig(this.config, this.defaults) ?? {});
+        this.#send('chat', { type: 'settings', settings: this.config.chatOverlay });
+        return ok({ chatOverlay: this.config.chatOverlay });
+      }
       case 'PUT /api/moderation': {
         this.config = sanitizeConfig({ ...this.config, moderation: body?.moderation }, this.defaults);
         storage.set('tg-demo-config', diffConfig(this.config, this.defaults) ?? {});

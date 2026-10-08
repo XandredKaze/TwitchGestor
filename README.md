@@ -21,9 +21,10 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 - **Anteprima della live e chat di Twitch** direttamente nella dashboard (scheda Live).
 - **Cambio scena di OBS** con un clic dalla dashboard (tramite OBS WebSocket, già incluso in OBS).
 - **Stato della diretta**: qualità della connessione, bitrate con grafico, fotogrammi persi, congestione, FPS e CPU, letti da OBS.
-- **Parole bannate** (scheda 💬 Comandi): il bot cancella il messaggio, dà un timeout o banna chi le scrive, anche se scritte con numeri, simboli o lettere ripetute.
+- **Chat per OBS** (scheda 💬 Chat): la chat della live da mettere a schermo, con 3 stili, emote e badge, senza i messaggi del bot (es. Wolfery), dei comandi e quelli moderati.
+- **Parole bannate** (scheda 🤖 Comandi): il bot cancella il messaggio, dà un timeout o banna chi le scrive, anche se scritte con numeri, simboli o lettere ripetute.
 - **Azioni rapide** come nel Gestore stream di Twitch (scheda Live): titolo e categoria, clip, segnalibro, raid, shoutout, annuncio, sondaggi, pronostici, pubblicità e impostazioni della chat.
-- **Comandi della chat** (scheda 💬 Comandi): `!discord`, `!uptime`, `!followage`, `!so`, `!scena`… con risposte, permessi, attese, contatori e messaggi a tempo; risponde il bot (es. Wolfery).
+- **Comandi della chat** (scheda 🤖 Comandi): `!discord`, `!uptime`, `!followage`, `!so`, `!scena`… con risposte, permessi, attese, contatori e messaggi a tempo; risponde il bot (es. Wolfery).
 - **Temi** (scheda 🖌 Tema): aspetto predefinito o **Brutalism** (nero, bianco e lilla) per tutta la dashboard, e stile Classico o Brutalism per l'animazione dei titoli di coda.
 - **Titoli di coda animati** (credit roll) con abbonati, gift e follower scaricati in automatico, musica e pannello di controllo.
 - **Editor degli alert nella dashboard** con anteprima dal vivo: testi, suoni, font, colori, sfondo, immagini e animazioni.
@@ -104,9 +105,20 @@ Nella scheda **📡 Live** della dashboard trovi il player della tua live (senza
 - Con **Nascondi** togli player o chat e risparmi risorse del PC durante la live.
 - La chat si adatta all'altezza della finestra. Per sceglierla tu, **trascina la maniglia** sotto la chat (o usala con le frecce ↑ ↓ della tastiera); doppio clic sulla maniglia per tornare all'altezza automatica. Ogni PC o browser ricorda la sua.
 
+## Chat per OBS
+
+Nella scheda **💬 Chat** prepari la chat della live da mettere a schermo. In OBS aggiungi una **Sorgente browser** con l'indirizzo `http://localhost:3000/chat` (es. 450×700; lo sfondo è trasparente).
+
+- **Stile**: *Classico* (nome colorato e testo), *Riquadri* (ogni messaggio nel suo riquadro, nome sopra) o *Brutalism* (come il tema); entrata dei messaggi, allineamento, messaggi nuovi in alto o in basso.
+- **Testo**: font, dimensione, colori (nomi con il colore scelto su Twitch o tutti uguali), ombra, badge (abbonato, moderatore, VIP…) ed emote come su Twitch.
+- **Sfondo e durata**: colore e opacità dello sfondo dei messaggi, quanti messaggi restano a schermo e dopo quanto spariscono.
+- **Cosa non mostrare**: i messaggi del **bot** (es. Wolfery: ringraziamenti, risposte ai comandi, avvisi) sono nascosti, come i **comandi** (`!…`) e gli account che scegli (Nightbot, StreamElements… già in elenco). I messaggi con **parole bannate** non compaiono, e quelli cancellati da un moderatore o di chi riceve un timeout/ban spariscono anche dallo schermo.
+
+Le modifiche si salvano da sole e arrivano subito in OBS; l'anteprima mostra messaggi di prova.
+
 ## Parole bannate
 
-Nella scheda **💬 Comandi**, riquadro **Parole bannate**, scrivi le parole (o frasi) da non permettere in chat e per ognuna scegli cosa fa il bot:
+Nella scheda **🤖 Comandi**, riquadro **Parole bannate**, scrivi le parole (o frasi) da non permettere in chat e per ognuna scegli cosa fa il bot:
 
 - **cancella il messaggio**, **timeout** (da 10 secondi a 1 settimana) o **ban**;
 - **anche dentro altre parole**: la trova anche attaccata ad altre parole e con spazi tra le lettere (`p a r o l a`);
@@ -130,7 +142,7 @@ Con **⚙ Personalizza** scegli quali azioni mostrare. La prima volta servono nu
 
 ## Comandi della chat
 
-Nella scheda **💬 Comandi** crei i comandi che gli spettatori scrivono in chat con il "!" (es. `!discord`): TwitchGestor legge la chat con il tuo account e risponde con il bot (es. Wolfery), oppure con il tuo account se il bot non è collegato.
+Nella scheda **🤖 Comandi** crei i comandi che gli spettatori scrivono in chat con il "!" (es. `!discord`): TwitchGestor legge la chat con il tuo account e risponde con il bot (es. Wolfery), oppure con il tuo account se il bot non è collegato.
 
 1. **La prima volta** serve un permesso Twitch in più per leggere la chat: in alto a destra clicca **Esci** e poi **Accedi con Twitch** (Wolfery non va ricollegato).
 2. Accendi l'interruttore **Attivi** e premi **Salva**.

@@ -39,6 +39,7 @@ const relative = (text) => text
   .replaceAll('src="/', 'src="')
   .replaceAll('href="/', 'href="')
   .replaceAll('overlay?preview', 'overlay.html?preview')
+  .replaceAll('"chat?preview', '"chat.html?preview')
   .replaceAll('`/credits?pannello', '`credits.html?pannello')
   .replaceAll('`/credits?anteprima', '`credits.html?anteprima');
 

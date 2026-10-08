@@ -622,7 +622,9 @@
   function renderForm() {
     const scroll = $('form').parentElement.scrollTop;
     try {
-      $('form').replaceChildren(...(selected === '__general' ? renderGeneralForm() : renderTypeForm(selected)).filter(Boolean));
+      // intestazione sopra, i riquadri in un contenitore (sugli schermi larghi vanno su due colonne)
+      const [head, ...parts] = (selected === '__general' ? renderGeneralForm() : renderTypeForm(selected)).filter(Boolean);
+      $('form').replaceChildren(head, el('div', { className: 'form-fields' }, ...parts));
     } catch (err) {
       $('form').replaceChildren(el('div', { className: 'notice' }, el('b', {}, '⚠️ Questa sezione non si è caricata. '), 'Il dettaglio dell\'errore è nel riquadro rosso in basso: copialo e mandalo a chi ti aiuta.'));
       window.TG.showError?.(`Editor (${selected}): ${err.message}\n${err.stack ?? ''}`);

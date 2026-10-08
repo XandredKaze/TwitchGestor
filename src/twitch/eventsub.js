@@ -18,6 +18,10 @@ export function subscriptionsFor(userId) {
     { type: 'channel.charity_campaign.donate', version: '1', condition: me },
     // messaggi della chat, letti con il tuo account: servono per i comandi (!discord, !uptime...)
     { type: 'channel.chat.message', version: '1', condition: { ...me, user_id: userId } },
+    // messaggi cancellati, timeout/ban e chat svuotata: per toglierli anche dalla chat in OBS
+    { type: 'channel.chat.message_delete', version: '1', condition: { ...me, user_id: userId } },
+    { type: 'channel.chat.clear_user_messages', version: '1', condition: { ...me, user_id: userId } },
+    { type: 'channel.chat.clear', version: '1', condition: { ...me, user_id: userId } },
   ];
 }
 

@@ -204,6 +204,7 @@ export function createServer(app) {
       if (route === 'GET /overlay') return serveStatic(res, '/overlay.html');
       if (route === 'GET /dashboard') return serveStatic(res, '/dashboard.html');
       if (route === 'GET /credits') return serveStatic(res, '/credits.html');
+      if (route === 'GET /chat') return serveStatic(res, '/chat.html');
       // Titoli di coda: la sorgente OBS legge lo stato senza token (contiene solo nomi e impostazioni).
       if (route === 'GET /api/credits/state' && app.credits) {
         const rev = Number(url.searchParams.get('rev'));
@@ -327,6 +328,12 @@ export function createServer(app) {
           return send(res, 200, result);
         }
         // --- Parole bannate ---
+        if (route === 'PUT /api/chat-overlay') {
+          // Solo l'aspetto della chat per OBS: non tocca le altre impostazioni.
+          const body = await readBody(req, 1_000_000);
+          const config = app.config.save({ ...app.config.get(), chatOverlay: body.chatOverlay });
+          return send(res, 200, { chatOverlay: config.chatOverlay });
+        }
         if (route === 'PUT /api/moderation') {
           const body = await readBody(req, 1_000_000);
           const config = app.config.save({ ...app.config.get(), moderation: body.moderation });
@@ -402,7 +409,7 @@ export function createServer(app) {
 
   // --- WebSocket ---
   const wss = new WebSocketServer({ noServer: true });
-  const clients = { overlay: new Set(), dashboard: new Set() };
+  const clients = { overlay: new Set(), dashboard: new Set(), chat: new Set() };
 
   server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, 'http://localhost');
@@ -417,9 +424,12 @@ export function createServer(app) {
         clients[role].delete(ws);
         app.broadcastState();
       });
-      ws.send(JSON.stringify(role === 'overlay'
-        ? { type: 'hello', overlay: app.config.get().overlay }
-        : { type: 'state', state: app.getState() }));
+      const hello = {
+        overlay: () => ({ type: 'hello', overlay: app.config.get().overlay }),
+        chat: () => ({ type: 'hello', settings: app.config.get().chatOverlay, badges: app.chatFeed?.badges ?? {}, messages: app.chatFeed?.messages ?? [] }),
+        dashboard: () => ({ type: 'state', state: app.getState() }),
+      }[role];
+      ws.send(JSON.stringify(hello()));
       app.broadcastState();
     });
   });
@@ -440,5 +450,6 @@ export function createServer(app) {
     clients,
     toOverlays: (m) => broadcast('overlay', m),
     toDashboards: (m) => broadcast('dashboard', m),
+    toChat: (m) => broadcast('chat', m),
   };
 }

@@ -6,6 +6,7 @@
 
 import { PERMISSIONS, ACTIONS } from './commands.js';
 import { MOD_ACTIONS, normalizeText } from './moderation.js';
+import { CHAT_STYLES, CHAT_ANIMATIONS } from './chatOverlay.js';
 
 export const ANIMATIONS = ['pop', 'fade', 'slide-down', 'slide-up', 'slide-left', 'slide-right', 'zoom', 'bounce', 'flip', 'shake'];
 export const POSITIONS = ['top-left', 'top-center', 'top-right', 'center', 'bottom-left', 'bottom-center', 'bottom-right'];
@@ -164,6 +165,33 @@ function sanitizeCommands(input, base) {
   return out;
 }
 
+const CHAT_OVERLAY_FIELDS = {
+  style: oneOf(CHAT_STYLES),
+  font,
+  fontSize: num(10, 80),
+  textColor: color,
+  nameColorMode: oneOf(['twitch', 'fixed']),
+  nameColor: color,
+  background: color,
+  backgroundOpacity: num(0, 1),
+  showBadges: bool,
+  textShadow: bool,
+  maxMessages: num(1, 100),
+  lifetime: num(0, 3600),
+  newestOnTop: bool,
+  align: oneOf(['left', 'right']),
+  animation: oneOf(CHAT_ANIMATIONS),
+  hideBot: bool,
+  hideCommands: bool,
+};
+function sanitizeChatOverlay(input, base) {
+  const out = pick(input, CHAT_OVERLAY_FIELDS, base);
+  if (isObject(input) && Array.isArray(input.hiddenUsers)) {
+    out.hiddenUsers = [...new Set(input.hiddenUsers.map((u) => String(u ?? '').trim().replace(/^@/, '').toLowerCase()).filter((u) => /^\w{2,25}$/.test(u)))].slice(0, 100);
+  }
+  return out;
+}
+
 /** Parole bannate: al massimo 500, senza doppioni (anche scritte in modo diverso). */
 function sanitizeModeration(input, base) {
   const out = { ...base };
@@ -198,6 +226,7 @@ export function sanitizeConfig(input, defaults) {
   if (out.ui && isObject(input.ui)) out.ui.theme = oneOf(UI_THEMES)(input.ui.theme) ?? out.ui.theme;
   if (out.commands) out.commands = sanitizeCommands(input.commands, out.commands);
   if (out.moderation) out.moderation = sanitizeModeration(input.moderation, out.moderation);
+  if (out.chatOverlay) out.chatOverlay = sanitizeChatOverlay(input.chatOverlay, out.chatOverlay);
   if (out.tts) {
     out.tts = pick(input.tts, TTS_FIELDS, out.tts);
     if (Array.isArray(input.tts?.bannedWords)) {

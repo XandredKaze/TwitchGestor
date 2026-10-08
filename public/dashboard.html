@@ -17,7 +17,8 @@
       <button class="tab active" data-tab="live" role="tab">📡 Live</button>
       <button class="tab" data-tab="editor" role="tab">🎨 Personalizza alert</button>
       <button class="tab" data-tab="credits" role="tab">🎬 Titoli di coda</button>
-      <button class="tab" data-tab="commands" role="tab">💬 Comandi</button>
+      <button class="tab" data-tab="chat" role="tab">💬 Chat</button>
+      <button class="tab" data-tab="commands" role="tab">🤖 Comandi</button>
       <button class="tab" data-tab="theme" role="tab">🖌 Tema</button>
     </nav>
     <div id="statuses" class="statuses"></div>
@@ -144,6 +145,9 @@
   </main>
 
   <main id="tab-editor" class="editor" hidden>
+    <div class="page-head">
+      <div><h2>🎨 Personalizza alert</h2><p>Testi, suoni, voce e aspetto di ogni alert. L'anteprima si aggiorna mentre modifichi.</p></div>
+    </div>
     <aside class="panel editor-nav">
       <h2>Alert</h2>
       <div id="type-list" class="type-list"></div>
@@ -181,16 +185,38 @@
   </main>
 
   <main id="tab-credits" class="credits-tab" hidden>
-    <div class="credits-info">
-      <span>In OBS aggiungi i titoli di coda come <b>Sorgente browser</b> (1920×1080, "Controlla l'audio tramite OBS"):</span>
-      <code id="credits-url"></code>
-      <button id="btn-copy-credits" class="small-btn">Copia</button>
+    <div class="page-head">
+      <div><h2>🎬 Titoli di coda</h2><p>In OBS: <b>Sorgente browser</b> 1920×1080 con "Controlla l'audio tramite OBS".</p></div>
+      <div class="obs-url"><code id="credits-url"></code><button id="btn-copy-credits" class="small-btn">Copia</button></div>
     </div>
     <iframe id="credits-frame" title="Pannello dei titoli di coda"></iframe>
   </main>
 
+  <main id="tab-chat" class="chat-tab" hidden>
+    <div class="page-head">
+      <div><h2>💬 Chat per OBS</h2><p>La chat della live da mettere a schermo. In OBS: <b>Sorgente browser</b> (es. 450×700). I messaggi del bot e quelli moderati non compaiono.</p></div>
+      <div class="obs-url"><code id="chat-url"></code><button id="btn-copy-chat" class="small-btn">Copia</button></div>
+    </div>
+    <div class="chat-layout">
+      <div id="chat-settings" class="chat-settings"></div>
+      <aside class="panel chat-preview-panel">
+        <h2>Anteprima</h2>
+        <div class="chat-preview-frame"><iframe id="chat-preview" src="/chat?preview" title="Anteprima della chat per OBS" tabindex="-1"></iframe></div>
+        <p class="muted small">Con messaggi di prova. Le modifiche si salvano da sole e arrivano subito in OBS.</p>
+      </aside>
+    </div>
+  </main>
+
   <main id="tab-commands" class="commands-tab" hidden>
-    <section class="panel cmd-head-panel">
+    <div class="page-head">
+      <div><h2>🤖 Comandi e moderazione</h2><p>Il bot risponde ai comandi, scrive i messaggi a tempo e modera le parole bannate.</p></div>
+      <nav class="subtabs" id="cmd-subtabs" role="tablist">
+        <button type="button" data-view="commands" class="active">Comandi</button>
+        <button type="button" data-view="timers">Messaggi a tempo</button>
+        <button type="button" data-view="moderation">Parole bannate</button>
+      </nav>
+    </div>
+    <section class="panel cmd-head-panel" data-view="commands">
       <div class="panel-head">
         <h2>Comandi della chat</h2>
         <label class="switch"><input type="checkbox" id="cmd-enabled"> Attivi</label>
@@ -204,7 +230,7 @@
       </div>
     </section>
 
-    <section class="panel cmd-list-panel">
+    <section class="panel cmd-list-panel" data-view="commands">
       <div class="panel-head">
         <h2>Comandi</h2>
         <button id="cmd-add" class="small-btn primary">＋ Nuovo comando</button>
@@ -215,7 +241,7 @@
       </div>
     </section>
 
-    <section class="panel cmd-test-panel">
+    <section class="panel cmd-test-panel" data-view="commands">
       <h2>Prova un comando</h2>
       <p class="muted small">Vedi cosa risponderebbe il bot, senza scrivere in chat e senza cambiare nulla (anche con le modifiche non salvate).</p>
       <form id="cmd-test" class="cmd-test">
@@ -232,7 +258,7 @@
       <div id="cmd-test-out" class="cmd-test-out muted small">La risposta comparirà qui.</div>
     </section>
 
-    <section class="panel cmd-timers-panel">
+    <section class="panel cmd-timers-panel" data-view="timers" hidden>
       <div class="panel-head">
         <h2>Messaggi a tempo</h2>
         <button id="timer-add" class="small-btn">＋ Nuovo messaggio</button>
@@ -241,7 +267,7 @@
       <div id="timer-list" class="timer-list"></div>
     </section>
 
-    <section class="panel mod-panel" id="mod-panel">
+    <section class="panel mod-panel" id="mod-panel" data-view="moderation" hidden>
       <div class="panel-head">
         <h2>Parole bannate</h2>
         <label class="switch"><input type="checkbox" id="mod-enabled"> Attiva</label>
@@ -296,23 +322,28 @@
   </main>
 
   <main id="tab-theme" class="theme-tab" hidden>
-    <section class="panel">
-      <h2>Aspetto di TwitchGestor</h2>
-      <p class="muted small">Cambia l'aspetto di dashboard, editor degli alert e pannello dei titoli di coda (anche nel dock di OBS). Gli alert in live non cambiano: quelli si personalizzano in "Personalizza alert".</p>
-      <div class="theme-cards" id="ui-themes"></div>
-    </section>
-    <section class="panel">
-      <h2>Animazione dei titoli di coda</h2>
-      <p class="muted small">Lo stile dei titoli di coda che vedono gli spettatori (sorgente browser in OBS).</p>
-      <div class="theme-cards" id="roll-themes"></div>
-      <div class="theme-roll-preview">
-        <div class="theme-roll-head">
-          <h3>Anteprima</h3>
-          <span class="muted small">Usa i nomi veri; se non ce ne sono, aggiungi "Nomi di prova" nella scheda Titoli di coda.</span>
-        </div>
-        <div class="theme-roll-frame"><iframe id="theme-roll-frame" title="Anteprima dei titoli di coda" tabindex="-1"></iframe></div>
+    <div class="page-head">
+      <div><h2>🖌 Tema</h2><p>L'aspetto di TwitchGestor e lo stile dell'animazione dei titoli di coda.</p></div>
+    </div>
+    <div class="theme-layout">
+      <div class="theme-col">
+        <section class="panel">
+          <h2>Aspetto di TwitchGestor</h2>
+          <p class="muted small">Dashboard, editor e pannello dei titoli di coda (anche nel dock di OBS). Gli alert in live si personalizzano in "Personalizza alert".</p>
+          <div class="theme-cards" id="ui-themes"></div>
+        </section>
+        <section class="panel">
+          <h2>Animazione dei titoli di coda</h2>
+          <p class="muted small">Lo stile dei titoli di coda che vedono gli spettatori.</p>
+          <div class="theme-cards" id="roll-themes"></div>
+        </section>
       </div>
-    </section>
+      <aside class="panel theme-roll-preview">
+        <h2>Anteprima dei titoli di coda</h2>
+        <div class="theme-roll-frame"><iframe id="theme-roll-frame" title="Anteprima dei titoli di coda" tabindex="-1"></iframe></div>
+        <p class="muted small">Usa i nomi veri; se non ce ne sono, aggiungi "Nomi di prova" nella scheda Titoli di coda.</p>
+      </aside>
+    </div>
   </main>
 
   <script src="/common.js"></script>
@@ -324,5 +355,6 @@
   <script src="/actions.js"></script>
   <script src="/stream.js"></script>
   <script src="/moderation.js"></script>
+  <script src="/chatoverlay.js"></script>
 </body>
 </html>

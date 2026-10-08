@@ -591,6 +591,7 @@
     if (name === 'editor') window.dispatchEvent(new Event('editor:open'));
     if (name === 'theme') openThemeTab();
     if (name === 'commands') window.dispatchEvent(new Event('commands:open'));
+    if (name === 'chat') window.dispatchEvent(new Event('chat:open'));
     if (name === 'credits' && !$('credits-frame').src) {
       // Il pannello dei titoli di coda è una pagina a sé: si carica solo quando apri la scheda.
       $('credits-frame').src = `/credits?pannello${token ? `&token=${encodeURIComponent(token)}` : ''}`;
@@ -598,6 +599,24 @@
     try { sessionStorage.setItem('tab', name); } catch { /* ignora */ }
   }
   for (const t of document.querySelectorAll('.tab')) t.onclick = () => showTab(t.dataset.tab);
+  // indirizzo della chat per OBS, con il pulsante Copia
+  const chatUrl = `${location.protocol}//${location.host}/chat`;
+  $('chat-url').textContent = chatUrl;
+  $('btn-copy-chat').onclick = async () => {
+    await navigator.clipboard.writeText(chatUrl);
+    $('btn-copy-chat').textContent = 'Copiato!';
+    setTimeout(() => { $('btn-copy-chat').textContent = 'Copia'; }, 1500);
+  };
+
+  // scheda Comandi: sottoschede Comandi / Messaggi a tempo / Parole bannate (ricordata in questo browser)
+  function showCmdView(view) {
+    for (const b of document.querySelectorAll('#cmd-subtabs button')) b.classList.toggle('active', b.dataset.view === view);
+    for (const sec of document.querySelectorAll('#tab-commands [data-view]:not(button)')) sec.hidden = sec.dataset.view !== view;
+    try { localStorage.setItem('cmdView', view); } catch { /* ignora */ }
+  }
+  for (const b of document.querySelectorAll('#cmd-subtabs button')) b.onclick = () => showCmdView(b.dataset.view);
+  try { showCmdView(localStorage.getItem('cmdView') || 'commands'); } catch { showCmdView('commands'); }
+
   const creditsUrl = `${location.protocol}//${location.host}/credits`;
   $('credits-url').textContent = creditsUrl;
   $('btn-copy-credits').onclick = async () => {
@@ -608,7 +627,7 @@
   try {
     const saved = sessionStorage.getItem('tab');
     if (location.hash === '#chat') showTab('editor');
-    else if (['editor', 'credits', 'theme', 'commands'].includes(saved)) showTab(saved);
+    else if (['editor', 'credits', 'chat', 'theme', 'commands'].includes(saved)) showTab(saved);
   } catch { /* ignora */ }
 
   // ---------- Registro ----------

@@ -973,3 +973,96 @@ html:root[data-ui="brutal"] {
   [data-ui="brutal"] .tab { flex: 1 1 30%; min-width: 0; padding: 6px 4px; font-size: 12px; letter-spacing: 0.02em; overflow-wrap: anywhere; }
 }
 [data-ui="brutal"] .commands-tab .chips .chip { text-transform: none; }
+
+/* =====================================================================
+   SEZIONI (tutte tranne Live): intestazione comune, sottoschede e spazi compatti
+   ===================================================================== */
+.editor, .credits-tab, .chat-tab, .commands-tab, .theme-tab { max-width: 1480px; margin: 0 auto; padding: 12px 16px 80px; gap: 12px; }
+.credits-tab { padding-bottom: 16px; }
+.page-head { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 2px 2px 4px; border-bottom: 1px solid var(--border); margin-bottom: 2px; }
+.page-head h2 { margin: 0; font-size: 18px; }
+.page-head p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+.obs-url { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.obs-url code { padding: 5px 9px; border-radius: 8px; background: var(--inset); border: 1px solid var(--border); font-size: 13px; overflow-wrap: anywhere; }
+.subtabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 12px; background: var(--inset); border: 1px solid var(--border); }
+.subtabs button { border: 0; background: transparent; padding: 6px 14px; border-radius: 9px; font-weight: 600; color: var(--muted); box-shadow: none; }
+.subtabs button:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.subtabs button.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), inset 0 -2px 0 var(--accent); }
+[data-view][hidden] { display: none !important; }
+
+/* riquadri più compatti */
+.editor .panel, .chat-tab .panel, .commands-tab .panel, .theme-tab .panel { padding: 14px; }
+.editor .panel-head, .chat-tab .panel-head, .commands-tab .panel-head, .theme-tab .panel-head { margin-bottom: 10px; }
+.editor h2, .chat-tab h2, .commands-tab h2, .theme-tab h2 { margin-bottom: 10px; }
+
+/* Personalizza alert: elenco, modulo (in due colonne sugli schermi larghi) e anteprima */
+.editor { grid-template-columns: 210px minmax(0, 1fr) minmax(300px, 400px); }
+.editor-nav, .editor-preview { top: calc(var(--header-h, 0px) + 12px); }
+.editor .section { margin: 10px 0 0; padding: 10px 12px 12px; }
+.editor .field { margin-top: 8px; }
+@media (min-width: 1500px) {
+  #form > .form-fields { columns: 2; column-gap: 12px; }
+  #form > .form-fields > .section { break-inside: avoid; display: block; width: 100%; margin: 0 0 10px; }
+}
+@media (max-width: 1200px) { .editor { grid-template-columns: 200px minmax(0, 1fr); } }
+@media (max-width: 760px) { .editor { grid-template-columns: minmax(0, 1fr); } }
+
+/* Titoli di coda: il pannello occupa tutto lo spazio sotto l'intestazione */
+.credits-tab .page-head { margin-bottom: 0; }
+
+/* Chat per OBS: impostazioni a riquadri e anteprima accanto */
+.chat-tab[hidden] { display: none; }
+.chat-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 440px); gap: 12px; align-items: start; }
+.chat-settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 12px; align-items: start; }
+.chat-preview-panel { position: sticky; top: calc(var(--header-h, 0px) + 12px); }
+.chat-preview-frame { height: min(620px, calc(100vh - var(--header-h, 100px) - 150px)); min-height: 360px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: repeating-conic-gradient(#3a3a44 0% 25%, #2a2a32 0% 50%) 50% / 24px 24px; }
+.chat-preview-frame iframe { width: 100%; height: 100%; border: 0; color-scheme: normal; }
+.chat-styles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.chat-style { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 10px; text-align: left; border-radius: 10px; background: var(--inset); }
+.chat-style span { font-size: 12px; color: var(--muted); font-weight: 400; }
+.chat-style.active { border-color: var(--accent); box-shadow: var(--glow); }
+.chat-tab input[type=text], .chat-tab input[type=number], .chat-tab select { min-width: 0; width: 100%; font: inherit; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--inset); color: var(--text); }
+.chat-tab input[type=color] { width: 64px; height: 34px; padding: 2px; border-radius: 8px; border: 1px solid var(--border); background: var(--inset); cursor: pointer; }
+.chat-tab .check { margin-top: 8px; }
+.chat-tab .field { margin-top: 8px; }
+.chat-add-user { display: flex; gap: 6px; }
+.chat-add-user button { flex: none; white-space: nowrap; }
+.chat-card .chips { margin-top: 8px; }
+@media (max-width: 1000px) { .chat-layout { grid-template-columns: minmax(0, 1fr); } .chat-preview-panel { position: static; } }
+
+/* Comandi: impostazioni e prova affiancate, elenco sotto */
+.commands-tab { grid-template-areas: "head head" "set test" "list list"; }
+.commands-tab .page-head { grid-area: head; }
+.cmd-head-panel { grid-area: set; grid-column: auto; }
+.cmd-test-panel { grid-area: test; }
+.cmd-list-panel { grid-area: list; grid-column: auto; }
+.cmd-timers-panel, .mod-panel { grid-column: 1 / -1; grid-row: 2; }
+.cmd-test-panel p { margin: 0; }
+@media (max-width: 900px) { .commands-tab { grid-template-areas: "head" "set" "test" "list"; } .cmd-timers-panel, .mod-panel { grid-row: auto; } }
+
+/* Tema: scelte a sinistra, anteprima dei titoli di coda a destra */
+.theme-tab { max-width: 1480px; }
+.theme-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 12px; align-items: start; }
+.theme-col { display: grid; gap: 12px; }
+.theme-cards { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 10px; }
+.theme-mock { height: 96px; }
+.theme-roll-preview { margin-top: 0; position: sticky; top: calc(var(--header-h, 0px) + 12px); }
+.theme-roll-preview p { margin: 8px 0 0; }
+@media (max-width: 1000px) { .theme-layout { grid-template-columns: minmax(0, 1fr); } .theme-roll-preview { position: static; } }
+
+/* tema Brutalism per le parti nuove */
+[data-ui="brutal"] .page-head { border-bottom: 2px solid var(--line); }
+[data-ui="brutal"] .page-head h2 { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: 20px; letter-spacing: 0.01em; }
+[data-ui="brutal"] .page-head p { font-family: 'Outfit', sans-serif; }
+[data-ui="brutal"] .obs-url code { background: #0f0f0f; border: 1.5px solid #8a8a8a; font-family: var(--mono); }
+[data-ui="brutal"] .subtabs { background: transparent; border: 0; padding: 0; gap: 4px; }
+[data-ui="brutal"] .subtabs button { font-family: var(--mono); font-weight: 400; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border: 1.5px solid transparent; }
+[data-ui="brutal"] .subtabs button:hover { background: transparent; color: var(--text); border-color: #6a6a6a; }
+[data-ui="brutal"] .subtabs button.active { color: var(--lilac); border-color: var(--line); background: #0f0f0f; box-shadow: none; }
+[data-ui="brutal"] .subtabs button.active::before { content: '// '; color: var(--text); }
+[data-ui="brutal"] .chat-style { background: transparent; border: 1.5px solid #6a6a6a; text-transform: none; font-family: 'Outfit', sans-serif; }
+[data-ui="brutal"] .chat-style b { font-family: var(--mono); font-weight: 400; text-transform: uppercase; }
+[data-ui="brutal"] .chat-style:hover { background: #ffffff0d; color: var(--text); border-color: var(--line); }
+[data-ui="brutal"] .chat-style.active { border-color: var(--line); background: #0f0f0f; box-shadow: none; }
+[data-ui="brutal"] .chat-style.active b { color: var(--lilac); }
+[data-ui="brutal"] .chat-preview-frame { border: 2px solid var(--line); }

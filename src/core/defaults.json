@@ -316,5 +316,33 @@
     "warning": "{user}, quella parola qui non è permessa ({action}).",
     "exemptVip": false,
     "exemptSubs": false
+  },
+  "chatOverlay": {
+    "style": "classic",
+    "font": "Poppins",
+    "fontSize": 22,
+    "textColor": "#ffffff",
+    "nameColorMode": "twitch",
+    "nameColor": "#b39bd3",
+    "background": "#000000",
+    "backgroundOpacity": 0.45,
+    "showBadges": true,
+    "textShadow": true,
+    "maxMessages": 15,
+    "lifetime": 0,
+    "newestOnTop": false,
+    "align": "left",
+    "animation": "slide",
+    "hideBot": true,
+    "hideCommands": true,
+    "hiddenUsers": [
+      "nightbot",
+      "streamelements",
+      "streamlabs",
+      "moobot",
+      "fossabot",
+      "sery_bot",
+      "soundalerts"
+    ]
   }
 }
