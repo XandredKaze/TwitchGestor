@@ -6,11 +6,11 @@
   const ANIMATION_LABELS = {
     pop: 'Pop (dall\'alto)', fade: 'Dissolvenza', 'slide-down': 'Scende dall\'alto', 'slide-up': 'Sale dal basso',
     'slide-left': 'Entra da destra', 'slide-right': 'Entra da sinistra', zoom: 'Zoom', bounce: 'Rimbalzo',
-    flip: 'Ribaltamento', shake: 'Scossa',
+    flip: 'Ribaltamento', shake: 'Scossa', window: 'Finestra (si apre dall\'alto)',
   };
   const ALERT_STYLE_LABELS = { classic: 'Classico', brutal: 'Brutalism (come il tema)' };
   const styleOptions = () => Object.entries(ALERT_STYLE_LABELS).map(([value, label]) => ({ value, label }));
-  const BRUTAL_HINT = 'Brutalism usa i colori (nero, bianco, lilla) e i font del tema: colori e font qui sotto non si applicano. Dimensioni, animazione e posizione sì.';
+  const BRUTAL_HINT = 'Brutalism usa i colori (nero, bianco, lilla) e i font del tema: colori e font qui sotto non si applicano. Dimensioni, animazione e posizione sì. Con l\'animazione "Pop" la finestra si apre dall\'alto.';
   const POSITION_LABELS = {
     'top-left': 'In alto a sinistra', 'top-center': 'In alto al centro', 'top-right': 'In alto a destra', center: 'Al centro',
     'bottom-left': 'In basso a sinistra', 'bottom-center': 'In basso al centro', 'bottom-right': 'In basso a destra',

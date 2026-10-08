@@ -8,7 +8,7 @@ import { PERMISSIONS, ACTIONS } from './commands.js';
 import { MOD_ACTIONS, normalizeText } from './moderation.js';
 import { CHAT_STYLES, CHAT_ANIMATIONS } from './chatOverlay.js';
 
-export const ANIMATIONS = ['pop', 'fade', 'slide-down', 'slide-up', 'slide-left', 'slide-right', 'zoom', 'bounce', 'flip', 'shake'];
+export const ANIMATIONS = ['pop', 'fade', 'slide-down', 'slide-up', 'slide-left', 'slide-right', 'zoom', 'bounce', 'flip', 'shake', 'window'];
 export const POSITIONS = ['top-left', 'top-center', 'top-right', 'center', 'bottom-left', 'bottom-center', 'bottom-right'];
 /** Temi della dashboard (scheda Tema). */
 export const UI_THEMES = ['default', 'brutal'];

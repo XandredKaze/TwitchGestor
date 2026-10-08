@@ -90,7 +90,9 @@
 
     const brutal = alert.alertStyle === 'brutal';
     if (!brutal) window.loadFont(alert.font);
-    const box = el('div', `alert anim-${alert.animation || 'pop'}`);
+    // con Brutalism "Pop" (il predefinito) diventa la finestra che si apre dall'alto
+    const animation = brutal && (alert.animation || 'pop') === 'pop' ? 'window' : alert.animation || 'pop';
+    const box = el('div', `alert anim-${animation}`);
     const opacity = alert.backgroundOpacity ?? 0.88;
     box.style.setProperty('--accent', alert.color);
     box.style.setProperty('--text', alert.textColor || '#fff');
@@ -110,6 +112,9 @@
     }
     box.dataset.id = alert.id;
     stage.append(box);
+    // l'animazione "Finestra" parte dalla barra in alto: serve la sua altezza
+    const bar = box.querySelector('.b-bar');
+    if (bar) box.style.setProperty('--bar-h', `${bar.offsetHeight + 2}px`);
     current = box;
     if (!silent) {
       window.playSound(alert.sound, alert.volume);

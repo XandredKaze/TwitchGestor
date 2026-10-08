@@ -172,10 +172,52 @@ html, body {
   max-width: 520px;
 }
 .style-brutal .message::before, .style-brutal .message::after { content: none; }
-/* entrata a scatti, come una finestra che si apre */
-.style-brutal.anim-pop { --in: brutal-in 0.45s steps(5, end); }
-@keyframes brutal-in {
-  0% { opacity: 0; clip-path: inset(0 100% 100% 0); }
-  1% { opacity: 1; }
-  100% { opacity: 1; clip-path: inset(0 0 0 0); }
+/* ---------- Animazione "Finestra": si apre dalla parte alta ----------
+   1) compare la barra "// FOLLOW" allargandosi dal centro, 2) la finestra si srotola verso il basso
+   seguita da una riga lilla, 3) il contenuto entra uno alla volta. All'uscita si riavvolge nella barra. */
+.anim-window { --bar-h: 8px; --in: window-in 0.95s; --out: window-out 0.6s; }
+@keyframes window-in {
+  0% { opacity: 0; clip-path: inset(0 50% calc(100% - var(--bar-h)) 50%); animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1); }
+  4% { opacity: 1; }
+  32% { clip-path: inset(0 0 calc(100% - var(--bar-h)) 0); animation-timing-function: cubic-bezier(0.6, 0, 0.2, 1); }
+  92% { clip-path: inset(0 0 0 0); }
+  100% { opacity: 1; clip-path: inset(-60px); } /* margine: alla fine non taglia l'ombra */
 }
+@keyframes window-out {
+  0% { clip-path: inset(-60px); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
+  60% { opacity: 1; clip-path: inset(0 0 calc(100% - var(--bar-h)) 0); animation-timing-function: ease-in; }
+  100% { opacity: 0; clip-path: inset(0 50% calc(100% - var(--bar-h)) 50%); }
+}
+/* riga lilla che scende insieme al bordo inferiore mentre la finestra si srotola */
+.anim-window::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--lilac, var(--accent));
+  box-shadow: 0 0 12px var(--lilac, var(--accent));
+  pointer-events: none;
+  opacity: 0;
+  animation: window-scan 0.95s both;
+}
+.anim-window.leaving::after { animation: none; }
+@keyframes window-scan {
+  0%, 31% { top: calc(var(--bar-h) - 3px); opacity: 0; }
+  32% { top: calc(var(--bar-h) - 3px); opacity: 1; animation-timing-function: cubic-bezier(0.6, 0, 0.2, 1); }
+  92% { top: calc(100% - 3px); opacity: 1; }
+  100% { top: calc(100% - 3px); opacity: 0; }
+}
+/* il contenuto entra dall'alto, un elemento dopo l'altro */
+.anim-window .b-name { animation: window-type 0.35s 0.12s steps(10, end) both; }
+.anim-window .b-tools { animation: fade-in 0.2s 0.3s both; }
+.anim-window .b-media, .anim-window > img, .anim-window > video,
+.anim-window .title, .anim-window .text, .anim-window .b-msg, .anim-window > .message { animation: window-drop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+.anim-window .b-media, .anim-window > img, .anim-window > video { animation-delay: 0.5s; }
+.anim-window .title { animation-delay: 0.58s; }
+.anim-window .text { animation-delay: 0.68s; }
+.anim-window .b-msg, .anim-window > .message { animation-delay: 0.78s; }
+.anim-window .b-rule::after { transform-origin: left; animation: window-line 0.4s 0.9s ease-out both; }
+@keyframes window-type { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes window-drop { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
+@keyframes window-line { from { transform: scaleX(0); } to { transform: none; } }
