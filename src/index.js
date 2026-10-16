@@ -16,6 +16,7 @@ import { createQuickActions } from './quickActions.js';
 import { ChatModerator } from './core/moderation.js';
 import { ChatFeed, toChatMessage, shouldShow, badgeMap } from './core/chatOverlay.js';
 import { ChatCommands, humanDuration } from './core/commands.js';
+import { AutoShoutout } from './core/shoutout.js';
 import { sanitizeConfig } from './core/schema.js';
 import { createLogger } from './logger.js';
 
@@ -211,6 +212,54 @@ const moderator = new ChatModerator({
   },
 });
 
+// --- Shoutout automatici: le persone scelte, al primo messaggio in chat della live ---
+/** Chi fa lo shoutout ufficiale: il bot, se collegato e con il permesso; altrimenti il tuo account. */
+function shoutoutAccount() {
+  if (botAuth.user && botAuth.user.id !== auth.user?.id && !botAuth.missingScopes.includes('moderator:manage:shoutouts')) {
+    return { helix: botHelix, id: botAuth.user.id, name: botAuth.user.login, bot: true };
+  }
+  return { helix, id: auth.user?.id, name: auth.user?.login, bot: false };
+}
+const SHOUTOUT_FILE = path.join(DATA_DIR, 'shoutouts.json');
+let liveCheck = { at: 0, value: null };
+const autoShoutout = new AutoShoutout({
+  getConfig: () => config.get().shoutouts,
+  log,
+  send: sendChat,
+  async shoutout(channelId) {
+    if (!auth.user) throw new Error('account Twitch non collegato');
+    const a = shoutoutAccount();
+    try {
+      await a.helix.request('POST', `/chat/shoutouts?from_broadcaster_id=${auth.user.id}&to_broadcaster_id=${encodeURIComponent(channelId)}&moderator_id=${a.id}`);
+      log.info(`Shoutout ufficiale fatto da ${a.name}`);
+    } catch (err) {
+      if (err.status === 403 || /moderator/i.test(err.message)) throw Object.assign(new Error(`${a.name} non è moderatore del canale: scrivi /mod ${a.name} nella tua chat`), { status: err.status });
+      throw err;
+    }
+  },
+  channelInfo: (login) => cached(`so:${login}`, async () => {
+    if (!auth.user) throw new Error('account Twitch non collegato');
+    const u = (await helix.request('GET', `/users?login=${encodeURIComponent(login)}`)).data?.[0];
+    if (!u) return null;
+    const c = (await helix.request('GET', `/channels?broadcaster_id=${u.id}`)).data?.[0] ?? {};
+    return { id: u.id, login: u.login, name: u.display_name || u.login, game: c.game_name || '', title: c.title || '' };
+  }),
+  async liveSince() {
+    // controllato al massimo ogni 30 secondi (quando inizi la live se ne accorge subito dopo)
+    if (!auth.user) return null;
+    if (Date.now() - liveCheck.at > 30000) {
+      const live = (await helix.request('GET', `/streams?user_id=${auth.user.id}`)).data?.[0];
+      liveCheck = { at: Date.now(), value: live?.started_at ?? null };
+    }
+    return liveCheck.value;
+  },
+  store: {
+    load: () => JSON.parse(fs.readFileSync(SHOUTOUT_FILE, 'utf8')),
+    save: (data) => fs.writeFile(SHOUTOUT_FILE, JSON.stringify(data), () => {}),
+  },
+  onChange: () => web?.toDashboards({ type: 'shoutouts', history: autoShoutout.history, seen: autoShoutout.seen }),
+});
+
 /** Prova della moderazione dalla dashboard: non fa nulla in chat. */
 function testModeration(text, role = 'everyone', draft) {
   const settings = draft ? sanitizeConfig({ ...config.get(), moderation: draft }, config.defaults()).moderation : config.get().moderation;
@@ -234,6 +283,7 @@ const app = {
   quickActions,
   moderator,
   testModeration,
+  autoShoutout,
   chatFeed,
   chatAccount,
   getState() {
@@ -263,6 +313,13 @@ const app = {
         missingScope: Boolean(auth.user && (modAccount().bot
           ? ['moderator:manage:chat_messages', 'moderator:manage:banned_users'].some((s) => botAuth.missingScopes.includes(s))
           : auth.missingScopes.includes('moderator:manage:banned_users'))),
+      },
+      shoutouts: {
+        enabled: Boolean(config.get().shoutouts?.enabled),
+        by: auth.user ? shoutoutAccount().name : null,
+        byBot: auth.user ? shoutoutAccount().bot : false,
+        // il bot è collegato ma gli manca il permesso nuovo: va ricollegato
+        botMissingScope: Boolean(botAuth.user && botAuth.user.id !== auth.user?.id && botAuth.missingScopes.includes('moderator:manage:shoutouts')),
       },
       commands: {
         enabled: Boolean(config.get().commands?.enabled),
@@ -364,6 +421,7 @@ function startEventSub() {
           if (moderated) return null;
           const shown = toChatMessage(payload, { botId: botAuth.user?.id });
           if (shouldShow(shown, config.get().chatOverlay, { commandPrefix: config.get().commands?.prefix })) chatFeed.push(shown);
+          autoShoutout.handle(msg).catch((err) => log.warn(`Shoutout automatico non riuscito: ${err.message}`));
           return commands.handle(msg);
         })
         .catch((err) => log.warn(`Messaggio della chat non gestito: ${err.message}`));

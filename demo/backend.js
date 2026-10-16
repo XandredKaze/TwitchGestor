@@ -20,6 +20,7 @@ import { ChatCommands, humanDuration } from '../src/core/commands.js';
 import { createQuickActions } from '../src/quickActions.js';
 import { summarizeStream } from '../src/core/streamHealth.js';
 import { ChatModerator } from '../src/core/moderation.js';
+import { AutoShoutout } from '../src/core/shoutout.js';
 import { ChatFeed, shouldShow } from '../src/core/chatOverlay.js';
 
 const CHANNEL = { id: '0', login: 'canale_demo' };
@@ -185,6 +186,17 @@ class DemoBackend {
       send: (text) => this.#chat(this.bot ? this.bot.login : CHANNEL.login, text, true),
     });
     setInterval(() => this.commands.tick(), 30000);
+    // shoutout automatici: nella demo la "live" è la simulazione e i canali sono inventati
+    const DEMO_GAMES = ['Minecraft', 'Just Chatting', 'Elden Ring', 'Fortnite', 'Art', 'Valorant'];
+    this.autoShoutout = new AutoShoutout({
+      getConfig: () => this.config.shoutouts,
+      log: this.log,
+      send: (text) => this.#chat(this.bot ? this.bot.login : CHANNEL.login, text, true),
+      shoutout: async () => { this.log.info('Shoutout di Twitch (simulato)'); },
+      channelInfo: async (login) => ({ id: login, login, name: login.replace(/^\w/, (c) => c.toUpperCase()), game: DEMO_GAMES[login.length % DEMO_GAMES.length], title: 'live di prova' }),
+      liveSince: async () => this.liveStartedAt ?? null,
+      onChange: () => this.#send('dashboard', { type: 'shoutouts', history: this.autoShoutout.history, seen: this.autoShoutout.seen }),
+    });
     this.log.info('Demo avviata: nessun collegamento a Twitch, gli eventi sono simulati');
   }
 
@@ -291,6 +303,7 @@ class DemoBackend {
     this.moderator.handle(msg).then((moderated) => {
       if (moderated) return null;
       this.#toObsChat(id, login, text);
+      this.autoShoutout.handle(msg).catch(() => {});
       return this.commands.handle(msg);
     }).catch(() => {});
   }
@@ -350,6 +363,7 @@ class DemoBackend {
       ui: this.config.ui,
       commands: { enabled: Boolean(this.config.commands?.enabled), missingScope: false, reading: true },
       moderation: { enabled: Boolean(this.config.moderation?.enabled), by: this.bot ? this.bot.login : CHANNEL.login, byBot: Boolean(this.bot), missingScope: false },
+      shoutouts: { enabled: Boolean(this.config.shoutouts?.enabled), by: this.bot ? this.bot.login : CHANNEL.login, byBot: Boolean(this.bot), botMissingScope: false },
       overlays: this.clients.overlay.size,
       chatReplies: Boolean(this.config.chat?.enabled),
       chatAccount: this.chatAccount(),
@@ -370,9 +384,11 @@ class DemoBackend {
     clearTimeout(this.chatTimer);
     this.simulation = null;
     if (!on) {
+      this.liveStartedAt = null;
       this.log.info('Simulazione fermata');
       return;
     }
+    this.liveStartedAt = new Date().toISOString(); // per gli shoutout: ogni simulazione è una live nuova
     this.log.info('Simulazione avviata: arriveranno eventi finti ogni pochi secondi');
     const weights = [['follow', 30], ['cheer', 12], ['sub', 10], ['resub', 10], ['giftsub', 6], ['redemption', 14], ['donation', 10], ['raid', 4]];
     const total = weights.reduce((s, [, w]) => s + w, 0);
@@ -394,7 +410,9 @@ class DemoBackend {
         return;
       }
       const text = Math.random() < 0.25 ? p + pick(['uptime', 'followage', 'comandi', 'social', 'discord']) : pick(VIEWER_CHAT);
-      this.#incoming(pick(VIEWERS), text);
+      // ogni tanto scrive una persona dell'elenco degli shoutout
+      const friends = this.config.shoutouts?.enabled ? this.config.shoutouts.users ?? [] : [];
+      this.#incoming(friends.length && Math.random() < 0.2 ? pick(friends).login : pick(VIEWERS), text);
       this.chatTimer = setTimeout(talk, 2500 + Math.random() * 3500);
     };
     this.simulation = setTimeout(next, 800);
@@ -436,6 +454,18 @@ class DemoBackend {
         storage.set('tg-demo-config', diffConfig(this.config, this.defaults) ?? {});
         this.#send('chat', { type: 'settings', settings: this.config.chatOverlay });
         return ok({ chatOverlay: this.config.chatOverlay });
+      }
+      case 'PUT /api/shoutouts': {
+        this.config = sanitizeConfig({ ...this.config, shoutouts: body?.shoutouts }, this.defaults);
+        storage.set('tg-demo-config', diffConfig(this.config, this.defaults) ?? {});
+        this.broadcastState();
+        return ok({ shoutouts: this.config.shoutouts });
+      }
+      case 'GET /api/shoutouts/log': return ok({ history: this.autoShoutout.history, seen: this.autoShoutout.seen });
+      case 'POST /api/shoutouts/reset': this.autoShoutout.reset(); return ok({ history: this.autoShoutout.history, seen: [] });
+      case 'POST /api/shoutouts/test': {
+        const settings = body?.shoutouts ? sanitizeConfig({ ...this.config, shoutouts: body.shoutouts }, this.defaults).shoutouts : undefined;
+        try { return ok(await this.autoShoutout.preview(body?.login, settings)); } catch (err) { return fail(400, err.message); }
       }
       case 'PUT /api/moderation': {
         this.config = sanitizeConfig({ ...this.config, moderation: body?.moderation }, this.defaults);

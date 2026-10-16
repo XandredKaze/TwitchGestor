@@ -23,11 +23,12 @@ export const SCOPES = [
   'moderator:manage:banned_users', // parole bannate: timeout e ban (se non c'è un account bot)
 ];
 
-/** Permessi dell'account bot: scrive in chat e modera le parole bannate (il bot deve essere moderatore del canale). */
+/** Permessi dell'account bot: scrive in chat, modera le parole bannate e fa gli shoutout (il bot deve essere moderatore del canale). */
 export const BOT_SCOPES = [
   'user:write:chat',
   'moderator:manage:chat_messages', // parole bannate: cancella i messaggi
   'moderator:manage:banned_users', // parole bannate: timeout e ban
+  'moderator:manage:shoutouts', // shoutout automatici
 ];
 
 /**

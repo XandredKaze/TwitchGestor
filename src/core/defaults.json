@@ -318,6 +318,14 @@
     "exemptVip": false,
     "exemptSubs": false
   },
+  "shoutouts": {
+    "enabled": false,
+    "onlyLive": true,
+    "official": true,
+    "chatMessage": true,
+    "message": "📣 Passate a trovare {user}! L'ultima volta era in live con {game} → {link}",
+    "users": []
+  },
   "chatOverlay": {
     "style": "classic",
     "font": "Poppins",

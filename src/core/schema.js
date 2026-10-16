@@ -7,6 +7,7 @@
 import { PERMISSIONS, ACTIONS } from './commands.js';
 import { MOD_ACTIONS, normalizeText } from './moderation.js';
 import { CHAT_STYLES, CHAT_ANIMATIONS } from './chatOverlay.js';
+import { cleanLogin } from './shoutout.js';
 
 export const ANIMATIONS = ['pop', 'fade', 'slide-down', 'slide-up', 'slide-left', 'slide-right', 'zoom', 'bounce', 'flip', 'shake', 'window'];
 export const POSITIONS = ['top-left', 'top-center', 'top-right', 'center', 'bottom-left', 'bottom-center', 'bottom-right'];
@@ -219,6 +220,23 @@ function sanitizeModeration(input, base) {
   return out;
 }
 
+/** Shoutout automatici: persone (nome del canale) e testo del messaggio, anche diverso per persona. */
+function sanitizeShoutouts(input, base) {
+  const out = { ...base };
+  if (!isObject(input)) return out;
+  for (const k of ['enabled', 'onlyLive', 'official', 'chatMessage']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  if (typeof input.message === 'string') out.message = input.message.slice(0, 400);
+  if (Array.isArray(input.users)) {
+    const seen = new Set();
+    out.users = input.users.map((u) => (typeof u === 'string' ? { login: u } : u)).filter(isObject).map((u) => {
+      const entry = { login: cleanLogin(u.login) };
+      if (typeof u.message === 'string' && u.message.trim()) entry.message = u.message.trim().slice(0, 400);
+      return entry;
+    }).filter((u) => u.login && !seen.has(u.login) && seen.add(u.login)).slice(0, 300);
+  }
+  return out;
+}
+
 /** Ritorna la configurazione completa e valida, partendo dai predefiniti. */
 export function sanitizeConfig(input, defaults) {
   const out = structuredClone(defaults);
@@ -230,6 +248,7 @@ export function sanitizeConfig(input, defaults) {
   if (out.ui && isObject(input.ui)) out.ui.theme = oneOf(UI_THEMES)(input.ui.theme) ?? out.ui.theme;
   if (out.commands) out.commands = sanitizeCommands(input.commands, out.commands);
   if (out.moderation) out.moderation = sanitizeModeration(input.moderation, out.moderation);
+  if (out.shoutouts) out.shoutouts = sanitizeShoutouts(input.shoutouts, out.shoutouts);
   if (out.chatOverlay) out.chatOverlay = sanitizeChatOverlay(input.chatOverlay, out.chatOverlay);
   if (out.tts) {
     out.tts = pick(input.tts, TTS_FIELDS, out.tts);

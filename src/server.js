@@ -354,6 +354,30 @@ export function createServer(app) {
           }
           return send(res, 200, { history: app.moderator.history });
         }
+        // --- Shoutout automatici ---
+        if (route === 'PUT /api/shoutouts') {
+          const body = await readBody(req, 1_000_000);
+          const config = app.config.save({ ...app.config.get(), shoutouts: body.shoutouts });
+          app.broadcastState();
+          return send(res, 200, { shoutouts: config.shoutouts });
+        }
+        if (route === 'GET /api/shoutouts/log') {
+          return send(res, 200, { history: app.autoShoutout?.history ?? [], seen: app.autoShoutout?.seen ?? [] });
+        }
+        if (route === 'POST /api/shoutouts/reset') {
+          app.autoShoutout?.reset();
+          return send(res, 200, { history: app.autoShoutout?.history ?? [], seen: [] });
+        }
+        if (route === 'POST /api/shoutouts/test') {
+          const body = await readBody(req, 1_000_000);
+          if (!app.autoShoutout) return send(res, 400, { error: 'Shoutout non disponibili' });
+          const settings = body.shoutouts ? sanitizeConfig({ ...app.config.get(), shoutouts: body.shoutouts }, app.config.defaults()).shoutouts : undefined;
+          try {
+            return send(res, 200, await app.autoShoutout.preview(body.login, settings));
+          } catch (err) {
+            throw Object.assign(new Error(err.message), { status: err.status ?? 400 });
+          }
+        }
         if (route === 'PUT /api/commands') {
           // Solo i comandi della chat: non tocca le altre impostazioni.
           const body = await readBody(req, 1_000_000);

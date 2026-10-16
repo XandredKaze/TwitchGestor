@@ -209,11 +209,12 @@
 
   <main id="tab-commands" class="commands-tab" hidden>
     <div class="page-head">
-      <div><h2>🤖 Comandi e moderazione</h2><p>Il bot risponde ai comandi, scrive i messaggi a tempo e modera le parole bannate.</p></div>
+      <div><h2>🤖 Comandi e moderazione</h2><p>Il bot risponde ai comandi, scrive i messaggi a tempo, modera le parole bannate e fa gli shoutout.</p></div>
       <nav class="subtabs" id="cmd-subtabs" role="tablist">
         <button type="button" data-view="commands" class="active">Comandi</button>
         <button type="button" data-view="timers">Messaggi a tempo</button>
         <button type="button" data-view="moderation">Parole bannate</button>
+        <button type="button" data-view="shoutouts">Shoutout</button>
       </nav>
     </div>
     <section class="panel cmd-head-panel" data-view="commands">
@@ -314,6 +315,40 @@
       <div id="mod-log" class="mod-log"></div>
     </section>
 
+    <section class="panel mod-panel so-panel" id="so-panel" data-view="shoutouts" hidden>
+      <div class="panel-head">
+        <h2>Shoutout automatici</h2>
+        <label class="switch"><input type="checkbox" id="so-enabled"> Attivi</label>
+      </div>
+      <p class="muted small">Quando una delle persone qui sotto scrive per la prima volta in chat durante la live, il bot la presenta in chat e fa lo shoutout di Twitch (il riquadro "Segui" che vedono gli spettatori). Una volta per live.</p>
+      <div id="so-status"></div>
+      <div class="mod-layout">
+        <div>
+          <form id="so-add" class="mod-add">
+            <input type="text" id="so-login" placeholder="nome del canale o link twitch.tv/… (anche più nomi separati da virgola)" maxlength="600" autocomplete="off">
+            <button type="submit" class="primary">＋ Aggiungi</button>
+          </form>
+          <div id="so-users" class="so-users"></div>
+        </div>
+        <div class="mod-side">
+          <label class="field"><span class="field-label">Messaggio in chat</span>
+            <textarea id="so-message" rows="3" maxlength="400"></textarea>
+            <span class="hint">{user} nome del canale · {game} ultima categoria · {title} titolo della sua live · {link} twitch.tv/nome. Puoi scrivere un messaggio diverso per una persona con ✎.</span>
+          </label>
+          <div class="mod-exempt">
+            <label class="inline small"><input type="checkbox" id="so-chat"> Scrivi il messaggio in chat</label>
+            <label class="inline small"><input type="checkbox" id="so-official"> Fai anche lo shoutout di Twitch (/shoutout)</label>
+            <label class="inline small"><input type="checkbox" id="so-only-live"> Solo quando sei in live</label>
+            <span class="muted small">Twitch permette uno shoutout ogni 2 minuti (lo stesso canale una volta all'ora): se arrivano più persone insieme, il bot li fa uno dopo l'altro.</span>
+          </div>
+          <div class="cmd-test-out muted small" id="so-test-out">Premi ▶ accanto a un nome per vedere il messaggio che scriverebbe il bot.</div>
+          <button type="button" id="so-reset" class="small-btn">↺ Rifai gli shoutout in questa live</button>
+        </div>
+      </div>
+      <h3>Registro</h3>
+      <div id="so-log" class="mod-log"></div>
+    </section>
+
     <div class="save-bar" id="cmd-save-bar" hidden>
       <span>Comandi non salvati</span>
       <button id="cmd-discard">Annulla modifiche</button>
@@ -360,6 +395,7 @@
   <script src="/actions.js"></script>
   <script src="/stream.js"></script>
   <script src="/moderation.js"></script>
+  <script src="/shoutouts.js"></script>
   <script src="/chatoverlay.js"></script>
 </body>
 </html>

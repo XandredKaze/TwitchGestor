@@ -754,6 +754,21 @@ input, select, textarea { transition: border-color 0.15s, box-shadow 0.15s; }
 [data-ui="brutal"] .mod-entry.err { border-color: var(--lilac); border-style: dashed; }
 [data-ui="brutal"] .mod-error { color: var(--lilac); }
 
+/* Shoutout automatici */
+.so-users { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; max-height: 420px; overflow-y: auto; }
+.so-user { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--inset); font-size: 14px; }
+.so-user .so-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.so-user .so-name small { margin-left: 8px; color: var(--muted); font-size: 11px; }
+.so-user .so-done { color: var(--ok); }
+.so-user .so-btns { display: flex; gap: 4px; }
+.so-user textarea { grid-column: 1 / -1; min-height: 54px; }
+.so-user.custom { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.so-panel #so-reset { justify-self: start; }
+[data-ui="brutal"] .so-user { background: transparent; border: 1.5px solid #6a6a6a; }
+[data-ui="brutal"] .so-user.custom { border-color: var(--lilac); }
+[data-ui="brutal"] .so-user .so-name { font-family: var(--mono); }
+[data-ui="brutal"] .so-user .so-done { color: var(--lilac); }
+
 /* Miniature dei temi (disegnate, non immagini) */
 .theme-mock { position: relative; display: block; height: 120px; overflow: hidden; border-radius: 10px; }
 .theme-mock i { display: block; }
