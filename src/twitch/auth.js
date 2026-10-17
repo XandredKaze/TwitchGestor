@@ -21,7 +21,11 @@ export const SCOPES = [
   'user:read:chat', // comandi della chat (!discord, !uptime...)
   ...QUICK_ACTION_SCOPES, // azioni rapide (titolo, clip, raid, sondaggi, chat...)
   'moderator:manage:banned_users', // parole bannate: timeout e ban (se non c'è un account bot)
+  'channel:manage:schedule', // programmazione: calendario delle live su Twitch (facoltativo)
 ];
+
+/** Permessi che servono solo per funzioni facoltative: se mancano non compare l'avviso "servono nuovi permessi". */
+export const OPTIONAL_SCOPES = ['channel:manage:schedule'];
 
 /** Permessi dell'account bot: scrive in chat, modera le parole bannate e fa gli shoutout (il bot deve essere moderatore del canale). */
 export const BOT_SCOPES = [
@@ -71,7 +75,12 @@ export class TwitchAuth extends EventEmitter {
 
   get missingScopes() {
     const granted = this.#tokens?.scopes ?? [];
-    return this.scopes.filter((s) => !granted.includes(s));
+    return this.scopes.filter((s) => !granted.includes(s) && !OPTIONAL_SCOPES.includes(s));
+  }
+
+  /** L'accesso ha questo permesso? */
+  hasScope(scope) {
+    return (this.#tokens?.scopes ?? []).includes(scope);
   }
 
   authorizeUrl() {

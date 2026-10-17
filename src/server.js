@@ -378,6 +378,17 @@ export function createServer(app) {
           await sendTelegram(t, last ? recapText(last) : '✅ TwitchGestor è collegato: qui arriveranno i riepiloghi delle tue live.');
           return send(res, 200, { ok: true });
         }
+        // --- Programmazione delle live ---
+        if (route === 'GET /api/schedule') return send(res, 200, app.schedule?.state() ?? { entries: [] });
+        if (route === 'PUT /api/schedule') {
+          app.schedule.replace((await readBody(req, 1_000_000)).entries);
+          return send(res, 200, app.schedule.state());
+        }
+        if (route === 'POST /api/schedule/publish') {
+          const body = await readBody(req, 100_000);
+          const results = await app.schedule.publish(Array.isArray(body.ids) ? body.ids.map(String) : []);
+          return send(res, 200, { ...app.schedule.state(), results });
+        }
         if (route === 'GET /api/titles') return send(res, 200, { lives: app.titleLog?.lives ?? [], titles: app.titleLog?.titles() ?? [] });
         if (route === 'GET /api/obs') return send(res, 200, app.obs?.state() ?? null);
         if (route === 'PUT /api/obs/settings') {

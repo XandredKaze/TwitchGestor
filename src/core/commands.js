@@ -145,6 +145,7 @@ export class ChatCommands {
       game: () => this.vars.game?.(),
       title: () => this.vars.title?.(),
       lastfollow: () => this.vars.lastfollow?.(),
+      nextlive: () => this.vars.nextlive?.(),
       random: (range) => {
         const [a, b] = String(range || '1-100').split('-').map(Number);
         const lo = Number.isFinite(a) ? a : 1;

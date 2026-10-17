@@ -778,6 +778,7 @@
       if (msg.type === 'moderation') window.dispatchEvent(new CustomEvent('tg:moderation', { detail: msg.history }));
       if (msg.type === 'shoutouts') window.dispatchEvent(new CustomEvent('tg:shoutouts', { detail: msg }));
       if (msg.type === 'stats') window.dispatchEvent(new Event('tg:stats'));
+      if (msg.type === 'schedule') window.dispatchEvent(new Event('tg:schedule'));
       if (msg.type === 'stream' && state) {
         state.obs = { ...state.obs, stream: msg.stream };
         window.dispatchEvent(new CustomEvent('tg:stream', { detail: msg.stream }));

@@ -24,6 +24,7 @@ import { TitleLog } from './core/titles.js';
 import { LiveStats, computeRecap, recapText } from './core/livestats.js';
 import { liveSession } from './core/session.js';
 import { sendTelegram } from './telegram.js';
+import { Schedule, fromLocal } from './core/schedule.js';
 import { sanitizeConfig } from './core/schema.js';
 import { createLogger } from './logger.js';
 
@@ -129,6 +130,12 @@ const commandDeps = {
   log,
   vars: {
     channel: () => auth.user?.login ?? '',
+    nextlive: () => {
+      const n = schedule.next();
+      if (!n) return 'non ancora in programma';
+      const d = new Date(fromLocal(n.start));
+      return `${d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })} alle ${n.start.slice(11)}${n.title ? `: ${n.title}` : ''}`;
+    },
     scene: () => obs.current,
     lastfollow: () => manager.history.find((n) => n.type === 'follow' && !n.test)?.user?.name ?? 'nessuno, per ora',
     game: needsAccount(async () => (await channelInfo()).game_name || 'nessuna categoria'),
@@ -352,6 +359,56 @@ async function liveEnded(at = Date.now()) {
   if (tg?.sendRecap) sendTelegram(tg, recapText(live.recap)).catch((err) => log.warn(`Riepilogo su Telegram non inviato: ${err.message}`));
 }
 
+// --- Programmazione delle live (data/schedule.json) ---
+const SCHEDULE_FILE = path.join(DATA_DIR, 'schedule.json');
+const schedule = new Schedule({
+  store: {
+    load: () => JSON.parse(fs.readFileSync(SCHEDULE_FILE, 'utf8')),
+    save: (data) => fs.writeFile(SCHEDULE_FILE, JSON.stringify(data), () => {}),
+  },
+  onChange: () => web?.toDashboards({ type: 'schedule' }),
+});
+const TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Rome';
+/** Pochi minuti prima di una live in programma: imposta da solo titolo e categoria su Twitch. */
+async function scheduleTick() {
+  if (!auth.user) return;
+  for (const e of schedule.due()) {
+    try {
+      await quickActions.run('info', { ...(e.title ? { title: e.title } : {}), ...(e.gameId ? { gameId: e.gameId } : {}) });
+      schedule.markApplied(e.id);
+      log.info(`Programmazione: impostati titolo e categoria della live delle ${e.start.slice(11)} ("${e.title}")`);
+    } catch (err) {
+      log.warn(`Programmazione: titolo non impostato (${err.message})`);
+    }
+  }
+}
+setInterval(() => scheduleTick().catch(() => {}), 60000).unref();
+/** Calendario delle live su Twitch: crea o aggiorna la live in programma (serve il permesso channel:manage:schedule). */
+async function publishSchedule(e) {
+  if (!auth.user) throw Object.assign(new Error('Collega prima il tuo account Twitch'), { status: 409 });
+  if (!auth.hasScope('channel:manage:schedule')) throw Object.assign(new Error('Per il calendario di Twitch serve un nuovo accesso: Esci e Accedi con Twitch'), { status: 409 });
+  const body = {
+    start_time: new Date(fromLocal(e.start)).toISOString(), timezone: TIMEZONE, duration: String(e.durationMin),
+    ...(e.title ? { title: e.title } : {}), ...(e.gameId ? { category_id: e.gameId } : {}),
+  };
+  const base = `/schedule/segment?broadcaster_id=${auth.user.id}`;
+  if (e.twitchId) {
+    try {
+      await helix.request('PATCH', `${base}&id=${encodeURIComponent(e.twitchId)}`, body);
+      return e.twitchId;
+    } catch { /* cancellata da Twitch: si ricrea */ }
+  }
+  const r = await helix.request('POST', base, { ...body, is_recurring: false });
+  const seg = (r.data?.segments ?? []).find((x) => Date.parse(x.start_time) === Date.parse(body.start_time)) ?? r.data?.segments?.[0];
+  if (!seg?.id) throw new Error('Twitch non ha confermato la live in programma');
+  schedule.setTwitchId(e.id, seg.id);
+  return seg.id;
+}
+async function unpublishSchedule(twitchId) {
+  if (!auth.user || !twitchId) return;
+  await helix.request('DELETE', `/schedule/segment?broadcaster_id=${auth.user.id}&id=${encodeURIComponent(twitchId)}`).catch(() => {});
+}
+
 /** Inizio live: Twitch a volte la mostra con qualche secondo di ritardo, quindi riprova. */
 async function recordLiveStart(startedAt) {
   for (let i = 0; i < 4; i++) {
@@ -426,6 +483,23 @@ const app = {
   autoShoutout,
   titleLog,
   liveStats,
+  schedule: {
+    state: () => ({ entries: schedule.entries, next: schedule.next(), timezone: TIMEZONE, canPublish: Boolean(auth.user && auth.hasScope('channel:manage:schedule')) }),
+    replace(list) {
+      const before = new Map(schedule.entries.map((e) => [e.id, e]));
+      const after = schedule.replace(list);
+      const ids = new Set(after.map((e) => e.id));
+      for (const [id, e] of before) if (!ids.has(id) && e.twitchId) unpublishSchedule(e.twitchId);
+      return after;
+    },
+    async publish(ids) {
+      const results = [];
+      for (const e of schedule.entries.filter((x) => ids.includes(x.id))) {
+        try { await publishSchedule(e); results.push({ id: e.id, ok: true }); } catch (err) { results.push({ id: e.id, ok: false, error: err.message }); }
+      }
+      return results;
+    },
+  },
   chatFeed,
   /** In live adesso? (OBS sta trasmettendo o Twitch ti mostra in live): lo script di aggiornamento aspetta. */
   async isBusy() {

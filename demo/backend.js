@@ -21,6 +21,7 @@ import { summarizeStream } from '../src/core/streamHealth.js';
 import { ChatModerator } from '../src/core/moderation.js';
 import { AutoShoutout, shoutoutCard } from '../src/core/shoutout.js';
 import { LiveStats, computeRecap } from '../src/core/livestats.js';
+import { Schedule, generateWeeks } from '../src/core/schedule.js';
 import { ChatFeed, shouldShow } from '../src/core/chatOverlay.js';
 
 const CHANNEL = { id: '0', login: 'canale_demo' };
@@ -515,6 +516,24 @@ class DemoBackend {
         return ok({ telegram: this.config.telegram });
       case 'POST /api/telegram/find': case 'POST /api/telegram/test':
         return fail(400, 'Nella demo Telegram non è collegato: nel programma vero qui trovi la chat e mandi un messaggio di prova.');
+      case 'GET /api/schedule': case 'PUT /api/schedule': case 'POST /api/schedule/publish': {
+        if (!this.schedule) {
+          this.schedule = new Schedule({ onChange: () => this.#send('dashboard', { type: 'schedule' }) });
+          const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+          this.schedule.replace([
+            ...generateWeeks({ from: d.toISOString().slice(0, 10), weeks: 2, days: [2, 4], time: '21:00', durationMin: 180, title: 'Elden Ring alla cieca: oggi si batte Malenia!', game: 'Elden Ring', gameId: '512953' }),
+            ...generateWeeks({ from: d.toISOString().slice(0, 10), weeks: 2, days: [6], time: '18:30', durationMin: 120, title: 'Chiacchiere e caffè con la chat ☕', game: 'Just Chatting', gameId: '509658' }),
+          ]);
+        }
+        const state = () => ({ entries: this.schedule.entries, next: this.schedule.next(), timezone: 'Europe/Rome', canPublish: true });
+        if (method === 'PUT') this.schedule.replace(body?.entries);
+        if (route === 'POST /api/schedule/publish') {
+          const ids = body?.ids ?? [];
+          for (const id of ids) this.schedule.setTwitchId(id, `demo-${id}`);
+          return ok({ ...state(), results: ids.map((id) => ({ id, ok: true })) });
+        }
+        return ok(state());
+      }
       case 'GET /api/update': return ok({ managed: false, commit: '', settings: { auto: true, hour: 5 }, check: {} });
       case 'GET /api/backup': case 'POST /api/backup/restore':
         return fail(400, 'Nella demo non c\'è niente da esportare o importare: le impostazioni restano solo in questo browser.');

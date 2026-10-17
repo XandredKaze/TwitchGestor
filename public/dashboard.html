@@ -21,6 +21,7 @@
       <button class="tab" data-tab="commands" role="tab">🤖 Comandi</button>
       <button class="tab" data-tab="stats" role="tab">📈 Statistiche</button>
       <button class="tab" data-tab="recaps" role="tab">📋 Riepiloghi</button>
+      <button class="tab" data-tab="schedule" role="tab">📅 Programmazione</button>
       <button class="tab" data-tab="theme" role="tab">🖌 Tema</button>
     </nav>
     <div id="statuses" class="statuses"></div>
@@ -405,6 +406,24 @@
     </div>
   </main>
 
+  <main id="tab-schedule" class="schedule-tab" hidden>
+    <div class="page-head">
+      <div><h2>📅 Programmazione</h2><p>Decidi in anticipo quando andare in live: TwitchGestor imposta da solo titolo e categoria poco prima, li può mettere sul calendario di Twitch e crea l'immagine della settimana da condividere.</p></div>
+    </div>
+    <div class="schedule-layout">
+      <div class="schedule-main">
+        <section class="panel sc-next" id="sc-next"></section>
+        <section class="panel"><h2>Live in programma</h2><div id="sc-list" class="sc-list"></div></section>
+      </div>
+      <div class="schedule-side">
+        <section class="panel" id="sc-form-box"></section>
+        <details class="panel sc-details"><summary><h2>Crea più settimane in un colpo</h2></summary><div id="sc-weeks"></div></details>
+        <section class="panel"><h2>Calendario di Twitch</h2><div id="sc-twitch"></div></section>
+        <details class="panel sc-details" open><summary><h2>Immagine della settimana</h2></summary><div id="sc-image"></div></details>
+      </div>
+    </div>
+  </main>
+
   <main id="tab-theme" class="theme-tab" hidden>
     <div class="page-head">
       <div><h2>🖌 Tema</h2><p>L'aspetto di TwitchGestor, degli alert e dei titoli di coda.</p></div>
@@ -449,6 +468,7 @@
   <script src="/charts.js"></script>
   <script src="/stats.js"></script>
   <script src="/recaps.js"></script>
+  <script src="/schedule.js"></script>
   <script src="/chatoverlay.js"></script>
 </body>
 </html>
