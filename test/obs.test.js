@@ -37,9 +37,6 @@ async function fakeObs(password = 'segreta') {
       } else if (d.requestType === 'GetStreamStatus') {
         obs.bytes = (obs.bytes ?? 0) + 750_000; // ~3000 kbps con letture ogni 2 s
         reply({ outputActive: true, outputReconnecting: false, outputBytes: obs.bytes, outputSkippedFrames: 0, outputTotalFrames: obs.bytes / 10000, outputCongestion: 0.02, outputDuration: 60000 });
-      } else if (d.requestType === 'GetSourceScreenshot') {
-        obs.shot = d.requestData;
-        reply({ imageData: `data:image/jpg;base64,${d.requestData.sourceName}` });
       } else if (d.requestType === 'GetStats') {
         reply({ activeFps: 60, cpuUsage: 7.5, renderSkippedFrames: 0, renderTotalFrames: 1000 });
       } else reply(null, false);
@@ -143,21 +140,5 @@ test('collegato a OBS legge bitrate e statistiche della diretta', async () => {
   assert.ok(client.state().stream);
   client.stop();
   assert.equal(client.state().stream, null);
-  wss.close();
-});
-
-test('anteprima: immagine della scena in onda, al massimo una richiesta a OBS ogni 0,8 secondi', async () => {
-  const { wss, obs, port } = await fakeObs();
-  const client = new ObsClient({ file: tmpFile() });
-  await assert.rejects(client.preview(), /non è collegato/);
-  client.configure({ enabled: true, host: '127.0.0.1', port, password: 'segreta' });
-  await waitFor(() => client.scenes.length === 3);
-  const a = await client.preview();
-  assert.equal(a.image, 'data:image/jpg;base64,Inizio');
-  assert.equal(obs.shot.imageFormat, 'jpg');
-  assert.equal(obs.shot.imageWidth, 960);
-  await client.preview();
-  assert.equal(obs.requests.filter((r) => r === 'GetSourceScreenshot').length, 1, 'la seconda arriva dalla memoria');
-  client.stop();
   wss.close();
 });

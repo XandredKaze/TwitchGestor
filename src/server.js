@@ -215,6 +215,15 @@ export function createServer(app) {
         });
       }
       if (req.method === 'GET' && url.pathname.startsWith('/media/')) return serveStatic(res, url.pathname.slice('/media'.length), MEDIA_DIR);
+      // Certificato da installare una volta sul PC per aprire la dashboard in https (pubblico: non contiene segreti)
+      if (route === 'GET /twitchgestor-certificato.crt') {
+        const file = app.httpsCertificate?.();
+        if (!file) return send(res, 404, 'Indirizzo https non attivo');
+        res.writeHead(200, { 'Content-Type': 'application/x-x509-ca-cert', 'Content-Disposition': 'attachment; filename="TwitchGestor-certificato.crt"' });
+        return res.end(fs.readFileSync(file));
+      }
+      // La dashboard prova questo indirizzo in https: se risponde, il certificato è già installato
+      if (route === 'GET /https-ok') return send(res, 204, '', { 'Access-Control-Allow-Origin': '*' });
 
       // --- Accesso Twitch ---
       if (route === 'GET /auth/login') {
@@ -344,15 +353,6 @@ export function createServer(app) {
           // (sul Raspberry si riavvia da solo; sul PC va riaperto)
           setTimeout(() => process.exit(0), 500);
           return undefined;
-        }
-        if (route === 'GET /api/obs/preview') {
-          if (!app.obs) return send(res, 400, { error: 'Collegamento a OBS non disponibile' });
-          return send(res, 200, await app.obs.preview());
-        }
-        if (route === 'GET /api/chat/recent') return send(res, 200, { messages: app.dashboardChat ?? [], badges: app.chatFeed?.badges ?? {} });
-        if (route === 'POST /api/chat/send') {
-          await app.sendAsChannel((await readBody(req)).text);
-          return send(res, 200, { ok: true });
         }
         if (route === 'GET /api/obs') return send(res, 200, app.obs?.state() ?? null);
         if (route === 'PUT /api/obs/settings') {

@@ -497,15 +497,9 @@ input, select, textarea { transition: border-color 0.15s, box-shadow 0.15s; }
 .demo-scene-opts select { width: auto; padding: 3px 8px; font-size: 13px; }
 .demo-chat { height: var(--chat-h); overflow-y: auto; padding: 10px 12px; border-radius: 12px; background: var(--inset); font-size: 14px; display: flex; flex-direction: column; gap: 6px; }
 .demo-chat .bot b { color: var(--accent); }
-/* anteprima da OBS e chat di TwitchGestor (dashboard aperta dall'indirizzo del Raspberry) */
-.obs-preview { display: grid; place-items: center; }
-.obs-preview-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-.obs-preview-img:not([src]) { display: none; }
-.obs-preview-note { position: relative; padding: 16px; color: #ddd; font-size: 14px; text-align: center; }
-.own-chat { gap: 4px; }
-.own-chat .oc-badge { width: 16px; height: 16px; margin-right: 3px; vertical-align: -3px; }
-.own-chat .oc-emote { height: 24px; vertical-align: middle; margin: -4px 1px; }
-.own-chat .bot { opacity: .85; }
+/* dashboard dal Raspberry in http: istruzioni per l'https */
+.https-help { display: grid; gap: 8px; }
+.https-help ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--text); }
 .demo-chat > div { overflow-wrap: anywhere; }
 
 

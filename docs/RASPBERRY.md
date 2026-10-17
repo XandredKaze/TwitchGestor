@@ -75,13 +75,18 @@ Indirizzo e password della dashboard del Raspberry restano i suoi. Se importi da
 - Impostazioni, accessi, immagini, suoni e dati **non vengono mai toccati** dagli aggiornamenti. Le opzioni nuove partono con il loro valore predefinito.
 - Overlay, chat e titoli di coda in OBS **si ricaricano da soli** dopo l'aggiornamento: non serve "Aggiorna la cache". Anche la dashboard si ricarica da sola, a meno che tu non stia modificando qualcosa senza aver salvato.
 
-## La scheda Live
+## La scheda Live: anteprima e chat di Twitch (una volta)
 
-Twitch mostra il suo player e la sua chat solo su pagine aperte da "localhost". Dalla dashboard del Raspberry vedi quindi:
-- l'**anteprima presa da OBS**: la scena in onda, aggiornata ogni secondo e senza ritardo;
-- la **chat di TwitchGestor**: con i messaggi di tutti, compreso Wolfery, e una casella per scrivere con il tuo account.
+Twitch mostra il suo player e la sua chat solo su pagine **https**. Il Raspberry ha anche un indirizzo https, `https://twitchgestor.local:3443/dashboard`; per usarlo, il PC deve fidarsi del suo certificato. Si fa una volta sola:
 
-Per vedere la live come gli spettatori c'è sempre il pulsante **Apri su Twitch**.
+1. Apri la dashboard del Raspberry. Nel riquadro **Anteprima live** premi **Scarica il certificato di TwitchGestor** e aprilo con doppio clic.
+2. Premi **Installa certificato…**, poi:
+   - **Utente corrente** → Avanti;
+   - **Colloca tutti i certificati nel seguente archivio** → Sfoglia → **Autorità di certificazione radice attendibili** → OK;
+   - Avanti → Fine → **Sì**.
+3. Chiudi e riapri il browser e apri la dashboard come sempre: passa da sola all'indirizzo https. Lì trovi il player e la chat di Twitch come sul PC, con tutti gli strumenti di moderazione.
+
+Il certificato vale solo per TwitchGestor nella rete di casa e non può essere usato per altri siti. In OBS gli indirizzi restano quelli normali (`http://…:3000`).
 
 ## Accedere a Twitch (raramente)
 

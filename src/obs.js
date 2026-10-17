@@ -47,7 +47,6 @@ export class ObsClient extends EventEmitter {
   #ws = null;
   #timer = null;
   #pending = new Map();
-  #preview = null;
   #retry = 0;
 
   /** @param file dove salvare host, porta e password (data/obs.json) */
@@ -115,21 +114,6 @@ export class ObsClient extends EventEmitter {
     // OBS manda anche l'evento, ma aggiornare subito rende il pulsante più reattivo.
     this.#setCurrent(name);
     return this.state();
-  }
-
-  /**
-   * Immagine di quello che OBS sta trasmettendo (la scena in onda), per l'anteprima nella dashboard
-   * quando il player di Twitch non si può mostrare. Al massimo una richiesta a OBS ogni 0,8 secondi.
-   */
-  async preview() {
-    if (this.status !== 'connesso' || !this.current) throw Object.assign(new Error('OBS non è collegato'), { status: 409 });
-    const now = Date.now();
-    if (this.#preview && now - this.#preview.at < 800) return this.#preview.data;
-    this.#preview = { at: now, data: this.#preview?.data ?? null };
-    const r = await this.request('GetSourceScreenshot', { sourceName: this.current, imageFormat: 'jpg', imageWidth: 960, imageCompressionQuality: 60 });
-    const data = { image: r.imageData, scene: this.current, at: now };
-    this.#preview = { at: now, data };
-    return data;
   }
 
   request(requestType, requestData) {
