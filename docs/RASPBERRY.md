@@ -62,6 +62,7 @@ Indirizzo e password della dashboard del Raspberry restano i suoi. Se importi da
   - `http://192.168.1.50:3000/overlay`
   - `http://192.168.1.50:3000/chat`
   - `http://192.168.1.50:3000/credits`
+  - `http://192.168.1.50:3000/music` per la musica (nuova, facoltativa: spunta **Controlla l'audio tramite OBS**)
 - **Dock dei titoli di coda:** `http://192.168.1.50:3000/credits?pannello&token=LA-PASSWORD`.
 - Se avevi lo script `twitchgestor.lua` in **Strumenti → Script** (quello che avviava TwitchGestor insieme a OBS), toglilo: ora TwitchGestor è sempre acceso sul Raspberry.
 - Sul PC non avviare più TwitchGestor.
@@ -91,6 +92,20 @@ Twitch mostra il suo player e la sua chat solo su pagine **https**. Il Raspberry
 - Altrimenti salva il file. Poi apri **Impostazioni → Privacy e sicurezza → Certificati → Mostra certificati…**, scheda **Autorità**, **Importa…**: scegli il file, spunta la stessa casella e premi OK.
 
 Il certificato vale solo per TwitchGestor nella rete di casa e non può essere usato per altri siti. In OBS gli indirizzi restano quelli normali (`http://…:3000`).
+
+## La cartella condivisa: musica, immagini e suoni
+
+Il Raspberry ha una **cartella condivisa** in rete, così copi i file dal PC come in una chiavetta. Si attiva da sola con l'installazione o con un aggiornamento.
+
+1. Sul PC apri **Esplora file**, scrivi `\\twitchgestor\TwitchGestor` nella barra in alto e premi Invio.
+2. Se chiede le credenziali: **nome utente** e **password** li trovi nella dashboard, scheda **🎵 Musica → Cartella condivisa** (la password è la stessa della dashboard). Spunta **Memorizza credenziali**.
+3. Dentro trovi:
+   - `music`: la musica, una sottocartella per ogni playlist;
+   - `images`: immagini, GIF e video degli alert;
+   - `sounds`: i suoni degli alert.
+4. Consiglio: clic destro su **TwitchGestor** → **Connetti unità di rete…** per averla sempre in Esplora file.
+
+Se `\\twitchgestor` non risponde, usa l'indirizzo del Raspberry, per esempio `\\192.168.1.50\TwitchGestor`. La cartella si vede solo nella rete di casa. Le copie di sicurezza non contengono la musica (pesa troppo): tienine una copia anche sul PC.
 
 ## Accedere a Twitch (raramente)
 

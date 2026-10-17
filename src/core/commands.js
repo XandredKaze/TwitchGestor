@@ -146,6 +146,7 @@ export class ChatCommands {
       title: () => this.vars.title?.(),
       lastfollow: () => this.vars.lastfollow?.(),
       nextlive: () => this.vars.nextlive?.(),
+      song: () => this.vars.song?.(),
       random: (range) => {
         const [a, b] = String(range || '1-100').split('-').map(Number);
         const lo = Number.isFinite(a) ? a : 1;

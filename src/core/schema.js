@@ -232,6 +232,16 @@ function sanitizeTelegram(input, base) {
   return out;
 }
 
+/** Musica: abbassa il volume durante gli alert. */
+function sanitizeMusic(input, base) {
+  const out = { ...base };
+  if (!isObject(input)) return out;
+  if (typeof input.duck === 'boolean') out.duck = input.duck;
+  const level = Number(input.duckLevel);
+  if (Number.isFinite(level)) out.duckLevel = Math.min(1, Math.max(0, Math.round(level * 100) / 100));
+  return out;
+}
+
 /** Ritorna la configurazione completa e valida, partendo dai predefiniti. */
 export function sanitizeConfig(input, defaults) {
   const out = structuredClone(defaults);
@@ -245,6 +255,7 @@ export function sanitizeConfig(input, defaults) {
   if (out.moderation) out.moderation = sanitizeModeration(input.moderation, out.moderation);
   if (out.shoutouts) out.shoutouts = sanitizeShoutouts(input.shoutouts, out.shoutouts);
   if (out.telegram) out.telegram = sanitizeTelegram(input.telegram, out.telegram);
+  if (out.music) out.music = sanitizeMusic(input.music, out.music);
   if (out.chatOverlay) out.chatOverlay = sanitizeChatOverlay(input.chatOverlay, out.chatOverlay);
 
   for (const type of Object.keys(out.types)) {

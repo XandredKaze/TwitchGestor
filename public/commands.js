@@ -25,6 +25,7 @@
     ['{title}', 'titolo della live'],
     ['{lastfollow}', 'ultimo follower'],
     ['{nextlive}', 'prossima live in programma (scheda Programmazione)'],
+    ['{song}', 'canzone in riproduzione (scheda Musica)'],
     ['{count}', 'quante volte è stato usato il comando'],
     ['{random:1-100}', 'numero a caso'],
     ['{scene}', 'scena di OBS attivata'],

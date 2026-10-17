@@ -111,6 +111,8 @@ export async function updateState() {
 // ---------- Copia di sicurezza: esporta e importa ----------
 
 // Cosa entra nella copia: impostazioni, dati (accessi a Twitch, storico, immagini e suoni, titoli di coda...) e .env.
+// La musica no: può pesare gigabyte e resta comunque nella cartella (o sul tuo PC).
+const MUSIC_IN_DATA = path.join('media', 'music');
 const SKIP_IN_DATA = new Set(['backups', 'twitchgestor.pid', 'twitchgestor.log', 'update-request', 'update-status.json', 'update-bad-commit', 'system-setup-requested', 'tts', 'piper']);
 
 /** Crea un file .tar.gz con tutto quello che serve per ripartire su un altro computer. Ritorna il percorso. */
@@ -124,7 +126,10 @@ export async function createBackup() {
   if (fs.existsSync(DATA_DIR)) {
     for (const entry of fs.readdirSync(DATA_DIR)) {
       if (SKIP_IN_DATA.has(entry)) continue;
-      fs.cpSync(path.join(DATA_DIR, entry), path.join(stage, 'data', entry), { recursive: true });
+      fs.cpSync(path.join(DATA_DIR, entry), path.join(stage, 'data', entry), {
+        recursive: true,
+        filter: (from) => path.relative(DATA_DIR, from) !== MUSIC_IN_DATA,
+      });
     }
   }
   fs.writeFileSync(path.join(stage, 'twitchgestor-backup.json'), JSON.stringify({ createdAt: new Date().toISOString(), from: os.hostname() }));

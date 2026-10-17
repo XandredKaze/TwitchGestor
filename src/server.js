@@ -22,7 +22,7 @@ const MEDIA_DIR = path.join(DATA_DIR, 'media');
 const UPLOAD_KINDS = {
   sounds: ['.mp3', '.ogg', '.wav'],
   images: ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.webm', '.mp4'],
-  music: ['.mp3', '.ogg', '.wav', '.m4a', '.flac'],
+  music: ['.mp3', '.ogg', '.wav', '.m4a', '.flac', '.opus'],
 };
 const UPLOAD_LIMIT = 30 * 1024 * 1024;
 const MIME = {
@@ -42,9 +42,24 @@ const MIME = {
   '.m4a': 'audio/mp4',
   '.aiff': 'audio/aiff',
   '.flac': 'audio/flac',
+  '.opus': 'audio/ogg',
   '.webm': 'video/webm',
   '.mp4': 'video/mp4',
 };
+
+/**
+ * Cartella condivisa (Samba) del Raspberry: la crea lo script di installazione.
+ * Da Windows si apre con \\nome-del-raspberry\TwitchGestor, utente e password del Raspberry
+ * (la password è la stessa della dashboard).
+ */
+function shareInfo() {
+  if (!updates.isManaged()) return null;
+  try {
+    if (!/\[TwitchGestor\]/.test(fs.readFileSync('/etc/samba/smb.conf', 'utf8'))) return null;
+  } catch { return null; }
+  const host = os.hostname();
+  return { path: `\\\\${host}\\TwitchGestor`, host, user: os.userInfo().username, password: process.env.DASHBOARD_TOKEN ?? '' };
+}
 
 function safeEqual(a, b) {
   const x = Buffer.from(String(a ?? ''));
@@ -105,7 +120,21 @@ function serveStatic(res, urlPath, baseDir = PUBLIC_DIR) {
   if (!file.startsWith(baseDir + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
     return send(res, 404, 'Non trovato');
   }
-  res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] ?? 'application/octet-stream' });
+  const type = MIME[path.extname(file).toLowerCase()] ?? 'application/octet-stream';
+  const size = fs.statSync(file).size;
+  // richieste a pezzi (Range): le usano audio e video per sapere la durata e per saltare avanti
+  const m = /^bytes=(\d*)-(\d*)$/.exec(String(res.req?.headers.range ?? ''));
+  if (m && (m[1] || m[2])) {
+    const start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
+    const end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+    if (start >= size || start > end) {
+      res.writeHead(416, { 'Content-Range': `bytes */${size}` });
+      return res.end();
+    }
+    res.writeHead(206, { 'Content-Type': type, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': end - start + 1, 'Accept-Ranges': 'bytes' });
+    return fs.createReadStream(file, { start, end }).pipe(res);
+  }
+  res.writeHead(200, { 'Content-Type': type, 'Content-Length': size, 'Accept-Ranges': 'bytes' });
   fs.createReadStream(file).pipe(res);
 }
 
@@ -133,14 +162,16 @@ function listMedia() {
 }
 
 /** Salva un file caricato dalla dashboard in data/media/<tipo>/ con un nome sicuro. */
-async function saveUpload(req, kind, rawName) {
+async function saveUpload(req, kind, rawName, subfolder = '') {
   if (!UPLOAD_KINDS[kind]) throw Object.assign(new Error('Tipo di file non valido'), { status: 400 });
-  const name = path.basename(String(rawName ?? '')).normalize('NFKD').replace(/[^\w.\-]+/g, '_').replace(/^\.+/, '').slice(-80);
+  const name = path.basename(String(rawName ?? '')).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w.\-]+/g, '_').replace(/^\.+/, '').slice(-80);
   const ext = path.extname(name).toLowerCase();
   if (!name || !UPLOAD_KINDS[kind].includes(ext)) {
     throw Object.assign(new Error(`Formato non supportato. Usa: ${UPLOAD_KINDS[kind].join(', ')}`), { status: 400 });
   }
-  const dir = path.join(MEDIA_DIR, kind);
+  // le playlist della musica sono sottocartelle (es. "Chill")
+  const sub = String(subfolder).normalize('NFKC').replace(/[^\p{L}\p{N} _.\-]+/gu, '').replace(/\.{2,}/g, '.').replace(/^[.\s]+|\s+$/g, '').slice(0, 60);
+  const dir = path.join(MEDIA_DIR, kind, kind === 'music' ? sub : '');
   fs.mkdirSync(dir, { recursive: true });
   let final = name;
   for (let i = 1; fs.existsSync(path.join(dir, final)); i++) final = `${path.basename(name, ext)}-${i}${ext}`;
@@ -154,7 +185,7 @@ async function saveUpload(req, kind, rawName) {
   }
   if (!size) throw Object.assign(new Error('File vuoto'), { status: 400 });
   fs.writeFileSync(path.join(dir, final), Buffer.concat(chunks));
-  return `media/${kind}/${final}`;
+  return `media/${kind}/${kind === 'music' && sub ? `${sub}/` : ''}${final}`;
 }
 
 /**
@@ -207,6 +238,7 @@ export function createServer(app) {
       if (route === 'GET /dashboard') return serveStatic(res, '/dashboard.html');
       if (route === 'GET /credits') return serveStatic(res, '/credits.html');
       if (route === 'GET /chat') return serveStatic(res, '/chat.html');
+      if (route === 'GET /music') return serveStatic(res, '/music.html');
       // Titoli di coda: la sorgente OBS legge lo stato senza token (contiene solo nomi e impostazioni).
       if (route === 'GET /api/credits/state' && app.credits) {
         const rev = Number(url.searchParams.get('rev'));
@@ -389,6 +421,39 @@ export function createServer(app) {
           const results = await app.schedule.publish(Array.isArray(body.ids) ? body.ids.map(String) : []);
           return send(res, 200, { ...app.schedule.state(), results });
         }
+        // --- Musica ---
+        if (route === 'GET /api/music') {
+          const lib = app.music?.library() ?? [];
+          return send(res, 200, {
+            playlists: app.music?.player.playlists() ?? [],
+            tracks: lib.map((t) => ({ id: t.id, folder: t.folder, name: t.name })),
+            player: app.music?.player.snapshot() ?? null,
+            pages: musicPages(),
+            settings: app.config.get().music ?? {},
+            share: shareInfo(),
+          });
+        }
+        if (req.method === 'POST' && url.pathname.startsWith('/api/music/')) {
+          const p = app.music?.player;
+          if (!p) return send(res, 400, { error: 'Musica non disponibile' });
+          const action = url.pathname.slice('/api/music/'.length);
+          if (action === 'upload') {
+            const saved = await saveUpload(req, 'music', req.headers['x-filename'] && decodeURIComponent(req.headers['x-filename']), url.searchParams.get('folder') ?? '');
+            app.music.rescan();
+            return send(res, 200, { path: saved });
+          }
+          const body = await readBody(req);
+          if (action === 'play') p.play({ playlist: body.playlist, trackId: body.trackId });
+          else if (action === 'toggle') p.toggle();
+          else if (action === 'next') p.next();
+          else if (action === 'prev') p.prev();
+          else if (action === 'volume') p.setVolume(body.volume);
+          else if (action === 'shuffle') p.setShuffle(body.on);
+          else if (action === 'rescan') app.music.rescan();
+          else if (action === 'settings') app.config.save({ ...app.config.get(), music: { ...app.config.get().music, ...body } });
+          else return send(res, 404, { error: 'Azione sconosciuta' });
+          return send(res, 200, { player: p.snapshot(), pages: musicPages(), settings: app.config.get().music ?? {} });
+        }
         if (route === 'GET /api/titles') return send(res, 200, { lives: app.titleLog?.lives ?? [], titles: app.titleLog?.titles() ?? [] });
         if (route === 'GET /api/obs') return send(res, 200, app.obs?.state() ?? null);
         if (route === 'PUT /api/obs/settings') {
@@ -529,7 +594,7 @@ export function createServer(app) {
 
   // --- WebSocket ---
   const wss = new WebSocketServer({ noServer: true });
-  const clients = { overlay: new Set(), dashboard: new Set(), chat: new Set() };
+  const clients = { overlay: new Set(), dashboard: new Set(), chat: new Set(), music: new Set() };
 
   server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, 'http://localhost');
@@ -539,6 +604,7 @@ export function createServer(app) {
       return socket.destroy();
     }
     wss.handleUpgrade(req, socket, head, (ws) => {
+      if (role === 'music') ws.isWidget = url.searchParams.has('widget'); // il riquadro "in riproduzione" non suona
       clients[role].add(ws);
       ws.on('close', () => {
         clients[role].delete(ws);
@@ -548,8 +614,16 @@ export function createServer(app) {
         overlay: () => ({ type: 'hello', build: BUILD_ID, overlay: app.config.get().overlay }),
         chat: () => ({ type: 'hello', build: BUILD_ID, settings: app.config.get().chatOverlay, badges: app.chatFeed?.badges ?? {}, messages: app.chatFeed?.messages ?? [] }),
         dashboard: () => ({ type: 'state', state: app.getState() }),
+        music: () => ({ ...(app.music?.player.pageState() ?? {}), type: 'hello', build: BUILD_ID }),
       }[role];
       ws.send(JSON.stringify(hello()));
+      // la pagina della musica avvisa quando un brano finisce e a che punto è
+      if (role === 'music') {
+        ws.on('message', (data) => {
+          if (ws.isWidget) return;
+          try { app.music?.player.fromPage(JSON.parse(String(data).slice(0, 2000))); } catch { /* messaggio non valido */ }
+        });
+      }
       app.broadcastState();
     });
   });
@@ -559,6 +633,11 @@ export function createServer(app) {
     for (const ws of wss.clients) ws.ping();
   }, 30000);
   server.on('close', () => clearInterval(heartbeat));
+
+  // pagine /music che suonano davvero (senza contare i riquadri "in riproduzione")
+  function musicPages() {
+    return [...clients.music].filter((ws) => !ws.isWidget).length;
+  }
 
   function broadcast(role, message) {
     const data = JSON.stringify(message);
@@ -571,5 +650,7 @@ export function createServer(app) {
     toOverlays: (m) => broadcast('overlay', m),
     toDashboards: (m) => broadcast('dashboard', m),
     toChat: (m) => broadcast('chat', m),
+    toMusic: (m) => broadcast('music', m),
+    musicPages,
   };
 }

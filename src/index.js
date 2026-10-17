@@ -25,6 +25,8 @@ import { LiveStats, computeRecap, recapText } from './core/livestats.js';
 import { liveSession } from './core/session.js';
 import { sendTelegram } from './telegram.js';
 import { Schedule, fromLocal } from './core/schedule.js';
+import { MusicPlayer } from './core/music.js';
+import { scanLibrary } from './musiclib.js';
 import { sanitizeConfig } from './core/schema.js';
 import { createLogger } from './logger.js';
 
@@ -130,6 +132,7 @@ const commandDeps = {
   log,
   vars: {
     channel: () => auth.user?.login ?? '',
+    song: () => musicPlayer.songText(),
     nextlive: () => {
       const n = schedule.next();
       if (!n) return 'non ancora in programma';
@@ -359,6 +362,28 @@ async function liveEnded(at = Date.now()) {
   if (tg?.sendRecap) sendTelegram(tg, recapText(live.recap)).catch((err) => log.warn(`Riepilogo su Telegram non inviato: ${err.message}`));
 }
 
+// --- Musica: libreria in data/media/music, riprodotta dalla pagina /music in OBS ---
+const MUSIC_DIR = path.join(DATA_DIR, 'media', 'music');
+const MUSIC_FILE = path.join(DATA_DIR, 'music.json');
+let musicLibrary = scanLibrary(MUSIC_DIR);
+const musicPlayer = new MusicPlayer({
+  getLibrary: () => musicLibrary,
+  send: (m) => web?.toMusic(m),
+  store: {
+    load: () => JSON.parse(fs.readFileSync(MUSIC_FILE, 'utf8')),
+    save: (data) => fs.writeFile(MUSIC_FILE, JSON.stringify(data), () => {}),
+  },
+  onChange: () => web?.toDashboards({ type: 'music', music: musicPlayer.snapshot() }),
+});
+/** Rilegge la cartella (i file si possono aggiungere dalla cartella condivisa in qualsiasi momento). */
+function rescanMusic() {
+  const before = musicLibrary.map((t) => t.id).join('|');
+  musicLibrary = scanLibrary(MUSIC_DIR);
+  if (musicLibrary.map((t) => t.id).join('|') !== before) web?.toDashboards({ type: 'music', library: true, music: musicPlayer.snapshot() });
+  return musicLibrary;
+}
+setInterval(rescanMusic, 60000).unref();
+
 // --- Programmazione delle live (data/schedule.json) ---
 const SCHEDULE_FILE = path.join(DATA_DIR, 'schedule.json');
 const schedule = new Schedule({
@@ -483,6 +508,11 @@ const app = {
   autoShoutout,
   titleLog,
   liveStats,
+  music: {
+    player: musicPlayer,
+    library: () => musicLibrary,
+    rescan: rescanMusic,
+  },
   schedule: {
     state: () => ({ entries: schedule.entries, next: schedule.next(), timezone: TIMEZONE, canPublish: Boolean(auth.user && auth.hasScope('channel:manage:schedule')) }),
     replace(list) {
@@ -535,6 +565,7 @@ const app = {
       },
       ui: config.get().ui,
       overlays: web?.clients.overlay.size ?? 0,
+      musicPages: web?.musicPages() ?? 0,
       obs: obs.state(),
       moderation: {
         enabled: Boolean(config.get().moderation?.enabled),
@@ -587,6 +618,8 @@ const web = createServer(app);
 manager.on('alert', (alert) => {
   web.toOverlays({ type: 'alert', alert });
   web.toDashboards({ type: 'alert', alert });
+  // la musica si abbassa mentre c'è l'alert, così si sentono suono e voce
+  if (config.get().music?.duck !== false) web.toMusic({ type: 'duck', ms: alert.duration ?? 5000, level: config.get().music?.duckLevel ?? 0.3 });
 });
 manager.on('skip', (alert) => web.toOverlays({ type: 'skip', id: alert.id }));
 manager.on('queue', (queue) => web.toDashboards({ type: 'queue', queue }));

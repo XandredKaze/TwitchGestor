@@ -74,3 +74,64 @@ test('tema: si salva solo il tema e i temi sconosciuti sono rifiutati', async ()
   await bad.text();
   web.server.close();
 });
+
+test('musica: comandi dalla dashboard, pagina /music e file a pezzi (Range)', async () => {
+  const app = fakeApp();
+  const done = [];
+  app.music = {
+    library: () => [{ id: 'a.mp3', folder: '', name: 'a.mp3' }],
+    rescan: () => done.push('rescan'),
+    player: {
+      playlists: () => [{ id: '*', name: 'Tutta la musica', count: 1 }],
+      snapshot: () => ({ playing: done.includes('toggle') }),
+      pageState: () => ({ type: 'music', track: { id: 'a.mp3', url: '/media/music/a.mp3' }, playing: true, volume: 0.5 }),
+      toggle: () => done.push('toggle'),
+      fromPage: (m) => done.push(`page:${m.type}`),
+    },
+  };
+  const web = createServer(app);
+  web.server.listen(0, '127.0.0.1');
+  await once(web.server, 'listening');
+  const base = `http://127.0.0.1:${web.server.address().port}`;
+  const h = { 'x-twitchgestor': '1' };
+
+  const lib = await (await fetch(`${base}/api/music`, { headers: h })).json();
+  assert.equal(lib.tracks.length, 1);
+  assert.equal(lib.pages, 0);
+  assert.equal(lib.share, null); // la cartella condivisa c'è solo sul Raspberry
+  const r = await (await fetch(`${base}/api/music/toggle`, { method: 'POST', headers: h })).json();
+  assert.equal(r.player.playing, true);
+  assert.equal((await fetch(`${base}/api/music/boh`, { method: 'POST', headers: h })).status, 404);
+
+  // la pagina di OBS riceve cosa suonare e avvisa quando il brano finisce
+  const { WebSocket } = await import('ws');
+  const ws = new WebSocket(`${base.replace('http', 'ws')}/ws?role=music`);
+  const [hello] = await once(ws, 'message');
+  const msg = JSON.parse(hello);
+  assert.equal(msg.type, 'hello');
+  assert.equal(msg.track.id, 'a.mp3');
+  assert.equal(web.musicPages(), 1);
+  ws.send(JSON.stringify({ type: 'ended', id: 'a.mp3' }));
+  await new Promise((res) => setTimeout(res, 100));
+  assert.ok(done.includes('page:ended'));
+  ws.close();
+
+  const part = await fetch(`${base}/common.js`, { headers: { range: 'bytes=0-9' } });
+  assert.equal(part.status, 206);
+  assert.equal((await part.text()).length, 10);
+  assert.match(part.headers.get('content-range'), /^bytes 0-9\/\d+$/);
+  web.server.close();
+});
+
+test('configurazione per la dashboard: c\'è l\'elenco dei file caricati', async () => {
+  const app = fakeApp();
+  app.chatAccount = () => null;
+  const web = createServer(app);
+  web.server.listen(0, '127.0.0.1');
+  await once(web.server, 'listening');
+  const res = await fetch(`http://127.0.0.1:${web.server.address().port}/api/config`, { headers: { 'x-twitchgestor': '1' } });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.ok(Array.isArray(body.media.music) && Array.isArray(body.media.sounds));
+  web.server.close();
+});

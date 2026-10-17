@@ -69,7 +69,7 @@ status running
 BACKUPS="$DIR/data/backups"
 as_user mkdir -p "$BACKUPS"
 BACKUP="$BACKUPS/prima-di-aggiornare-$(date +%Y%m%d-%H%M%S).tar.gz"
-as_user tar -czf "$BACKUP" --exclude=data/backups -C "$DIR" config data .env 2>/dev/null
+as_user tar -czf "$BACKUP" --exclude=data/backups --exclude=data/media/music -C "$DIR" config data .env 2>/dev/null
 ls -1t "$BACKUPS"/prima-di-aggiornare-*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
 
 # reinstalla i pacchetti solo se sono cambiati (non basta il numero di versione in package.json)

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Musica per OBS</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&family=Bungee&family=Share+Tech+Mono&display=swap">
+  <link rel="stylesheet" href="/music.css">
+</head>
+<body>
+  <audio id="audio" preload="auto"></audio>
+  <div id="widget" class="np" hidden>
+    <div class="np-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <div class="np-text">
+      <div class="np-label">In riproduzione</div>
+      <div class="np-title" id="np-title"></div>
+      <div class="np-artist" id="np-artist"></div>
+    </div>
+  </div>
+  <button id="unlock" type="button" hidden>🔊 Clicca per attivare l'audio</button>
+  <script src="/music.js"></script>
+</body>
+</html>

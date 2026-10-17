@@ -23,6 +23,7 @@ import { AutoShoutout, shoutoutCard } from '../src/core/shoutout.js';
 import { LiveStats, computeRecap } from '../src/core/livestats.js';
 import { Schedule, generateWeeks } from '../src/core/schedule.js';
 import { ChatFeed, shouldShow } from '../src/core/chatOverlay.js';
+import { MusicPlayer } from '../src/core/music.js';
 
 const CHANNEL = { id: '0', login: 'canale_demo' };
 const DEMO_SCENES = ['Inizio', 'Gioco', 'Chiacchiere', 'Pausa', 'Fine'];
@@ -30,8 +31,14 @@ const BOT = { id: '1', login: 'Wolfery' };
 const UPLOAD_KINDS = {
   sounds: ['.mp3', '.ogg', '.wav'],
   images: ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.webm', '.mp4'],
-  music: ['.mp3', '.ogg', '.wav', '.m4a', '.flac'],
+  music: ['.mp3', '.ogg', '.wav', '.m4a', '.flac', '.opus'],
 };
+// libreria musicale di prova: nella demo non c'è audio, il lettore "suona" in silenzio
+const DEMO_MUSIC = [
+  ['Chill', 'Lofi Girl - Pioggia sui tetti.mp3', 154], ['Chill', 'Lofi Girl - Caffè delle 3.mp3', 131], ['Chill', 'Nuvole basse.mp3', 176],
+  ['Chill', 'Sognando - Notte in città.mp3', 142], ['Gaming', 'Pixel Hero - Boss Fight.mp3', 118], ['Gaming', 'Pixel Hero - Livello segreto.mp3', 127],
+  ['Gaming', 'Arcade_Night.mp3', 149], ['Intro e pause', 'Sigla di apertura.mp3', 45], ['Intro e pause', 'Torno subito.mp3', 96],
+].map(([folder, name, duration]) => ({ id: `${folder}/${name}`, url: '', folder, name, duration }));
 
 const storage = {
   get(key, fallback) {
@@ -156,7 +163,7 @@ class DemoBackend {
     this.defaults = defaults;
     this.config = sanitizeConfig(deepMerge(defaults, storage.get('tg-demo-config', {})), defaults);
     this.manager = new NotificationManager({ config: this.config });
-    this.clients = { overlay: new Set(), dashboard: new Set(), chat: new Set() };
+    this.clients = { overlay: new Set(), dashboard: new Set(), chat: new Set(), music: new Set() };
     this.chatFeed = new ChatFeed({ send: (m) => this.#send('chat', m) });
     this.media = { sounds: [], images: [], music: [] };
     this.chat = [];
@@ -197,6 +204,7 @@ class DemoBackend {
         game: () => 'Just Chatting',
         title: () => 'Live demo di TwitchGestor',
         lastfollow: () => this.manager.history.find((n) => n.type === 'follow')?.user?.name ?? 'nessuno, per ora',
+        song: () => this.music?.songText() ?? 'nessuna canzone in riproduzione',
       },
       actions: {
         scene: async (wanted) => {
@@ -255,6 +263,22 @@ class DemoBackend {
       liveSince: async () => this.liveStartedAt ?? null,
       onChange: () => this.#send('dashboard', { type: 'shoutouts', history: this.autoShoutout.history, seen: this.autoShoutout.seen }),
     });
+    // musica: stesso lettore del programma vero; qui un "OBS finto" fa scorrere il tempo dei brani
+    this.musicLibrary = [...DEMO_MUSIC];
+    this.music = new MusicPlayer({
+      getLibrary: () => this.musicLibrary,
+      store: { load: () => storage.get('tg-demo-music', null), save: (d) => storage.set('tg-demo-music', d) },
+      onChange: () => this.#send('dashboard', { type: 'music', music: this.music.snapshot() }),
+    });
+    this.musicDuck = 0;
+    setInterval(() => {
+      const t = this.music.current;
+      if (!t || !this.music.state.playing) return;
+      const position = this.music.state.position + 1;
+      if (position >= t.duration) this.music.fromPage({ type: 'ended', id: t.id });
+      else if (position % 2 === 0) this.music.fromPage({ type: 'progress', id: t.id, position, duration: t.duration });
+      else this.music.state.position = position;
+    }, 1000);
     this.log.info('Demo avviata: nessun collegamento a Twitch, gli eventi sono simulati');
   }
 
@@ -423,6 +447,8 @@ class DemoBackend {
       moderation: { enabled: Boolean(this.config.moderation?.enabled), by: this.bot ? this.bot.login : CHANNEL.login, byBot: Boolean(this.bot), missingScope: false },
       shoutouts: { enabled: Boolean(this.config.shoutouts?.enabled), by: this.bot ? this.bot.login : CHANNEL.login, byBot: Boolean(this.bot), botMissingScope: false },
       overlays: this.clients.overlay.size,
+      musicPages: 1,
+      obsBase: 'http://localhost:3000',
       chatReplies: Boolean(this.config.chat?.enabled),
       chatAccount: this.chatAccount(),
       overlayUrl: 'overlay.html',
@@ -533,6 +559,35 @@ class DemoBackend {
           return ok({ ...state(), results: ids.map((id) => ({ id, ok: true })) });
         }
         return ok(state());
+      }
+      case 'GET /api/music':
+        return ok({
+          playlists: this.music.playlists(), tracks: this.musicLibrary.map((t) => ({ id: t.id, folder: t.folder, name: t.name })),
+          player: this.music.snapshot(), pages: 1, settings: this.config.music, share: null,
+        });
+      case 'POST /api/music/play': case 'POST /api/music/toggle': case 'POST /api/music/next': case 'POST /api/music/prev':
+      case 'POST /api/music/volume': case 'POST /api/music/shuffle': case 'POST /api/music/rescan': case 'POST /api/music/settings':
+      case 'POST /api/music/upload': {
+        const p = this.music;
+        const action = route.slice('POST /api/music/'.length);
+        if (action === 'upload') {
+          const name = String(decodeURIComponent(headers['x-filename'] ?? '')).replace(/[\\/]/g, '_');
+          if (!UPLOAD_KINDS.music.includes(ext(name))) return fail(400, `Formato non supportato. Usa: ${UPLOAD_KINDS.music.join(', ')}`);
+          const folder = String(url.searchParams.get('folder') ?? '').replace(/[\\/]/g, '').slice(0, 60);
+          this.musicLibrary.push({ id: folder ? `${folder}/${name}` : name, url: '', folder, name, duration: 120 });
+          return ok({ path: `media/music/${folder ? `${folder}/` : ''}${name}` });
+        }
+        if (action === 'play') p.play({ playlist: body?.playlist, trackId: body?.trackId });
+        else if (action === 'toggle') p.toggle();
+        else if (action === 'next') p.next();
+        else if (action === 'prev') p.prev();
+        else if (action === 'volume') p.setVolume(body?.volume);
+        else if (action === 'shuffle') p.setShuffle(body?.on);
+        else if (action === 'settings') {
+          this.config = sanitizeConfig({ ...this.config, music: { ...this.config.music, ...body } }, this.defaults);
+          storage.set('tg-demo-config', diffConfig(this.config, this.defaults) ?? {});
+        }
+        return ok({ player: p.snapshot(), pages: 1, settings: this.config.music });
       }
       case 'GET /api/update': return ok({ managed: false, commit: '', settings: { auto: true, hour: 5 }, check: {} });
       case 'GET /api/backup': case 'POST /api/backup/restore':

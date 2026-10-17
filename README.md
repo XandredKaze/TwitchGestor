@@ -31,6 +31,10 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 - **Varianti**: alert diversi in base all'importo (es. donazioni sopra i 50 €, bits sopra i 1000, 10+ sub regalate) o alla ricompensa dei punti canale.
 - **Filtri**: disattiva un tipo, imposta un minimo, ignora ricompense specifiche. Le sub regalate non generano un doppio alert.
 - **Storico e statistiche** della sessione: conteggi, bits totali, donazioni per valuta, top donatori. Lo storico viene salvato su disco.
+- **Statistiche nel tempo** (scheda 📈 Statistiche): spettatori, follower, abbonati, ore di live e chat, settimana per settimana, spiegati in parole semplici.
+- **Riepilogo di fine live** (scheda 📋 Riepiloghi): tutti i riepiloghi delle live passate, con il confronto con le precedenti; facoltativo anche su **Telegram**.
+- **Programmazione delle live** (scheda 📅 Programmazione): le live in programma, titolo e categoria impostati da soli poco prima, calendario di Twitch e immagine della settimana da condividere.
+- **Musica** (scheda 🎵 Musica): la musica di sottofondo con playlist, suonata da OBS e comandata dalla dashboard; si abbassa da sola durante gli alert. Sul Raspberry c'è una **cartella condivisa** per copiarci musica, immagini e suoni dal PC.
 - **Ringraziamenti automatici in chat** (facoltativi) con testi personalizzabili, scritti dal tuo account o da un **account bot** (es. Wolfery).
 - **Anti-duplicati**, riconnessione automatica a Twitch, rinnovo automatico del token.
 - Le modifiche valgono **subito**, anche durante la live.
@@ -147,6 +151,30 @@ Con **⚙ Personalizza** scegli quali azioni mostrare. La prima volta servono nu
 
 TwitchGestor segna ogni live: data, ora, durata, titolo e categoria, compresi i cambi fatti durante la diretta. In **Azioni rapide → Titolo e categoria** trovi i **titoli usati nelle live**: un clic li rimette insieme alla loro categoria, poi premi **Salva**. Con **📜 Storico delle live** vedi l'elenco completo. Lo storico sta in `data/titles.json`.
 
+## Statistiche nel tempo
+
+La scheda **📈 Statistiche** raccoglie i dati di ogni live (da quando usi questa versione): media e picco di spettatori, follower e abbonati guadagnati, ore in diretta, messaggi in chat e chi scrive di più. Scegli il periodo (4 settimane, 3 mesi, 1 anno, tutto); ogni numero ha una frase che spiega cosa vuol dire. I dati stanno in `data/livestats.json`.
+
+## Riepilogo di fine live (e Telegram)
+
+Quando la live finisce TwitchGestor prepara il **riepilogo**: durata, spettatori, nuovi follower, abbonamenti, bits, donazioni, raid, chat, titoli usati e il confronto con le live precedenti. Li trovi tutti nella scheda **📋 Riepiloghi**.
+
+Per riceverli anche sul telefono con **Telegram** (gratis): nella scheda Riepiloghi segui i passaggi di **Telegram** (crei un bot con @BotFather, incolli il codice, scrivi un messaggio al bot e premi **Trova la chat**). Puoi ricevere anche un avviso quando inizia la live.
+
+## Programmazione delle live
+
+Nella scheda **📅 Programmazione** scrivi le prossime live (giorno, ora, durata, titolo, categoria) oppure le crei per **più settimane in un colpo** (es. martedì e giovedì alle 21 per 4 settimane). Per ogni live puoi far impostare **titolo e categoria da soli 10 minuti prima**. Con **Calendario di Twitch** le pubblichi sul tuo canale (la prima volta serve un permesso in più: **Esci** e **Accedi con Twitch**) e con **Immagine della settimana** scarichi un'immagine pronta per social e Discord. In chat `{nextlive}` dice quando è la prossima live (es. un comando `!prossima`).
+
+## Musica
+
+La scheda **🎵 Musica** gestisce la musica di sottofondo. La musica sono **file audio** (mp3, ogg, m4a, flac, wav) nella cartella `data/media/music`: ogni **sottocartella è una playlist** (es. `Chill`, `Gaming`). Un brano mp3 occupa 3–5 MB: 500 brani stanno in 2–3 GB.
+
+1. In OBS aggiungi una **Sorgente browser** con `http://localhost:3000/music` (sul Raspberry con il suo indirizzo) e spunta **Controlla l'audio tramite OBS**: la musica va in live e la regoli dal mixer.
+2. Carica i brani dalla scheda Musica (**Aggiungi brani**) oppure copiali nella cartella.
+3. Dalla scheda scegli playlist e brano, ⏮ ⏯ ⏭, volume e ordine casuale.
+
+Facoltativo: `http://localhost:3000/music?widget` è un riquadro "in riproduzione" da mettere a schermo (`&style=brutal` per lo stile brutalista). Durante gli alert la musica si abbassa da sola (si regola in "Durante gli alert"). In chat `{song}` dice il brano che sta suonando (es. un comando `!song`). Usa musica di cui hai i diritti: quella protetta può far silenziare i VOD su Twitch.
+
 ## Comandi della chat
 
 Nella scheda **🤖 Comandi** crei i comandi che gli spettatori scrivono in chat con il "!" (es. `!discord`): TwitchGestor legge la chat con il tuo account e risponde con il bot (es. Wolfery), oppure con il tuo account se il bot non è collegato.
@@ -159,7 +187,7 @@ Per ogni comando scegli:
 - **cosa fa**: risponde con un testo, elenca i comandi, **cambia scena di OBS** (`!scena gioco`, basta l'inizio del nome) o **fa ripartire i titoli di coda**;
 - **chi può usarlo**: tutti, abbonati, VIP, moderatori o solo tu;
 - **attese**: tra un uso e l'altro e per lo stesso spettatore (tu e i moderatori non avete attese);
-- la **risposta**, con le variabili: `{user}` chi scrive, `{target}` il nome dopo il comando (es. `!so @nome`), `{args}`, `{1}`…`{9}`, `{channel}`, `{uptime}`, `{followage}`, `{game}`, `{title}`, `{lastfollow}`, `{count}` (quante volte è stato usato: salvato in `data/command-counts.json`), `{random:1-100}`, `{scene}`, `{result}`.
+- la **risposta**, con le variabili: `{user}` chi scrive, `{target}` il nome dopo il comando (es. `!so @nome`), `{args}`, `{1}`…`{9}`, `{channel}`, `{uptime}`, `{followage}`, `{game}`, `{title}`, `{lastfollow}`, `{nextlive}` (la prossima live in programma), `{song}` (il brano che sta suonando), `{count}` (quante volte è stato usato: salvato in `data/command-counts.json`), `{random:1-100}`, `{scene}`, `{result}`.
 
 Ci sono già alcuni comandi pronti (`!comandi`, `!uptime`, `!followage`, `!social`, `!discord`, `!so`, `!scena`, `!titoli`) da modificare a piacere. Con **Prova un comando** vedi la risposta senza scrivere in chat. I **messaggi a tempo** il bot li scrive da solo ogni N minuti, ma solo se in chat sono stati scritti abbastanza messaggi.
 

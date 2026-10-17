@@ -71,9 +71,10 @@
 
   // Indirizzo da mettere in OBS: sul Raspberry è quello con cui hai aperto la dashboard (non "localhost").
   // (Anche se la dashboard è aperta in https, OBS usa l'indirizzo normale.)
-  const obsUrl = (page) => (state.managed
+  const obsUrl = (page) => (state.obsBase ? `${state.obsBase}/${page}` : state.managed
     ? `http://${location.hostname}:${new URL(state.overlayUrl).port || 80}/${page}`
     : state.overlayUrl.replace(/overlay$/, page));
+  window.TG.obsUrl = (page) => (state ? obsUrl(page) : '');
 
   // TwitchGestor aggiornato (es. sul Raspberry): ricarica la pagina, se non ci sono modifiche non salvate
   let knownBuild = null;
@@ -779,6 +780,7 @@
       if (msg.type === 'shoutouts') window.dispatchEvent(new CustomEvent('tg:shoutouts', { detail: msg }));
       if (msg.type === 'stats') window.dispatchEvent(new Event('tg:stats'));
       if (msg.type === 'schedule') window.dispatchEvent(new Event('tg:schedule'));
+      if (msg.type === 'music') window.dispatchEvent(new CustomEvent('tg:music', { detail: msg }));
       if (msg.type === 'stream' && state) {
         state.obs = { ...state.obs, stream: msg.stream };
         window.dispatchEvent(new CustomEvent('tg:stream', { detail: msg.stream }));

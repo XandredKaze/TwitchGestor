@@ -22,6 +22,7 @@
       <button class="tab" data-tab="stats" role="tab">📈 Statistiche</button>
       <button class="tab" data-tab="recaps" role="tab">📋 Riepiloghi</button>
       <button class="tab" data-tab="schedule" role="tab">📅 Programmazione</button>
+      <button class="tab" data-tab="music" role="tab">🎵 Musica</button>
       <button class="tab" data-tab="theme" role="tab">🖌 Tema</button>
     </nav>
     <div id="statuses" class="statuses"></div>
@@ -424,6 +425,27 @@
     </div>
   </main>
 
+  <main id="tab-music" class="music-tab" hidden>
+    <div class="page-head">
+      <div><h2>🎵 Musica</h2><p>La musica di sottofondo della live: la suona OBS (così va in diretta e la regoli dal mixer), tu la comandi da qui. Ogni sottocartella della cartella "music" è una playlist.</p></div>
+    </div>
+    <div class="music-layout">
+      <div class="music-main">
+        <section class="panel mu-now" id="mu-now"></section>
+        <section class="panel">
+          <div class="mu-lib-head"><h2>Libreria</h2><input type="search" id="mu-search" placeholder="Cerca un brano o un artista…"></div>
+          <div id="mu-library" class="mu-library"></div>
+        </section>
+      </div>
+      <div class="music-side">
+        <section class="panel" id="mu-obs"></section>
+        <section class="panel" id="mu-upload"></section>
+        <section class="panel" id="mu-share"></section>
+        <section class="panel" id="mu-duck"></section>
+      </div>
+    </div>
+  </main>
+
   <main id="tab-theme" class="theme-tab" hidden>
     <div class="page-head">
       <div><h2>🖌 Tema</h2><p>L'aspetto di TwitchGestor, degli alert e dei titoli di coda.</p></div>
@@ -469,6 +491,7 @@
   <script src="/stats.js"></script>
   <script src="/recaps.js"></script>
   <script src="/schedule.js"></script>
+  <script src="/music-tab.js"></script>
   <script src="/chatoverlay.js"></script>
 </body>
 </html>
