@@ -58,6 +58,7 @@
     $('so-enabled').checked = Boolean(settings.enabled);
     $('so-chat').checked = settings.chatMessage !== false;
     $('so-official').checked = settings.official !== false;
+    $('so-card').checked = settings.obsCard !== false;
     $('so-only-live').checked = settings.onlyLive !== false;
     if (document.activeElement !== $('so-message')) $('so-message').value = settings.message ?? '';
     const users = settings.users ?? [];
@@ -123,6 +124,7 @@
   $('so-enabled').onchange = (e) => { settings.enabled = e.target.checked; renderStatus(); save(); };
   $('so-chat').onchange = (e) => { settings.chatMessage = e.target.checked; save(); };
   $('so-official').onchange = (e) => { settings.official = e.target.checked; renderStatus(); save(); };
+  $('so-card').onchange = (e) => { settings.obsCard = e.target.checked; save(); };
   $('so-only-live').onchange = (e) => { settings.onlyLive = e.target.checked; save(); };
   $('so-message').oninput = (e) => { settings.message = e.target.value; save(); };
   $('so-reset').onclick = async () => {

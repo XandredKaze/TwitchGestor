@@ -47,7 +47,7 @@
     css.setProperty('--bg', hexToRgba(settings.background, settings.backgroundOpacity ?? 0.45));
     if (style === 'brutal') {
       css.removeProperty('--font');
-      ['Share Tech Mono', 'Outfit'].forEach(ensureFont);
+      ['Share Tech Mono', 'Outfit', 'Bungee'].forEach(ensureFont);
     } else {
       css.setProperty('--font', `'${settings.font || 'Poppins'}', sans-serif`);
       ensureFont(settings.font || 'Poppins');
@@ -90,11 +90,43 @@
     return node;
   }
 
+  /** Scheda dello shoutout: immagine del canale, nome, ultima categoria e link. */
+  function renderShoutout(m) {
+    const node = el('div', 'msg so-card');
+    node.dataset.id = m.id;
+    node.dataset.user = m.userId;
+    node.dataset.at = m.at;
+    const bar = el('div', 'so-bar');
+    const label = el('span', 'so-bar-name', '// ');
+    label.append(el('span', 'hl', 'SHOUTOUT'));
+    bar.append(label, el('span', 'so-tools', '_ ▢ ✕'));
+    const avatar = el('div', 'so-avatar');
+    if (m.avatar) {
+      const img = el('img');
+      img.src = m.avatar;
+      img.alt = '';
+      img.onerror = () => { img.remove(); avatar.textContent = (m.name || '?')[0].toUpperCase(); };
+      avatar.append(img);
+    } else {
+      avatar.textContent = (m.name || '?')[0].toUpperCase();
+    }
+    const body = el('div', 'so-body');
+    body.append(el('div', 'so-label', '📣 Shoutout'), el('div', 'so-name', m.name));
+    if (m.game) {
+      const game = el('div', 'so-game', 'Ultima live: ');
+      game.append(el('b', '', m.game));
+      body.append(game);
+    }
+    body.append(el('div', 'so-link', `twitch.tv/${m.login}`));
+    node.append(bar, avatar, body, el('div', 'so-shine'));
+    return node;
+  }
+
   function add(m) {
     // messaggi vecchi (es. quando la sorgente si ricarica) solo se non sarebbero già spariti
     const life = (settings.lifetime ?? 0) * 1000;
     if (life && Date.now() - m.at > life) return;
-    box.append(render(m));
+    box.append(m.kind === 'shoutout' ? renderShoutout(m) : render(m));
     trim();
   }
 
@@ -143,7 +175,14 @@
       'vip/1': 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18"><rect width="18" height="18" rx="4" fill="#e005b9"/><path d="M4 7l5 6 5-6-2-2H6z" fill="#fff"/></svg>'),
     };
     let i = 0;
+    const AVATAR = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="#c58bff"/><stop offset="1" stop-color="#5b21b6"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/><text x="50" y="66" font-family="Arial,sans-serif" font-size="50" font-weight="700" fill="#fff" text-anchor="middle">S</text></svg>');
     const tick = () => {
+      // ogni tanto uno shoutout, per vederne l'aspetto
+      if (i % 9 === 4) {
+        add({ id: `p${i}`, kind: 'shoutout', userId: 'so:demo', login: 'streamer_amico', name: 'Streamer_Amico', avatar: AVATAR, game: 'Minecraft', at: Date.now() });
+        i++;
+        return;
+      }
       const [name, color, b] = PEOPLE[i % PEOPLE.length];
       add({ id: `p${i}`, userId: name, login: name.toLowerCase(), name, color, badges: b.map(([set, id]) => ({ set, id })), text: LINES[i % LINES.length], fragments: [{ type: 'text', text: LINES[i % LINES.length] }], at: Date.now() });
       i++;

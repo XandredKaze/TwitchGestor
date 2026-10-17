@@ -20,7 +20,7 @@ import { ChatCommands, humanDuration } from '../src/core/commands.js';
 import { createQuickActions } from '../src/quickActions.js';
 import { summarizeStream } from '../src/core/streamHealth.js';
 import { ChatModerator } from '../src/core/moderation.js';
-import { AutoShoutout } from '../src/core/shoutout.js';
+import { AutoShoutout, shoutoutCard } from '../src/core/shoutout.js';
 import { ChatFeed, shouldShow } from '../src/core/chatOverlay.js';
 
 const CHANNEL = { id: '0', login: 'canale_demo' };
@@ -97,6 +97,11 @@ function demoCreditsData() {
 const VIEWER_CHAT = ['ciao a tutti!', 'che bella live 🔥', 'GG', 'ahahah', 'forza!', 'da dove stai giocando?', 'quel salto era perfetto', 'LUL', 'buonasera chat', '💜💜💜'];
 const VIEWERS = ['PizzaConAnanas', 'LupoSolitario', 'GattoNinja', 'CaffèCorretto', 'MarioRossi92', 'SuperNonna', 'VolpeRossa', 'NebbiaZeta'];
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+/** Immagine del canale inventata (lettera iniziale su un colore) per gli shoutout della demo. */
+function demoAvatar(login) {
+  const hue = [...login].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+  return 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue},75%,62%)"/><stop offset="1" stop-color="hsl(${(hue + 60) % 360},70%,40%)"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/><text x="50" y="66" font-family="Arial,sans-serif" font-size="50" font-weight="700" fill="#fff" text-anchor="middle">${login[0].toUpperCase()}</text></svg>`);
+}
 
 class DemoBackend {
   constructor() {
@@ -179,7 +184,13 @@ class DemoBackend {
       },
       onAction: () => this.#send('dashboard', { type: 'moderation', history: this.moderator.history }),
     });
-    this.quickActions = createQuickActions({ helix: this.#fakeTwitch(), getUser: () => CHANNEL });
+    this.quickActions = createQuickActions({
+      helix: this.#fakeTwitch(),
+      getUser: () => CHANNEL,
+      onShoutout: (login) => {
+        if (this.config.shoutouts?.obsCard !== false) this.autoShoutout.channelInfo(login).then((info) => this.chatFeed.push(shoutoutCard(info)));
+      },
+    });
     this.commands = new ChatCommands({
       ...commandDeps,
       getConfig: () => this.config.commands,
@@ -193,7 +204,8 @@ class DemoBackend {
       log: this.log,
       send: (text) => this.#chat(this.bot ? this.bot.login : CHANNEL.login, text, true),
       shoutout: async () => { this.log.info('Shoutout di Twitch (simulato)'); },
-      channelInfo: async (login) => ({ id: login, login, name: login.replace(/^\w/, (c) => c.toUpperCase()), game: DEMO_GAMES[login.length % DEMO_GAMES.length], title: 'live di prova' }),
+      channelInfo: async (login) => ({ id: login, login, name: login.replace(/^\w/, (c) => c.toUpperCase()), game: DEMO_GAMES[login.length % DEMO_GAMES.length], title: 'live di prova', avatar: demoAvatar(login) }),
+      onCard: (info) => this.chatFeed.push(shoutoutCard(info)),
       liveSince: async () => this.liveStartedAt ?? null,
       onChange: () => this.#send('dashboard', { type: 'shoutouts', history: this.autoShoutout.history, seen: this.autoShoutout.seen }),
     });

@@ -16,7 +16,7 @@ import { createQuickActions } from './quickActions.js';
 import { ChatModerator } from './core/moderation.js';
 import { ChatFeed, toChatMessage, shouldShow, badgeMap } from './core/chatOverlay.js';
 import { ChatCommands, humanDuration } from './core/commands.js';
-import { AutoShoutout } from './core/shoutout.js';
+import { AutoShoutout, shoutoutCard } from './core/shoutout.js';
 import { sanitizeConfig } from './core/schema.js';
 import { createLogger } from './logger.js';
 
@@ -159,7 +159,15 @@ function testCommand(text, role = 'broadcaster', draft) {
   return tester.handle({ text, user: { id: role === 'broadcaster' ? auth.user?.id : 'prova', login: name, name }, badges }, { dryRun: true });
 }
 
-const quickActions = createQuickActions({ helix, getUser: () => auth.user });
+const quickActions = createQuickActions({
+  helix,
+  getUser: () => auth.user,
+  // shoutout fatto a mano dalle Azioni rapide: anche lui compare nella chat di OBS
+  onShoutout: (login) => {
+    if (config.get().shoutouts?.obsCard === false) return;
+    autoShoutout.channelInfo(login).then((info) => info && chatFeed.push(shoutoutCard(info))).catch(() => {});
+  },
+});
 
 // --- Chat per OBS (pagina /chat): messaggi della chat, senza bot, comandi e messaggi moderati ---
 const chatFeed = new ChatFeed({ send: (m) => web?.toChat(m) });
@@ -242,7 +250,7 @@ const autoShoutout = new AutoShoutout({
     const u = (await helix.request('GET', `/users?login=${encodeURIComponent(login)}`)).data?.[0];
     if (!u) return null;
     const c = (await helix.request('GET', `/channels?broadcaster_id=${u.id}`)).data?.[0] ?? {};
-    return { id: u.id, login: u.login, name: u.display_name || u.login, game: c.game_name || '', title: c.title || '' };
+    return { id: u.id, login: u.login, name: u.display_name || u.login, game: c.game_name || '', title: c.title || '', avatar: u.profile_image_url || '' };
   }),
   async liveSince() {
     // controllato al massimo ogni 30 secondi (quando inizi la live se ne accorge subito dopo)
@@ -258,6 +266,7 @@ const autoShoutout = new AutoShoutout({
     save: (data) => fs.writeFile(SHOUTOUT_FILE, JSON.stringify(data), () => {}),
   },
   onChange: () => web?.toDashboards({ type: 'shoutouts', history: autoShoutout.history, seen: autoShoutout.seen }),
+  onCard: (info) => chatFeed.push(shoutoutCard(info)),
 });
 
 /** Prova della moderazione dalla dashboard: non fa nulla in chat. */

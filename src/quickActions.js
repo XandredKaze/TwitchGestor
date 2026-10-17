@@ -41,7 +41,7 @@ export function explainTwitchError(err) {
   return m || 'Errore di Twitch';
 }
 
-export function createQuickActions({ helix, getUser }) {
+export function createQuickActions({ helix, getUser, onShoutout }) {
   const me = () => {
     const user = getUser();
     if (!user) throw Object.assign(new Error('Collega prima il tuo account Twitch'), { status: 409, local: true });
@@ -137,6 +137,7 @@ export function createQuickActions({ helix, getUser }) {
       const id = me();
       const target = await userIdOf(login(channel));
       await req('POST', `/chat/shoutouts?${q({ from_broadcaster_id: id, to_broadcaster_id: target.id, moderator_id: id })}`);
+      onShoutout?.(target.login);
       return { message: `Shoutout a ${target.display_name} inviato` };
     },
     async announce({ message, color }) {

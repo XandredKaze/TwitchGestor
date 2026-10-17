@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { AutoShoutout, renderShoutout, cleanLogin, OFFICIAL_GAP_MS } from '../src/core/shoutout.js';
+import { AutoShoutout, renderShoutout, cleanLogin, shoutoutCard, OFFICIAL_GAP_MS } from '../src/core/shoutout.js';
 import { sanitizeConfig } from '../src/core/schema.js';
 
 const defaults = JSON.parse(fs.readFileSync(new URL('../src/core/defaults.json', import.meta.url)));
@@ -97,4 +97,19 @@ test('spento non fa nulla; impostazioni ripulite', async () => {
   assert.deepEqual(s.users, [{ login: 'luna' }, { login: 'drago', message: 'Ciao {user}' }]);
   assert.equal(s.official, false);
   assert.equal(s.onlyLive, true);
+});
+
+test('scheda dello shoutout nella chat di OBS (se attiva)', async () => {
+  const cards = [];
+  const make = (obsCard) => new AutoShoutout({
+    getConfig: () => ({ ...defaults.shoutouts, enabled: true, official: false, obsCard, users: [{ login: 'luna' }] }),
+    send: async () => {},
+    channelInfo: async () => ({ ...CHANNELS.luna, avatar: 'https://img/luna.png' }),
+    liveSince: async () => '2026-10-16T18:00:00Z',
+    onCard: (info) => cards.push(shoutoutCard(info, 5)),
+  });
+  await make(true).handle(msg('luna'));
+  assert.deepEqual(cards, [{ id: 'so-luna-5', kind: 'shoutout', userId: 'so:1', login: 'luna', name: 'LunaRossa', avatar: 'https://img/luna.png', game: 'Minecraft', title: 'costruiamo', text: '', at: 5 }]);
+  await make(false).handle(msg('luna'));
+  assert.equal(cards.length, 1);
 });

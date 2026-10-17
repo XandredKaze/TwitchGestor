@@ -224,7 +224,7 @@ function sanitizeModeration(input, base) {
 function sanitizeShoutouts(input, base) {
   const out = { ...base };
   if (!isObject(input)) return out;
-  for (const k of ['enabled', 'onlyLive', 'official', 'chatMessage']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  for (const k of ['enabled', 'onlyLive', 'official', 'chatMessage', 'obsCard']) if (typeof input[k] === 'boolean') out[k] = input[k];
   if (typeof input.message === 'string') out.message = input.message.slice(0, 400);
   if (Array.isArray(input.users)) {
     const seen = new Set();

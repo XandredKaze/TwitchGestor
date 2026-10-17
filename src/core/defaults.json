@@ -323,6 +323,7 @@
     "onlyLive": true,
     "official": true,
     "chatMessage": true,
+    "obsCard": true,
     "message": "📣 Passate a trovare {user}! L'ultima volta era in live con {game} → {link}",
     "users": []
   },

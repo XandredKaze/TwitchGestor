@@ -7,8 +7,9 @@
  *   getConfig()          impostazioni correnti (config.shoutouts)
  *   send(text)           scrive in chat (con il bot, se collegato)
  *   shoutout(userId)     shoutout ufficiale di Twitch verso quel canale
- *   channelInfo(login)   { id, login, name, game, title } del canale (null se non esiste)
+ *   channelInfo(login)   { id, login, name, game, title, avatar } del canale (null se non esiste)
  *   liveSince()          inizio della live in corso (stringa ISO) oppure null se non sei in live
+ *   onCard(info)         mostra la scheda dello shoutout nella chat di OBS (con immagine del canale)
  *   store                { load(), save(data) } per ricordare chi ha già avuto lo shoutout (anche dopo un riavvio)
  */
 
@@ -46,8 +47,8 @@ export class AutoShoutout {
   #timer = null;
   #busy = new Set(); // login in lavorazione (due messaggi ravvicinati non fanno due shoutout)
 
-  constructor({ getConfig, send, shoutout, channelInfo, liveSince, store, onChange, now = () => Date.now(), log = console }) {
-    Object.assign(this, { getConfig, send, shoutoutFn: shoutout, channelInfo, liveSince, store, onChange, now, log });
+  constructor({ getConfig, send, shoutout, channelInfo, liveSince, store, onChange, onCard, now = () => Date.now(), log = console }) {
+    Object.assign(this, { getConfig, send, shoutoutFn: shoutout, channelInfo, liveSince, store, onChange, onCard, now, log });
     this.history = []; // ultimi shoutout, il più recente per primo
     try {
       const saved = store?.load?.();
@@ -128,6 +129,9 @@ export class AutoShoutout {
       this.onChange?.();
       return record;
     }
+    if (cfg.obsCard !== false) {
+      try { this.onCard?.(info); } catch (err) { this.log.warn?.(`Scheda dello shoutout: ${err.message}`); }
+    }
     if (cfg.chatMessage !== false) {
       const text = renderShoutout(entry.message || cfg.message, info);
       try {
@@ -188,4 +192,20 @@ export class AutoShoutout {
   #persist() {
     try { this.store?.save?.({ key: this.#key, seen: [...this.#seen] }); } catch { /* non importante */ }
   }
+}
+
+/** Scheda dello shoutout per la chat di OBS (pagina /chat). */
+export function shoutoutCard(info, now = Date.now()) {
+  return {
+    id: `so-${info.login}-${now}`,
+    kind: 'shoutout',
+    userId: `so:${info.id ?? info.login}`, // non sparisce se la persona riceve un timeout
+    login: info.login,
+    name: info.name || info.login,
+    avatar: info.avatar || '',
+    game: info.game || '',
+    title: info.title || '',
+    text: '',
+    at: now,
+  };
 }

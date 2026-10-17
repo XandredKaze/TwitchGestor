@@ -9,7 +9,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: transparent;
 .chat.top { flex-direction: column-reverse; justify-content: flex-end; }
 .chat.right { align-items: flex-end; text-align: right; }
 .chat.shadow .msg { text-shadow: 0 1px 2px rgba(0, 0, 0, .9), 0 0 6px rgba(0, 0, 0, .6); }
-.msg { max-width: 100%; overflow-wrap: anywhere; }
+.msg { flex-shrink: 0; max-width: 100%; overflow-wrap: anywhere; } /* con tanti messaggi spariscono quelli in alto, non si schiacciano */
 .msg .badges { display: inline-flex; gap: 3px; margin-right: 5px; vertical-align: -0.12em; }
 .msg .badges img { width: 1.05em; height: 1.05em; }
 .msg .name { font-weight: 700; color: var(--user, var(--name)); }
@@ -37,6 +37,67 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: transparent;
 .style-brutal .msg .sep { display: none; }
 .style-brutal .msg .text { display: block; font-family: 'Outfit', sans-serif; font-weight: 500; }
 
+/* ---------- Shoutout: scheda con l'immagine del canale ---------- */
+.msg.so-card {
+  position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .3em .75em;
+  width: 100%; padding: .6em .85em; overflow: hidden; text-align: left; text-shadow: none !important;
+  border-radius: 16px; border: 2px solid rgba(255, 255, 255, .28);
+  background: linear-gradient(120deg, #9146ff, #5b21b6 60%, #3b0f8a);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .25);
+  color: #fff;
+}
+.so-bar { display: none; }
+.so-avatar {
+  display: grid; place-items: center; width: 3.3em; height: 3.3em; border-radius: 50%; overflow: hidden;
+  border: 3px solid #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, .25), 0 0 18px rgba(255, 255, 255, .45);
+  background: #2a1450; font-weight: 800; font-size: 1em;
+}
+.so-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.so-body { min-width: 0; display: flex; flex-direction: column; gap: .1em; }
+.so-label { font-size: .58em; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; opacity: .85; }
+.so-name { font-size: 1.32em; font-weight: 800; line-height: 1.05; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.so-game { font-size: .7em; opacity: .92; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.so-link {
+  align-self: flex-start; margin-top: .3em; padding: .12em .65em; border-radius: 999px;
+  background: #fff; color: #5b21b6; font-size: .64em; font-weight: 800;
+}
+/* riflesso che attraversa la scheda quando arriva */
+.so-shine {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .45) 50%, transparent 65%);
+  transform: translateX(-120%); animation: so-shine 1.1s .45s ease-out both;
+}
+.so-card .so-avatar { animation: so-avatar .7s .15s cubic-bezier(.2, 1.5, .4, 1) both; }
+.anim-slide .msg.so-card, .anim-fade .msg.so-card, .anim-none .msg.so-card { animation: so-in .55s cubic-bezier(.2, 1.3, .4, 1) both; }
+@keyframes so-in { from { opacity: 0; transform: scale(.85) translateY(10px); } }
+@keyframes so-avatar { from { transform: scale(0) rotate(-120deg); } }
+@keyframes so-shine { to { transform: translateX(120%); } }
+
+/* Riquadri: un po' più squadrata, bordo del colore dei nomi */
+.style-boxes .msg.so-card { border-radius: 12px; border: 0; border-left: 4px solid #fff; }
+
+/* Brutalism: finestra "// SHOUTOUT _ ▢ ✕" nero carbone, bianco e lilla */
+.style-brutal .msg.so-card {
+  grid-template-columns: auto minmax(0, 1fr); gap: 0 .75em; padding: 0 0 .7em; border-radius: 0;
+  border: 2px solid #e6e6e6; border-right-width: 2px;
+  background: #151515; box-shadow: 6px 6px 0 rgba(179, 155, 211, .4); color: #e6e6e6;
+}
+.style-brutal.right .msg.so-card { border-right: 2px solid #e6e6e6; }
+.style-brutal .so-bar {
+  grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 1em; margin-bottom: .6em; padding: .25em .6em;
+  border-bottom: 2px solid #e6e6e6; font: 400 .62em/1.3 'Share Tech Mono', monospace; letter-spacing: .1em;
+}
+.style-brutal .so-bar .hl { color: var(--lilac); }
+.style-brutal .so-tools { letter-spacing: .3em; }
+.style-brutal .so-avatar { margin-left: .7em; border-radius: 0; border: 2px solid #e6e6e6; box-shadow: 4px 4px 0 var(--lilac); background: #222; }
+.style-brutal .so-label { display: none; }
+.style-brutal .so-name { font-family: 'Bungee', 'Impact', sans-serif; font-weight: 400; font-size: 1.15em; text-transform: uppercase; }
+.style-brutal .so-game { font-family: 'Outfit', sans-serif; }
+.style-brutal .so-game b { color: var(--lilac); font-weight: 500; }
+.style-brutal .so-link { margin-right: .7em; padding: 0; border-radius: 0; background: none; color: var(--lilac); font: 400 .7em 'Share Tech Mono', monospace; }
+.style-brutal .so-link::before { content: '→ '; }
+.style-brutal .so-shine { background: linear-gradient(105deg, transparent 40%, rgba(179, 155, 211, .35) 50%, transparent 60%); }
+
 /* entrata e uscita */
 .anim-slide .msg { animation: in-slide .35s ease-out; }
 .anim-slide.right .msg { animation-name: in-slide-r; }
@@ -45,4 +106,4 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: transparent;
 @keyframes in-slide { from { opacity: 0; transform: translateX(-24px); } }
 @keyframes in-slide-r { from { opacity: 0; transform: translateX(24px); } }
 @keyframes in-fade { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .msg { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .msg, .so-avatar, .so-shine { animation: none !important; } }
