@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { render, templateVars } from './templates.js';
-import { cleanText } from './ttsText.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('notifiche');
@@ -127,17 +126,7 @@ export class NotificationManager extends EventEmitter {
       // stile del riquadro: classico o Brutalism (come il tema di TwitchGestor)
       alertStyle: style.alertStyle || overlay.alertStyle || 'classic',
       label: style.label ?? this.typeConfig(n.type)?.label ?? n.type,
-      ...this.#tts(n, style, vars),
     };
-  }
-
-  /** Testo da leggere ad alta voce (solo se la voce è attiva in generale e per questo alert). */
-  #tts(n, style, vars) {
-    const cfg = this.#config.tts;
-    if (!cfg?.enabled || !style.tts) return {};
-    const text = cleanText(render(style.ttsText ?? '{message}', vars), cfg);
-    if (!text) return {};
-    return { tts: { text, rate: cfg.rate ?? 0, volume: (cfg.volume ?? 100) / 100 } };
   }
 
   #chatReply(n, cfg) {
@@ -154,14 +143,6 @@ export class NotificationManager extends EventEmitter {
       log.warn(`Coda piena (${max}), alert scartato: ${alert.title}`);
       return;
     }
-    // Preparazione facoltativa (es. creare l'audio della voce) mentre l'alert aspetta in coda.
-    if (this.prepareAlert && alert.tts) {
-      const ready = Promise.race([
-        Promise.resolve().then(() => this.prepareAlert(alert)),
-        new Promise((resolve) => { setTimeout(resolve, 10000); }),
-      ]).catch((err) => log.warn(`Preparazione dell'alert non riuscita: ${err.message}`));
-      Object.defineProperty(alert, 'ready', { value: ready, enumerable: false });
-    }
     front ? this.#queue.unshift(alert) : this.#queue.push(alert);
     this.#emitQueue();
     this.#next();
@@ -171,15 +152,10 @@ export class NotificationManager extends EventEmitter {
     if (this.#current || this.#paused || this.#queue.length === 0) return;
     const alert = this.#queue.shift();
     this.#current = alert;
-    const start = () => {
-      if (this.#current !== alert) return; // saltato mentre si preparava
-      this.emit('alert', alert);
-      this.#emitQueue();
-      const gap = this.#config.queue?.gapMs ?? 800;
-      this.#timer = setTimeout(() => this.#finish(), alert.duration + gap);
-    };
-    if (alert.ready) alert.ready.then(start);
-    else start();
+    this.emit('alert', alert);
+    this.#emitQueue();
+    const gap = this.#config.queue?.gapMs ?? 800;
+    this.#timer = setTimeout(() => this.#finish(), alert.duration + gap);
   }
 
   #finish() {

@@ -499,10 +499,6 @@ input, select, textarea { transition: border-color 0.15s, box-shadow 0.15s; }
 .demo-chat .bot b { color: var(--accent); }
 .demo-chat > div { overflow-wrap: anywhere; }
 
-/* ---------- Voci Piper ---------- */
-.piper-box { margin-top: 14px; padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
-.piper-box h3 { margin: 0 0 4px; text-transform: none; letter-spacing: 0; color: var(--text); font-size: 15px; }
-.piper-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); }
 
 .error-box { position: fixed; left: 16px; bottom: 16px; z-index: 50; width: min(560px, calc(100vw - 32px)); padding: 14px 16px; border-radius: 12px; background: var(--panel); border: 2px solid var(--danger); box-shadow: 0 10px 40px rgba(0,0,0,.4); }
 .error-box p { margin: 4px 0 8px; font-size: 13px; color: var(--muted); }
@@ -987,7 +983,6 @@ html:root[data-ui="brutal"] {
 [data-ui="brutal"] .badge { background: transparent; border: 1px solid #6a6a6a; color: var(--muted); font-family: var(--mono); }
 [data-ui="brutal"] .save-bar { background: #111; border: 2px solid var(--line); box-shadow: none; font-family: var(--mono); text-transform: uppercase; }
 [data-ui="brutal"] .toast { background: var(--lilac); color: #111; font-family: var(--mono); }
-[data-ui="brutal"] .piper-box { border: 1.5px dashed var(--lilac); background: transparent; }
 [data-ui="brutal"] .error-box { background: #111; border: 2px solid var(--lilac); }
 
 /* titoli di coda e scheda Tema */

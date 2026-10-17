@@ -6,7 +6,6 @@
   const preview = new URLSearchParams(location.search).has('preview');
   let current = null;
   let hideTimer = null;
-  let stopVoice = () => {};
 
   const isVideo = (src) => /\.(webm|mp4)$/i.test(src);
   const mediaSrc = (src) => (/^[a-z][a-z0-9+.-]*:/i.test(src) || src.startsWith('/') ? src : `/${src}`);
@@ -85,7 +84,6 @@
 
   function show(alert, { silent = false } = {}) {
     clearTimeout(hideTimer);
-    stopVoice();
     hide(current);
 
     const brutal = alert.alertStyle === 'brutal';
@@ -116,10 +114,7 @@
     const bar = box.querySelector('.b-bar');
     if (bar) box.style.setProperty('--bar-h', `${bar.offsetHeight + 2}px`);
     current = box;
-    if (!silent) {
-      window.playSound(alert.sound, alert.volume);
-      stopVoice = window.speak(alert.tts, { delay: alert.tts?.delay ?? (alert.sound ? 1200 : 300) });
-    }
+    if (!silent) window.playSound(alert.sound, alert.volume);
     hideTimer = setTimeout(() => {
       hide(box);
       if (current === box) current = null;
@@ -149,8 +144,7 @@
       if (msg.type === 'alert') show(msg.alert);
       if (msg.type === 'skip' && current?.dataset.id === msg.id) {
         clearTimeout(hideTimer);
-        stopVoice();
-        hide(current);
+            hide(current);
         current = null;
       }
     };

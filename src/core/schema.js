@@ -65,23 +65,8 @@ const STYLE_FIELDS = {
   chatReply: text(450),
 };
 
-const TTS_ALERT_FIELDS = {
-  tts: bool,
-  ttsText: text(300),
-};
-
-const TTS_FIELDS = {
-  enabled: bool,
-  voice: text(120),
-  rate: num(-10, 10),
-  volume: num(0, 100),
-  maxLength: num(20, 500),
-  skipLinks: bool,
-};
-
 const TYPE_FIELDS = {
   ...STYLE_FIELDS,
-  ...TTS_ALERT_FIELDS,
   label: text(40),
   enabled: bool,
   alert: bool,
@@ -92,7 +77,6 @@ const TYPE_FIELDS = {
 
 const VARIANT_FIELDS = {
   ...STYLE_FIELDS,
-  ...TTS_ALERT_FIELDS,
   minAmount: num(0, 1e9),
   maxAmount: num(0, 1e9),
   reward: text(60),
@@ -250,12 +234,6 @@ export function sanitizeConfig(input, defaults) {
   if (out.moderation) out.moderation = sanitizeModeration(input.moderation, out.moderation);
   if (out.shoutouts) out.shoutouts = sanitizeShoutouts(input.shoutouts, out.shoutouts);
   if (out.chatOverlay) out.chatOverlay = sanitizeChatOverlay(input.chatOverlay, out.chatOverlay);
-  if (out.tts) {
-    out.tts = pick(input.tts, TTS_FIELDS, out.tts);
-    if (Array.isArray(input.tts?.bannedWords)) {
-      out.tts.bannedWords = input.tts.bannedWords.filter((w) => typeof w === 'string' && w.trim()).map((w) => w.trim().slice(0, 40)).slice(0, 200);
-    }
-  }
 
   for (const type of Object.keys(out.types)) {
     const src = input.types?.[type];

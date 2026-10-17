@@ -47,7 +47,6 @@
   let media = { sounds: [], images: [] };
   let chatAccount = null;
   let twitchConfigured = true;
-  let ttsInfo = { engine: null, voices: [], piper: null };
   let selected = 'follow';
   let previewType = 'follow';
   let lastTextField = null;
@@ -82,13 +81,6 @@
     twitchConfigured = data.twitchConfigured;
     for (const f of window.ALERT_FONTS.google) window.loadFont(f);
     render();
-    // Su Windows leggere le voci richiede qualche secondo: l'editor si mostra subito, le voci arrivano dopo.
-    api('/api/tts/voices', { method: 'GET', quiet: true }).then((info) => {
-      if (!info) return;
-      ttsInfo = info;
-      if (ttsInfo.piper?.job && !ttsInfo.piper.job.done) watchPiper();
-      if (selected === '__general') renderForm();
-    });
   }
 
   if (location.hash === '#chat') selected = '__general';
@@ -346,16 +338,6 @@
         field('Suono', soundPicker(t, 'sound'), { hint: 'Puoi caricare MP3, OGG o WAV' }),
         field('Volume', range(t, 'volume', { min: 0, max: 100, step: 5, scale: 0.01, fallback: 0.5, format: (v) => `${Math.round(v * 100)}%` }), { onReset: reset('volume') })),
 
-      section('Voce (text-to-speech)',
-        ttsOffNotice(),
-        checkbox(t, 'tts', 'Leggi ad alta voce questo alert'),
-        field('Testo da leggere', textInput(t, 'ttsText', { multiline: true }), { onReset: reset('ttsText'), hint: 'Usa gli stessi segnaposto dei testi, es. {user} e {message}. Link e parole vietate non vengono letti.' }),
-        el('div', { className: 'buttons' },
-          el('button', { type: 'button', onclick: async () => listen(await sampleTtsText(type)) }, '▶ Ascolta con dati di prova')),
-        ['follow', 'sub'].includes(type) ? null : el('p', { className: 'hint' }, type === 'redemption'
-          ? 'Per leggere solo una ricompensa (es. "Leggi il mio messaggio"), lascia spento qui e attiva la voce in un alert dedicato qui sotto.'
-          : 'Per leggere solo sopra una soglia (es. bits da 100 in su), lascia spento qui e attiva la voce in un alert speciale qui sotto.')),
-
       section('Messaggio in chat',
         draft.chat.enabled
           ? el('p', { className: 'hint' }, `Scrive: ${chatWho()}. Si cambia in "Impostazioni generali".`)
@@ -408,18 +390,7 @@
           field('Animazione', select(v, 'animation', Object.entries(ANIMATION_LABELS).map(([value, label]) => ({ value, label })), { inheritLabel: 'Come sopra' })),
           field('Stile del riquadro', select(v, 'alertStyle', styleOptions(), { inheritLabel: 'Come sopra' })),
           field('Suono', soundPicker(v, 'sound', { inheritLabel: 'Come sopra' })),
-          field('Immagine', imagePicker(v, 'image', { inheritLabel: 'Come sopra' })),
-          field('Voce', (() => {
-            const sel = el('select', {
-              onchange: (e) => {
-                if (e.target.value === '') delete v.tts; else v.tts = e.target.value === 'on';
-                markChanged({ rerender: true });
-              },
-            }, el('option', { value: '' }, 'Come sopra'), el('option', { value: 'on' }, 'Leggi ad alta voce'), el('option', { value: 'off' }, 'Non leggere'));
-            sel.value = v.tts === undefined ? '' : v.tts ? 'on' : 'off';
-            return sel;
-          })()),
-          v.tts ? field('Testo letto', el('input', { type: 'text', value: v.ttsText ?? '', placeholder: t.ttsText ?? '', oninput: blankToDelete(v, 'ttsText') })) : null))),
+          field('Immagine', imagePicker(v, 'image', { inheritLabel: 'Come sopra' }))))),
       el('button', {
         type: 'button',
         onclick: () => {
@@ -429,85 +400,6 @@
           markChanged({ rerender: true });
         },
       }, isReward ? '＋ Aggiungi ricompensa' : '＋ Aggiungi soglia'));
-  }
-
-  // ---------- Voce (text-to-speech) ----------
-
-  let stopTest = () => {};
-  /** Legge un testo con le impostazioni della voce non ancora salvate. */
-  async function listen(text) {
-    stopTest();
-    const data = await api('/api/tts/test', { body: { text, config: draft } });
-    if (!data) return;
-    stopTest = window.speak({ text: data.text, url: data.url, rate: data.rate ?? draft.tts.rate, volume: data.volume ?? draft.tts.volume / 100 });
-  }
-
-  /** Testo che verrebbe letto per questo alert, con dati di prova. */
-  async function sampleTtsText(type, ttsText) {
-    const cfg = clone(draft);
-    cfg.tts.enabled = true;
-    cfg.types[type] = { ...cfg.types[type], tts: true, ...(ttsText !== undefined ? { ttsText } : {}), variants: [] };
-    const data = await api('/api/preview', { body: { type, config: cfg, sample: sampleFor(type) }, quiet: true });
-    return data?.alert?.tts?.text ?? '';
-  }
-
-  /** Riquadro per scaricare le voci naturali Piper, con l'avanzamento del download. */
-  let piperPoll = null;
-  function piperBox() {
-    const piper = ttsInfo.piper;
-    if (!piper) return null;
-    if (!piper.supported) return el('p', { className: 'hint' }, 'Le voci Piper non sono disponibili per questo sistema.');
-    const job = piper.job;
-    const running = job && !job.done;
-    const rows = piper.voices.map((v) => el('div', { className: 'piper-row' },
-      el('span', {}, el('b', {}, v.label.split(' (')[0]), ` ${v.label.slice(v.label.indexOf('('))}`),
-      v.installed
-        ? el('span', { className: 'pill ok' }, 'installata')
-        : el('button', {
-          type: 'button', disabled: running,
-          onclick: async () => {
-            const data = await api('/api/tts/piper/install', { body: { voice: v.key } });
-            if (data) { ttsInfo.piper = data; renderForm(); watchPiper(); }
-          },
-        }, `⬇ Scarica (${v.size})`)));
-    return el('div', { className: 'piper-box' },
-      el('h3', {}, 'Voci naturali Piper'),
-      el('p', { className: 'hint' }, 'Voci molto più naturali, gratuite e open source. Si scaricano una volta sola (serve Internet solo per il download), poi funzionano anche senza. La prima volta viene scaricato anche il programma Piper (circa 20 MB).'),
-      ...rows,
-      job ? el('p', { className: job.error ? 'notice' : 'hint' }, job.error ? `Download non riuscito: ${job.error}` : job.step) : null);
-  }
-
-  function watchPiper() {
-    clearInterval(piperPoll);
-    piperPoll = setInterval(async () => {
-      const status = await api('/api/tts/piper', { method: 'GET', quiet: true });
-      if (!status) return;
-      ttsInfo.piper = status;
-      if (status.job?.done) {
-        clearInterval(piperPoll);
-        ttsInfo = (await api('/api/tts/voices', { method: 'GET', quiet: true })) ?? ttsInfo;
-        // appena installata, la voce Piper diventa quella scelta
-        const fresh = ttsInfo.voices.find((v) => v.engine === 'piper' && v.name.includes(status.job.voice));
-        if (fresh && !status.job.error) { draft.tts.voice = fresh.id; markChanged(); }
-      }
-      if (selected === '__general') renderForm();
-    }, 1500);
-  }
-
-  function voiceSelect() {
-    const groups = new Map();
-    for (const v of ttsInfo.voices) {
-      if (!groups.has(v.group)) groups.set(v.group, []);
-      groups.get(v.group).push({ value: v.id, label: `${v.label || v.name}${v.lang ? ` (${v.lang})` : ''}` });
-    }
-    const options = [...groups].map(([group, list]) => ({ group, options: list }));
-    const current = draft.tts.voice;
-    if (current && !ttsInfo.voices.some((v) => v.id === current)) options.push({ value: current, label: `${current} (non trovata su questo PC)` });
-    return select(draft.tts, 'voice', options, { inheritLabel: 'Voce predefinita' });
-  }
-
-  function ttsOffNotice() {
-    return draft.tts.enabled ? null : el('p', { className: 'notice' }, 'La voce è spenta in generale: attivala in "Impostazioni generali → Voce".');
   }
 
   // ---------- Account che scrive in chat ----------
@@ -577,27 +469,6 @@
           field('Colore del testo', colorInput(o, 'textColor', '#ffffff'), { onReset: reset('textColor') }),
           field('Colore dello sfondo', colorInput(o, 'background', '#121218'), { onReset: reset('background') }),
           field('Opacità dello sfondo', range(o, 'backgroundOpacity', { min: 0, max: 100, step: 5, scale: 0.01, fallback: 0.88, format: (v) => `${Math.round(v * 100)}%` }), { onReset: reset('backgroundOpacity') }))),
-      section('Voce (text-to-speech)',
-        checkbox(draft.tts, 'enabled', 'Attiva la voce (poi scegli in ogni alert cosa leggere)'),
-        ttsInfo.voices.length
-          ? el('p', { className: 'hint' }, `${ttsInfo.voices.length} voci disponibili. La voce va in live tramite l'overlay, come i suoni.`)
-          : el('p', { className: 'notice' }, 'Su questo computer non ci sono voci di sistema: userà la voce del browser, che nel browser si sente ma dentro OBS no. Sul PC Windows TwitchGestor usa le voci di Windows (e le voci Piper, se le scarichi) e la voce va in live.'),
-        el('div', { className: 'grid-2' },
-          ttsInfo.voices.length ? field('Voce', voiceSelect()) : null,
-          field('Velocità', range(draft.tts, 'rate', { min: -10, max: 10, step: 1, fallback: 0, format: (v) => (v > 0 ? `+${v}` : `${v}`) })),
-          field('Volume', range(draft.tts, 'volume', { min: 0, max: 100, step: 5, fallback: 100, format: (v) => `${v}%` })),
-          field('Lunghezza massima (caratteri)', numberInput(draft.tts, 'maxLength', { min: 20, step: 10 }))),
-        checkbox(draft.tts, 'skipLinks', 'Non leggere i link (dice solo "link")'),
-        field('Parole vietate (una per riga, vengono lette come "bip")', el('textarea', {
-          rows: 3, value: (draft.tts.bannedWords ?? []).join('\n'),
-          oninput: (e) => { draft.tts.bannedWords = e.target.value.split('\n').map((w) => w.trim()).filter(Boolean); markChanged(); },
-        })),
-        (() => {
-          const input = el('input', { type: 'text', value: 'Ciao! Questa è la voce degli alert di TwitchGestor.' });
-          return field('Prova la voce', el('div', { className: 'row' }, input, el('button', { type: 'button', onclick: () => listen(input.value) }, '▶ Ascolta')));
-        })(),
-        piperBox(),
-        el('p', { className: 'hint' }, 'Altre voci di Windows: Impostazioni di Windows → Ora e lingua → Voce → Aggiungi voci, poi riavvia TwitchGestor.')),
       section('Coda',
         field('Pausa tra un alert e l\'altro', range(draft.queue, 'gapMs', { min: 0, max: 5, step: 0.1, scale: 1000, fallback: 800, format: (v) => `${(v / 1000).toFixed(1)} s` }))),
       el('div', { id: 'chat-section' }, section('Chat',

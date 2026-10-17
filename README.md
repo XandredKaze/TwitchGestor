@@ -17,7 +17,6 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 **Funzioni principali**
 
 - **Coda degli alert**: le notifiche vengono mostrate una alla volta, mai sovrapposte. Dalla dashboard puoi mettere in pausa, saltare, svuotare la coda o **riproporre** un alert passato.
-- **Voce (text-to-speech)** gratuita e locale: legge gli alert e i messaggi degli spettatori con le voci di Windows, e la voce va in live tramite OBS.
 - **Anteprima della live e chat di Twitch** direttamente nella dashboard (scheda Live).
 - **Cambio scena di OBS** con un clic dalla dashboard (tramite OBS WebSocket, già incluso in OBS).
 - **Stato della diretta**: qualità della connessione, bitrate con grafico, fotogrammi persi, congestione, FPS e CPU, letti da OBS.
@@ -188,19 +187,6 @@ Serve una sola configurazione:
 
 Il collegamento resta su questo PC; la password è salvata solo in `data/obs.json`. Se OBS è chiuso TwitchGestor riprova da solo finché non lo riapri. In alto, il pallino **OBS** dice se è collegato.
 
-## Voce (text-to-speech)
-
-TwitchGestor può leggere ad alta voce gli alert, per esempio "Mario ha donato 5 €. Continua così!". È gratuito e funziona senza Internet. L'audio viene creato dal programma e suonato dall'overlay, quindi **va in live tramite OBS** come gli altri suoni. Voci disponibili:
-
-- **Voci di Windows**, classiche (es. "Microsoft Elsa Desktop") e moderne (es. "Microsoft Cosimo", "Microsoft Elsa" e quelle aggiunte da *Impostazioni → Ora e lingua → Voce → Aggiungi voci*; poi riavvia TwitchGestor).
-- **Voci naturali Piper** (open source): in *Impostazioni generali → Voce* clicca **⬇ Scarica** accanto a **Paola** (femminile) o **Riccardo** (maschile). Il programma Piper (circa 20 MB) e la voce si scaricano una volta sola in `data/piper/`, poi funzionano senza Internet. Altre voci Piper (file `.onnx` + `.onnx.json` dal catalogo [piper-voices](https://huggingface.co/rhasspy/piper-voices)) si possono copiare a mano in `data/piper/voices/`.
-
-1. Dashboard → **🎨 Personalizza alert → ⚙️ Impostazioni generali → Voce**: attiva la voce e scegli voce, velocità, volume, lunghezza massima e **parole vietate** (lette come "bip"). I link non vengono letti.
-2. In ogni alert, sezione **Voce**: attiva "Leggi ad alta voce" e scegli il testo da leggere (con i segnaposto, es. `{user} ha donato {amountFormatted}. {message}`). **▶ Ascolta con dati di prova** ti fa sentire il risultato.
-3. Per leggere solo sopra una soglia (es. bits da 100 in su) o solo per un premio dei punti canale (es. "Leggi il mio messaggio"), usa la voce negli **alert speciali**.
-
-Su Linux funzionano Piper ed `espeak-ng` (se installato); senza nessuna voce viene usata quella del browser, che però dentro OBS non si sente.
-
 ## Titoli di coda (credit roll)
 
 Titoli di coda animati per la fine della live con **abbonati** (paganti e regalati), **chi ha regalato sub** (con badge dorato al Top Gifter) e **follower**. I nomi li scarica TwitchGestor con l'account del canale: all'avvio, ogni N minuti e poco dopo ogni follow, sub o gift ricevuto in live.
@@ -344,8 +330,6 @@ src/
   twitch/                      accesso OAuth, API Helix, EventSub
   sources/                     StreamElements, Ko-fi, webhook generico
   credits.js                   titoli di coda: stato condiviso e download da Twitch
-  tts.js                       voce: voci di Windows (classiche e moderne), espeak-ng e file audio
-  piper.js                     voci naturali Piper: download, elenco e sintesi
 public/                        overlay, dashboard e titoli di coda (credits.html)
 demo/                          "server finto" della versione demo (usa il codice vero di src/core)
 ```

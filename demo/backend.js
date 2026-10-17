@@ -14,7 +14,6 @@ import { NOTIFICATION_TYPES, testNotification } from '../src/core/normalize.js';
 import { sanitizeConfig, diffConfig, ANIMATIONS, POSITIONS, SOUND_PRESETS, UI_THEMES } from '../src/core/schema.js';
 import { recentLogs, createLogger } from '../src/logger.js';
 import { liveSession } from '../src/core/session.js';
-import { cleanText } from '../src/core/ttsText.js';
 import { API_LEVEL, APP_VERSION } from '../src/core/apiLevel.js';
 import { ChatCommands, humanDuration } from '../src/core/commands.js';
 import { createQuickActions } from '../src/quickActions.js';
@@ -519,12 +518,6 @@ class DemoBackend {
         storage.set('tg-demo-config', diffConfig(this.config, this.defaults) ?? {});
         this.broadcastState();
         return ok({ ui: this.config.ui });
-      }
-      // Nella demo non ci sono voci di sistema: la voce è quella del browser.
-      case 'GET /api/tts/voices': return ok({ engine: null, voices: [] });
-      case 'POST /api/tts/test': {
-        const cfg = (draft(body) ?? this.config).tts ?? {};
-        return ok({ fallback: true, text: cleanText(body?.text || 'Ciao! Questa è la voce degli alert di TwitchGestor.', cfg), rate: cfg.rate ?? 0, volume: (cfg.volume ?? 100) / 100 });
       }
       case 'POST /api/preview': {
         if (!NOTIFICATION_TYPES.includes(body?.type)) return fail(400, 'Tipo sconosciuto');
