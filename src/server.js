@@ -1,6 +1,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { timingSafeEqual } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { ROOT_DIR, DATA_DIR } from './config.js';
@@ -8,7 +9,8 @@ import { NOTIFICATION_TYPES, testNotification } from './core/normalize.js';
 import { NotificationManager } from './core/NotificationManager.js';
 import { sanitizeConfig, ANIMATIONS, POSITIONS, SOUND_PRESETS, UI_THEMES } from './core/schema.js';
 import { recentLogs } from './logger.js';
-import { API_LEVEL } from './version.js';
+import * as updates from './updates.js';
+import { API_LEVEL, APP_VERSION, BUILD_ID } from './version.js';
 import { parseKofi, parseGenericDonation } from './sources/webhooks.js';
 import { createLogger } from './logger.js';
 
@@ -209,6 +211,7 @@ export function createServer(app) {
         return send(res, 200, {
           ...app.credits.store.snapshot(rev), account: app.auth.user?.login ?? null, configured: app.auth.configured,
           ui: app.config.get().ui?.theme ?? 'default', // tema della dashboard, anche per il pannello nel dock di OBS
+          build: BUILD_ID, // dopo un aggiornamento la pagina si ricarica da sola
         });
       }
       if (req.method === 'GET' && url.pathname.startsWith('/media/')) return serveStatic(res, url.pathname.slice('/media'.length), MEDIA_DIR);
@@ -268,6 +271,79 @@ export function createServer(app) {
           if (!NOTIFICATION_TYPES.includes(body.type)) return send(res, 400, { error: 'Tipo sconosciuto' });
           const builder = new NotificationManager({ config: draft(body) ?? app.config.get() });
           return send(res, 200, { alert: builder.buildAlert(sampleNotification(body.type, body.sample)) });
+        }
+        // --- Aggiornamenti (Raspberry) e copia di sicurezza ---
+        if (route === 'GET /api/system') {
+          // usato anche dallo script di aggiornamento: non aggiorna durante la live
+          return send(res, 200, { version: APP_VERSION, commit: await updates.installedCommit(), busy: Boolean(await app.isBusy?.()) });
+        }
+        if (route === 'GET /api/raspberry/login.bat') {
+          // Accesso a Twitch quando TwitchGestor gira sul Raspberry: Twitch accetta il ritorno solo su "localhost",
+          // quindi il PC si collega al Raspberry con un tunnel SSH e l'accesso passa da http://localhost.
+          const host = String(req.headers.host ?? '').replace(/:\d+$/, '').replace(/[^\w.\-:[\]]/g, '');
+          const port = Number(process.env.PORT) || 3000;
+          const user = os.userInfo().username.replace(/[^\w.\-]/g, '');
+          const what = url.searchParams.get('kind') === 'bot' ? 'bot/login' : 'login';
+          const bat = [
+            '@echo off',
+            'title TwitchGestor - accesso a Twitch',
+            'echo.',
+            `echo  Collego questo PC a TwitchGestor sul Raspberry (${host})...`,
+            `echo  Se te la chiede, scrivi la password dell'utente "${user}" del Raspberry.`,
+            'echo  Se TwitchGestor e\' ancora acceso su questo PC, spegnilo prima.',
+            'echo  Finito l\'accesso su Twitch, chiudi questa finestra.',
+            'echo.',
+            `start "" cmd /c "timeout /t 6 >nul & start http://localhost:${port}/auth/${what}"`,
+            `ssh -o StrictHostKeyChecking=accept-new -N -L ${port}:127.0.0.1:${port} ${user}@${host}`,
+            'pause',
+            '',
+          ].join('\r\n');
+          return send(res, 200, bat, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="Accedi a Twitch (${what === 'login' ? 'canale' : 'bot'}).bat"` });
+        }
+        if (route === 'GET /api/update') return send(res, 200, await updates.updateState());
+        if (route === 'POST /api/update/check') {
+          await updates.checkForUpdates({ force: true });
+          return send(res, 200, await updates.updateState());
+        }
+        if (route === 'POST /api/update') {
+          updates.requestUpdate();
+          return send(res, 200, await updates.updateState());
+        }
+        if (route === 'PUT /api/update/settings') {
+          updates.saveUpdateSettings(await readBody(req));
+          return send(res, 200, await updates.updateState());
+        }
+        if (route === 'GET /api/backup') {
+          const backup = await updates.createBackup();
+          const name = `twitchgestor-${new Date().toISOString().slice(0, 10)}.tar.gz`;
+          res.writeHead(200, { 'Content-Type': 'application/gzip', 'Content-Disposition': `attachment; filename="${name}"`, 'Cache-Control': 'no-store' });
+          const stream = fs.createReadStream(backup.file);
+          stream.on('close', backup.cleanup);
+          stream.pipe(res);
+          return undefined;
+        }
+        if (route === 'POST /api/backup/restore') {
+          const tmp = path.join(DATA_DIR, `import-${Date.now()}.tar.gz`);
+          fs.mkdirSync(DATA_DIR, { recursive: true });
+          try {
+            let size = 0;
+            const out = fs.createWriteStream(tmp);
+            for await (const chunk of req) {
+              size += chunk.length;
+              if (size > 2 * 1024 ** 3) throw Object.assign(new Error('File troppo grande'), { status: 413 });
+              if (!out.write(chunk)) await new Promise((r) => out.once('drain', r));
+            }
+            await new Promise((r, j) => out.end((err) => (err ? j(err) : r())));
+            if (!size) throw Object.assign(new Error('File vuoto'), { status: 400 });
+            const result = await updates.restoreBackup(tmp, { clientAddress: req.socket.remoteAddress });
+            send(res, 200, { ...result, restarting: true, managed: updates.isManaged() });
+          } finally {
+            fs.rmSync(tmp, { force: true });
+          }
+          // riparte subito, senza salvare niente sopra ai file appena importati
+          // (sul Raspberry si riavvia da solo; sul PC va riaperto)
+          setTimeout(() => process.exit(0), 500);
+          return undefined;
         }
         if (route === 'GET /api/obs') return send(res, 200, app.obs?.state() ?? null);
         if (route === 'PUT /api/obs/settings') {
@@ -424,8 +500,8 @@ export function createServer(app) {
         app.broadcastState();
       });
       const hello = {
-        overlay: () => ({ type: 'hello', overlay: app.config.get().overlay }),
-        chat: () => ({ type: 'hello', settings: app.config.get().chatOverlay, badges: app.chatFeed?.badges ?? {}, messages: app.chatFeed?.messages ?? [] }),
+        overlay: () => ({ type: 'hello', build: BUILD_ID, overlay: app.config.get().overlay }),
+        chat: () => ({ type: 'hello', build: BUILD_ID, settings: app.config.get().chatOverlay, badges: app.chatFeed?.badges ?? {}, messages: app.chatFeed?.messages ?? [] }),
         dashboard: () => ({ type: 'state', state: app.getState() }),
       }[role];
       ws.send(JSON.stringify(hello()));

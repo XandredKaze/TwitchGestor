@@ -69,7 +69,22 @@
   try { const z = localStorage.getItem('uiZoom'); if (z) { $('ui-zoom').value = z; applyZoom(z); } } catch { /* ignora */ }
   $('ui-zoom').onchange = (e) => { applyZoom(e.target.value); try { localStorage.setItem('uiZoom', e.target.value); } catch { /* ignora */ } };
 
+  // Indirizzo da mettere in OBS: sul Raspberry è quello con cui hai aperto la dashboard (non "localhost").
+  const obsUrl = (page) => (state.managed ? `${location.origin}/${page}` : state.overlayUrl.replace(/overlay$/, page));
+
+  // TwitchGestor aggiornato (es. sul Raspberry): ricarica la pagina, se non ci sono modifiche non salvate
+  let knownBuild = null;
+  function checkBuild() {
+    if (!state.build) return;
+    if (knownBuild && state.build !== knownBuild) {
+      const unsaved = [...document.querySelectorAll('.save-bar')].some((b) => !b.hidden);
+      if (!unsaved) { location.reload(); return; }
+    }
+    knownBuild ??= state.build;
+  }
+
   function renderHeader() {
+    checkBuild();
     window.TG.version = state.version ?? '(programma precedente alla 1.5)';
     $('app-version').textContent = state.version ? `v${state.version}` : '';
     const { twitch, sources, overlays } = state;
@@ -510,7 +525,7 @@
     renderFilters();
     renderFeed();
     renderObs();
-    $('overlay-url').textContent = state.overlayUrl;
+    $('overlay-url').textContent = obsUrl('overlay');
     renderEmbeds();
   }
 
@@ -526,11 +541,20 @@
   $('btn-clear').onclick = () => api('/api/queue/clear');
   $('btn-reset-stats').onclick = () => confirm('Azzerare le statistiche della sessione?') && api('/api/stats/reset');
   $('btn-copy').onclick = async () => {
-    await navigator.clipboard.writeText(state.overlayUrl);
+    await navigator.clipboard.writeText(obsUrl('overlay'));
     $('btn-copy').textContent = 'Copiato!';
     setTimeout(() => { $('btn-copy').textContent = 'Copia'; }, 1500);
   };
   $('btn-shutdown').onclick = async () => {
+    if (state?.managed) {
+      // Raspberry: il servizio lo fa ripartire da solo
+      if (!confirm('Riavviare TwitchGestor? Torna attivo in pochi secondi.')) return;
+      if (await api('/api/shutdown')) {
+        document.body.replaceChildren(el('div', { className: 'bye' }, el('h1', {}, '⟳ Riavvio in corso…'), el('p', {}, 'La pagina si ricarica da sola.')));
+        setTimeout(() => location.reload(), 8000);
+      }
+      return;
+    }
     if (!confirm('Spegnere TwitchGestor? Gli alert smetteranno di arrivare finché non lo riavvii (o riapri OBS).')) return;
     if (await api('/api/shutdown')) {
       shuttingDown = true;

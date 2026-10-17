@@ -658,8 +658,13 @@ function save(k, v) {
 function onChange(fn) { changeListeners.push(fn); }
 function getSettings() { return { ...DEFAULTS, ...load(K.settings, {}) }; }
 
+let build = null; // versione di TwitchGestor: se cambia (aggiornamento) la pagina si ricarica da sola
 async function sync() {
   const j = await (await api('state?rev=' + rev)).json();
+  if (j.build) {
+    if (build && j.build !== build && !pending) { location.reload(); return; }
+    build = j.build;
+  }
   // tema della dashboard (scheda Tema): vale anche per questo pannello
   if (MODE === 'panel' && j.ui && document.documentElement.dataset.ui !== j.ui) {
     document.documentElement.dataset.ui = j.ui;

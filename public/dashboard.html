@@ -26,8 +26,29 @@
     <label class="zoom" title="Dimensione dei testi della dashboard">Aa
       <select id="ui-zoom"><option value="0.9">90%</option><option value="1">100%</option><option value="1.15">115%</option><option value="1.3">130%</option><option value="1.5">150%</option></select>
     </label>
+    <button id="btn-system" class="small-btn" title="Sistema: aggiornamenti e copia di sicurezza" aria-label="Sistema">⚙</button>
     <button id="btn-shutdown" class="small-btn danger" title="Spegne il programma TwitchGestor">⏻ Spegni</button>
   </header>
+
+  <dialog id="system-dialog" class="sys-dialog">
+    <div class="sys-head">
+      <h2>Sistema</h2>
+      <button type="button" class="small-btn" id="sys-close" aria-label="Chiudi">✕</button>
+    </div>
+    <section class="sys-sec">
+      <h3>Aggiornamenti</h3>
+      <div id="sys-update"></div>
+    </section>
+    <section class="sys-sec">
+      <h3>Copia di sicurezza</h3>
+      <p class="muted small">Un file con impostazioni, accessi a Twitch e al bot, immagini e suoni caricati, storico e titoli di coda. Serve per spostare TwitchGestor su un altro computer (es. dal PC al Raspberry) senza reinserire niente.</p>
+      <div class="row">
+        <button type="button" id="sys-export">⬇ Esporta tutto</button>
+        <label class="btn" id="sys-import-label">⬆ Importa<input type="file" id="sys-import" accept=".gz,.tgz,application/gzip" hidden></label>
+      </div>
+      <p class="muted small" id="sys-backup-out"></p>
+    </section>
+  </dialog>
 
   <div id="banners"></div>
 
@@ -397,6 +418,7 @@
   <script src="/stream.js"></script>
   <script src="/moderation.js"></script>
   <script src="/shoutouts.js"></script>
+  <script src="/system.js"></script>
   <script src="/chatoverlay.js"></script>
 </body>
 </html>

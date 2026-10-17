@@ -441,6 +441,10 @@ class DemoBackend {
 
     switch (route) {
       case 'GET /api/state': return ok(this.getState());
+      // ⚙ Sistema: nella demo niente aggiornamenti né copie di sicurezza (le impostazioni stanno in questo browser)
+      case 'GET /api/update': return ok({ managed: false, commit: '', settings: { auto: true, hour: 5 }, check: {} });
+      case 'GET /api/backup': case 'POST /api/backup/restore':
+        return fail(400, 'Nella demo non c\'è niente da esportare o importare: le impostazioni restano solo in questo browser.');
       case 'GET /api/logs': return ok({ logs: recentLogs() });
       case 'GET /api/config':
         return ok({

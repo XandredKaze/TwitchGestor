@@ -505,6 +505,23 @@ input, select, textarea { transition: border-color 0.15s, box-shadow 0.15s; }
 .error-box pre { max-height: 180px; overflow: auto; margin: 0; padding: 8px; border-radius: 8px; background: var(--inset); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .app-version { font-size: 11px; color: var(--muted); font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--inset); border: 1px solid var(--border); letter-spacing: 0; }
 .app-version:empty { display: none; }
+.app-version { cursor: pointer; }
+
+/* Finestra "Sistema": aggiornamenti e copia di sicurezza */
+.sys-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 40px); padding: 0; border: 1px solid var(--border); border-radius: 16px; background: var(--panel); color: var(--text); box-shadow: 0 20px 60px rgba(0, 0, 0, .45); }
+.sys-dialog::backdrop { background: rgba(0, 0, 0, .55); }
+.sys-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.sys-head h2 { margin: 0; font-size: 18px; }
+.sys-sec { display: grid; gap: 10px; padding: 14px 18px; }
+.sys-sec + .sys-sec { border-top: 1px solid var(--border); }
+.sys-sec h3 { margin: 0; }
+.sys-sec p { margin: 0; }
+.sys-sec #sys-update { display: grid; gap: 10px; justify-items: start; }
+.sys-changes { margin: 0; padding-left: 20px; font-size: 13px; color: var(--muted); max-height: 180px; overflow-y: auto; }
+[data-ui="brutal"] .sys-dialog { border: 2px solid var(--line); border-radius: 0; background: #141414; box-shadow: 8px 8px 0 #b39bd35c; }
+[data-ui="brutal"] .sys-head { border-bottom: 2px solid var(--line); font-family: var(--mono); }
+[data-ui="brutal"] .sys-head h2::before { content: '// '; }
+[data-ui="brutal"] .sys-sec + .sys-sec { border-top: 1.5px solid #5a5a5a; }
 .zoom { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--muted); }
 .zoom select { font: inherit; font-size: 13px; padding: 3px 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--inset); color: var(--text); }
 .banner:has(.restart-banner) { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--panel)); }

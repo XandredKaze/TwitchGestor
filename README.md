@@ -95,6 +95,10 @@ Da quel momento TwitchGestor parte da solo, senza finestre, quando apri OBS e si
 
 Usa i pulsanti **Prova gli alert** nella dashboard per vedere subito come appaiono.
 
+## Su Raspberry Pi (sempre acceso, aggiornamenti automatici)
+
+TwitchGestor può stare su un Raspberry Pi (dal 3 in su). Così bot, comandi, parole bannate e shoutout funzionano anche a PC spento, e la dashboard si apre da ogni dispositivo di casa. Si installa con un solo comando. Impostazioni e accessi si portano dal PC con **⚙ Sistema → Esporta / Importa**, e gli aggiornamenti arrivano da soli ogni notte (mai durante la live), con copia di sicurezza e ritorno automatico alla versione precedente se qualcosa non va. Guida passo passo: [docs/RASPBERRY.md](docs/RASPBERRY.md).
+
 ## Anteprima della live e chat
 
 Nella scheda **📡 Live** della dashboard trovi il player della tua live (senza audio, per evitare l'eco) e la chat di Twitch, accanto a coda, statistiche e notifiche. Il canale è quello con cui hai fatto l'accesso; se non l'hai ancora fatto puoi scriverne il nome.

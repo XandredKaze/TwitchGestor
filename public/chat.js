@@ -5,6 +5,7 @@
   const preview = new URLSearchParams(location.search).has('preview');
   let settings = {};
   let badges = {};
+  let build = null;
   const loadedFonts = new Set();
 
   // colori dei nomi per chi non ne ha scelto uno su Twitch (come fa Twitch)
@@ -151,6 +152,9 @@
 
   function handle(msg) {
     if (msg.type === 'hello') {
+      // TwitchGestor è stato aggiornato: la pagina si ricarica da sola
+      if (build && msg.build && msg.build !== build) { location.reload(); return; }
+      build = msg.build;
       badges = msg.badges ?? {};
       applySettings(msg.settings);
       box.replaceChildren();

@@ -6,6 +6,7 @@
   const preview = new URLSearchParams(location.search).has('preview');
   let current = null;
   let hideTimer = null;
+  let build = null;
 
   const isVideo = (src) => /\.(webm|mp4)$/i.test(src);
   const mediaSrc = (src) => (/^[a-z][a-z0-9+.-]*:/i.test(src) || src.startsWith('/') ? src : `/${src}`);
@@ -140,7 +141,12 @@
     const ws = new WebSocket(`${proto}://${location.host}/ws?role=overlay`);
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
-      if (msg.type === 'hello') applySettings(msg.overlay);
+      if (msg.type === 'hello') {
+        // TwitchGestor è stato aggiornato: la pagina si ricarica da sola (niente "Aggiorna la cache" in OBS)
+        if (build && msg.build && msg.build !== build) { location.reload(); return; }
+        build = msg.build;
+        applySettings(msg.overlay);
+      }
       if (msg.type === 'alert') show(msg.alert);
       if (msg.type === 'skip' && current?.dataset.id === msg.id) {
         clearTimeout(hideTimer);

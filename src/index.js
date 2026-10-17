@@ -8,7 +8,8 @@ import { HelixClient } from './twitch/helix.js';
 import { EventSubClient } from './twitch/eventsub.js';
 import { StreamElementsSource } from './sources/streamelements.js';
 import { createServer } from './server.js';
-import { API_LEVEL, APP_VERSION, codeChangedSinceStart } from './version.js';
+import { API_LEVEL, APP_VERSION, BUILD_ID, codeChangedSinceStart } from './version.js';
+import { isManaged } from './updates.js';
 import { CreditsStore, startCreditsScheduler } from './credits.js';
 import { ObsClient } from './obs.js';
 import { createQuickActions } from './quickActions.js';
@@ -290,11 +291,23 @@ const app = {
   testModeration,
   autoShoutout,
   chatFeed,
+  /** In live adesso? (OBS sta trasmettendo o Twitch ti mostra in live): lo script di aggiornamento aspetta. */
+  async isBusy() {
+    if (obs.state().stream?.active) return true;
+    if (!auth.user) return false;
+    try {
+      return Boolean(await autoShoutout.liveSince());
+    } catch {
+      return false;
+    }
+  },
   chatAccount,
   getState() {
     return {
       apiLevel: API_LEVEL,
       version: APP_VERSION,
+      build: BUILD_ID,
+      managed: isManaged(), // installato sul Raspberry: aggiornamenti dalla dashboard
       restartNeeded: codeChangedSinceStart(),
       twitch: {
         configured: auth.configured,

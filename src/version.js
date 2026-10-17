@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT_DIR } from './config.js';
 
+import { APP_VERSION } from './core/apiLevel.js';
+
 export { API_LEVEL, APP_VERSION } from './core/apiLevel.js';
 
 const SRC_DIR = path.join(ROOT_DIR, 'src');
@@ -24,6 +26,8 @@ function codeStamp() {
 }
 
 const startedWith = codeStamp();
+/** Cambia a ogni aggiornamento: le pagine aperte in OBS si ricaricano da sole quando lo vedono cambiare. */
+export const BUILD_ID = `${APP_VERSION}-${startedWith.toString(36)}`;
 let checkedAt = 0;
 let stale = false;
 
