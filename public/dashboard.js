@@ -343,11 +343,19 @@
       return;
     }
     const tok = window.TG.token();
+    const firefox = /firefox/i.test(navigator.userAgent);
     body.replaceChildren(el('div', { className: 'embed-off https-help' },
       el('b', {}, 'Per vedere l\'anteprima di Twitch (una volta sola su questo PC):'),
-      el('ol', {},
-        el('li', {}, el('a', { href: '/twitchgestor-certificato.crt' }, '⬇ Scarica il certificato di TwitchGestor'), ' e aprilo con doppio clic.'),
-        el('li', {}, el('b', {}, 'Installa certificato…'), ' → ', el('b', {}, 'Utente corrente'), ' → Avanti → ', el('b', {}, 'Colloca tutti i certificati nel seguente archivio'), ' → Sfoglia → ', el('b', {}, 'Autorità di certificazione radice attendibili'), ' → OK → Avanti → Fine → ', el('b', {}, 'Sì'), '.'),
+      // Firefox ha un archivio dei certificati suo: lì si importa dalle impostazioni
+      firefox
+        ? el('ol', {},
+          el('li', {}, el('a', { href: '/twitchgestor-certificato.crt' }, '⬇ Scarica il certificato di TwitchGestor'), '. Se Firefox apre subito la finestra "Scaricamento certificato", spunta ', el('b', {}, 'Considera attendibile questa CA per l\'identificazione di siti web'), ', premi OK e passa al punto 4.'),
+          el('li', {}, 'In Firefox apri ', el('b', {}, 'Impostazioni → Privacy e sicurezza'), ', scorri fino a ', el('b', {}, 'Certificati'), ' e premi ', el('b', {}, 'Mostra certificati…'), '.'),
+          el('li', {}, 'Scheda ', el('b', {}, 'Autorità'), ' → ', el('b', {}, 'Importa…'), ' → scegli il file scaricato → spunta ', el('b', {}, 'Considera attendibile questa CA per l\'identificazione di siti web'), ' → OK → OK.'))
+        : el('ol', {},
+          el('li', {}, el('a', { href: '/twitchgestor-certificato.crt' }, '⬇ Scarica il certificato di TwitchGestor'), ' e aprilo con doppio clic.'),
+          el('li', {}, el('b', {}, 'Installa certificato…'), ' → ', el('b', {}, 'Utente corrente'), ' → Avanti → ', el('b', {}, 'Colloca tutti i certificati nel seguente archivio'), ' → Sfoglia → ', el('b', {}, 'Autorità di certificazione radice attendibili'), ' → OK → Avanti → Fine → ', el('b', {}, 'Sì'), '.')),
+      el('ol', { start: firefox ? 4 : 3 },
         el('li', {}, 'Chiudi e riapri il browser e torna qui: la dashboard passa da sola all\'indirizzo sicuro ',
           el('a', { href: `${state.httpsUrl}/dashboard${tok ? `?token=${encodeURIComponent(tok)}` : ''}` }, state.httpsUrl.replace('https://', '')), '.')),
       el('span', { className: 'muted small' }, 'Il certificato vale solo per TwitchGestor nella rete di casa. In OBS gli indirizzi restano quelli di sempre.')));

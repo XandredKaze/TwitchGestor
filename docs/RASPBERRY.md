@@ -86,6 +86,10 @@ Twitch mostra il suo player e la sua chat solo su pagine **https**. Il Raspberry
    - Avanti → Fine → **Sì**.
 3. Chiudi e riapri il browser e apri la dashboard come sempre: passa da sola all'indirizzo https. Lì trovi il player e la chat di Twitch come sul PC, con tutti gli strumenti di moderazione.
 
+**Con Firefox**, che usa un archivio dei certificati suo, i punti 1 e 2 cambiano:
+- Premi **Scarica il certificato di TwitchGestor**. Se Firefox apre la finestra "Scaricamento certificato", spunta **Considera attendibile questa CA per l'identificazione di siti web** e premi OK.
+- Altrimenti salva il file. Poi apri **Impostazioni → Privacy e sicurezza → Certificati → Mostra certificati…**, scheda **Autorità**, **Importa…**: scegli il file, spunta la stessa casella e premi OK.
+
 Il certificato vale solo per TwitchGestor nella rete di casa e non può essere usato per altri siti. In OBS gli indirizzi restano quelli normali (`http://…:3000`).
 
 ## Accedere a Twitch (raramente)
