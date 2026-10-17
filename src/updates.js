@@ -111,7 +111,7 @@ export async function updateState() {
 // ---------- Copia di sicurezza: esporta e importa ----------
 
 // Cosa entra nella copia: impostazioni, dati (accessi a Twitch, storico, immagini e suoni, titoli di coda...) e .env.
-const SKIP_IN_DATA = new Set(['backups', 'twitchgestor.pid', 'twitchgestor.log', 'update-request', 'update-status.json', 'update-bad-commit', 'tts', 'piper']);
+const SKIP_IN_DATA = new Set(['backups', 'twitchgestor.pid', 'twitchgestor.log', 'update-request', 'update-status.json', 'update-bad-commit', 'system-setup-requested', 'tts', 'piper']);
 
 /** Crea un file .tar.gz con tutto quello che serve per ripartire su un altro computer. Ritorna il percorso. */
 export async function createBackup() {

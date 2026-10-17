@@ -77,7 +77,7 @@ Indirizzo e password della dashboard del Raspberry restano i suoi. Se importi da
 
 ## La scheda Live: anteprima e chat di Twitch (una volta)
 
-Twitch mostra il suo player e la sua chat solo su pagine **https**. Il Raspberry ha anche un indirizzo https, `https://twitchgestor.local:3443/dashboard`; per usarlo, il PC deve fidarsi del suo certificato. Si fa una volta sola:
+Twitch mostra il suo player e la sua chat solo su pagine **https**. Il Raspberry ha anche un indirizzo https, `https://twitchgestor.local/dashboard`; per usarlo, il PC deve fidarsi del suo certificato. Si fa una volta sola:
 
 1. Apri la dashboard del Raspberry. Nel riquadro **Anteprima live** premi **Scarica il certificato di TwitchGestor** e aprilo con doppio clic.
 2. Premi **Installa certificato…**, poi:

@@ -3,7 +3,7 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/XandredKaze/TwitchGestor/main/scripts/raspberry/install.sh | bash
 #
-# Cosa fa: installa Node.js e git, scarica TwitchGestor in ~/twitchgestor, prepara il file .env e crea tre servizi:
+# Cosa fa: installa Node.js e git, scarica TwitchGestor in ~/twitchgestor, prepara il file .env e crea i servizi:
 #   twitchgestor          il programma, parte da solo all'accensione e si riavvia se si blocca
 #   twitchgestor-update   l'aggiornamento (dal pulsante della dashboard o ogni notte, mai durante la live)
 # Rilanciarlo non cancella niente: impostazioni e dati restano dove sono.
@@ -59,61 +59,7 @@ TOKEN="$(grep -E '^DASHBOARD_TOKEN=' .env | cut -d= -f2-)"
 mkdir -p data
 
 say "Servizi (avvio automatico e aggiornamenti)"
-sudo tee /etc/systemd/system/twitchgestor.service >/dev/null <<UNIT
-[Unit]
-Description=TwitchGestor
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-User=$ME
-WorkingDirectory=$DIR
-ExecStart=$(command -v node) src/index.js
-Restart=always
-RestartSec=3
-Environment=NODE_ENV=production
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-
-sudo tee /etc/systemd/system/twitchgestor-update.service >/dev/null <<UNIT
-[Unit]
-Description=Aggiornamento di TwitchGestor
-
-[Service]
-Type=oneshot
-ExecStart=/bin/bash $DIR/scripts/raspberry/update.sh
-UNIT
-
-# il pulsante "Aggiorna ora" della dashboard crea data/update-request
-sudo tee /etc/systemd/system/twitchgestor-update.path >/dev/null <<UNIT
-[Unit]
-Description=Aggiornamento di TwitchGestor chiesto dalla dashboard
-
-[Path]
-PathExists=$DIR/data/update-request
-Unit=twitchgestor-update.service
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-
-# controllo ogni ora: aggiorna solo all'ora scelta nella dashboard (predefinita le 5) e mai durante la live
-sudo tee /etc/systemd/system/twitchgestor-update.timer >/dev/null <<UNIT
-[Unit]
-Description=Aggiornamento notturno di TwitchGestor
-
-[Timer]
-OnCalendar=*-*-* *:07:00
-Unit=twitchgestor-update.service
-
-[Install]
-WantedBy=timers.target
-UNIT
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now twitchgestor.service twitchgestor-update.path twitchgestor-update.timer >/dev/null
+sudo bash "$DIR/scripts/raspberry/system-setup.sh" "$DIR" "$ME"
 sudo systemctl restart twitchgestor.service
 
 IP="$(hostname -I | awk '{print $1}')"
@@ -121,8 +67,10 @@ say "Fatto! TwitchGestor è acceso e si avvierà da solo a ogni accensione."
 cat <<INFO
 
   Dashboard (da PC o telefono, la prima volta con questo indirizzo: la password poi resta salvata):
-    http://$IP:$PORT/dashboard?token=$TOKEN
     http://$(hostname).local:$PORT/dashboard?token=$TOKEN
+    http://$IP:$PORT/dashboard?token=$TOKEN
+  Per anteprima e chat di Twitch nella scheda Live la dashboard ti guida a installare (una volta)
+  il certificato del Raspberry, poi passa da sola a https://$(hostname).local
 
   In OBS cambia l'indirizzo delle sorgenti browser da localhost a quello del Raspberry:
     http://$IP:$PORT/overlay      http://$IP:$PORT/chat      http://$IP:$PORT/credits

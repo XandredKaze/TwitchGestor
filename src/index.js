@@ -28,9 +28,10 @@ const log = createLogger('app');
 const env = process.env;
 const port = Number(env.PORT) || 3000;
 const host = env.HOST || '127.0.0.1';
-// indirizzo https della dashboard (vedi startHttps): sul Raspberry porta 3443
-const httpsPort = Number(env.HTTPS_PORT) || (isManaged() ? 3443 : 0);
+// indirizzo https della dashboard (vedi startHttps): sul Raspberry porta 443
+let httpsPort = Number(env.HTTPS_PORT) || (isManaged() ? 443 : 0);
 let httpsReady = false;
+let httpsNeedsSetup = false; // la porta 443 non è permessa: va rilanciato lo script di installazione
 let caFile = null;
 const publicUrl = (env.PUBLIC_URL || `http://localhost:${port}`).replace(/\/$/, '');
 
@@ -315,7 +316,8 @@ const app = {
       version: APP_VERSION,
       build: BUILD_ID,
       managed: isManaged(), // installato sul Raspberry: aggiornamenti dalla dashboard
-      httpsUrl: httpsReady ? `https://${os.hostname().toLowerCase()}.local:${httpsPort}` : null,
+      httpsUrl: httpsReady ? httpsBase() : null,
+      httpsNeedsSetup,
       restartNeeded: codeChangedSinceStart(),
       twitch: {
         configured: auth.configured,
@@ -498,21 +500,55 @@ web.server.on('error', (err) => {
   process.exit(0);
 });
 
-// Indirizzo https (sul Raspberry, porta 3443): Twitch mostra player e chat solo su https o "localhost".
-// Stesse pagine e stesse API dell'indirizzo normale; OBS può continuare a usare quello normale.
+// Indirizzo https (sul Raspberry, porta 443): Twitch mostra player e chat solo su https o "localhost",
+// e solo sulla porta standard (443). Stesse pagine e API dell'indirizzo normale; OBS usa quello normale.
+// La porta 443 richiede il permesso dato dal servizio (scripts/raspberry/system-setup.sh): senza,
+// si usa la 3443 e la dashboard chiede di rilanciare l'installazione.
+// Il servizio di aggiornamento (che ha i permessi di sistema) sistema i servizi e riavvia TwitchGestor.
+// Al massimo una richiesta al giorno, per non ripetere all'infinito se qualcosa non va.
+function askSystemSetup() {
+  if (!isManaged()) return;
+  const marker = path.join(DATA_DIR, 'system-setup-requested');
+  try {
+    if (fs.existsSync(marker) && Date.now() - fs.statSync(marker).mtimeMs < 86400000) return;
+    fs.writeFileSync(marker, new Date().toISOString());
+    fs.writeFileSync(path.join(DATA_DIR, 'update-request'), new Date().toISOString());
+  } catch (err) {
+    log.warn(`Richiesta di sistemare i servizi non riuscita: ${err.message}`);
+  }
+}
+const httpsBase = () => `https://${os.hostname().toLowerCase()}.local${httpsPort === 443 ? '' : `:${httpsPort}`}`;
 async function startHttps() {
   if (!httpsPort) return;
   const certs = await ensureCertificates(path.join(DATA_DIR, 'https'));
   if (!certs) return;
   caFile = certs.caFile;
-  const secure = https.createServer({ key: certs.key, cert: certs.cert }, (req, res) => web.server.emit('request', req, res));
-  secure.on('upgrade', (req, socket, head) => web.server.emit('upgrade', req, socket, head));
-  secure.on('error', (err) => log.warn(`Indirizzo https non disponibile: ${err.message}`));
-  secure.listen(httpsPort, host, () => {
-    httpsReady = true;
-    log.info(`Dashboard in https: https://${os.hostname().toLowerCase()}.local:${httpsPort}/dashboard`);
-    app.broadcastState();
-  });
+  const listen = (port) => {
+    const secure = https.createServer({ key: certs.key, cert: certs.cert }, (req, res) => web.server.emit('request', req, res));
+    secure.on('upgrade', (req, socket, head) => web.server.emit('upgrade', req, socket, head));
+    secure.on('error', (err) => {
+      if (err.code === 'EACCES' && port === 443) {
+        log.warn('Porta 443 non ancora permessa: uso la 3443 e chiedo al servizio di aggiornamento di sistemarla.');
+        httpsNeedsSetup = true;
+        askSystemSetup();
+        httpsPort = 3443;
+        listen(3443);
+      } else log.warn(`Indirizzo https non disponibile: ${err.message}`);
+    });
+    secure.listen(port, host, () => {
+      httpsReady = true;
+      log.info(`Dashboard in https: ${httpsBase()}/dashboard`);
+      app.broadcastState();
+      // chi ha ancora aperto il vecchio indirizzo con :3443 viene portato su quello nuovo
+      if (port === 443) {
+        https.createServer({ key: certs.key, cert: certs.cert }, (req, res) => {
+          res.writeHead(301, { Location: `${httpsBase()}${req.url}` });
+          res.end();
+        }).on('error', () => {}).listen(3443, host);
+      }
+    });
+  };
+  listen(httpsPort);
 }
 app.httpsCertificate = () => caFile;
 

@@ -321,13 +321,14 @@
 
   // Twitch accetta gli embed solo se la pagina è aperta da "localhost" o da un sito https
   // (non dall'indirizzo http del Raspberry): allora si passa all'indirizzo https.
-  const embedBlocked = () => !(location.hostname === 'localhost' || location.protocol === 'https:');
+  // (In https sulla porta 3443 Twitch rifiuta lo stesso: serve la porta standard, che il Raspberry sistema da solo.)
+  const embedBlocked = () => !(location.hostname === 'localhost' || (location.protocol === 'https:' && !location.port));
 
   // ---------- Dashboard aperta in http dall'indirizzo del Raspberry: per player e chat di Twitch serve l'https ----------
   // Se il certificato è già installato su questo PC si passa da soli all'indirizzo https.
   let httpsChecked = false;
   function tryHttps() {
-    if (httpsChecked || !state?.httpsUrl || location.protocol === 'https:') return;
+    if (httpsChecked || !state?.httpsUrl || state.httpsNeedsSetup || location.protocol === 'https:') return;
     httpsChecked = true;
     const ctrl = new AbortController();
     setTimeout(() => ctrl.abort(), 4000);
@@ -337,6 +338,10 @@
     }).catch(() => { /* certificato non ancora installato: restano le istruzioni */ });
   }
   function renderHttpsHelp(body) {
+    if (state?.httpsNeedsSetup || (location.protocol === 'https:' && location.port)) {
+      body.replaceChildren(el('div', { className: 'embed-off' }, '⏳ Il Raspberry sta sistemando l\'indirizzo https sulla porta standard (serve a Twitch): in circa un minuto si riavvia e la pagina si ricarica da sola.'));
+      return;
+    }
     if (!state?.httpsUrl) {
       body.replaceChildren(el('div', { className: 'embed-off' }, 'Twitch mostra l\'anteprima solo se apri la dashboard da ',
         el('a', { href: `${location.protocol}//localhost:${location.port}${location.pathname}` }, 'localhost'), ' o in https.'));
@@ -786,6 +791,12 @@
     };
     ws.onclose = () => {
       if (shuttingDown) return;
+      // vecchio indirizzo https con :3443: quando il Raspberry passa alla porta standard, ricarica (verrà reindirizzata)
+      if (location.protocol === 'https:' && location.port) {
+        const standard = `https://${location.hostname}`;
+        fetch(`${standard}/https-ok`, { mode: 'no-cors', cache: 'no-store' })
+          .then(() => location.replace(`${standard}${location.pathname}${location.search}${location.hash}`)).catch(() => {});
+      }
       $('statuses').replaceChildren(pill('Programma', 'non raggiungibile'));
       setTimeout(connect, 2000);
     };

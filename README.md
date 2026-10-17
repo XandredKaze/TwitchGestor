@@ -103,7 +103,7 @@ TwitchGestor può stare su un Raspberry Pi (dal 3 in su). Così bot, comandi, pa
 
 Nella scheda **📡 Live** della dashboard trovi il player della tua live (senza audio, per evitare l'eco) e la chat di Twitch, accanto a coda, statistiche e notifiche. Il canale è quello con cui hai fatto l'accesso; se non l'hai ancora fatto puoi scriverne il nome.
 
-- Apri la dashboard da **`http://localhost:3000`**: Twitch mostra player e chat solo su `localhost` (non su `127.0.0.1`). Sul Raspberry la dashboard ha anche un indirizzo https (`https://twitchgestor.local:3443`): dopo aver installato una volta il suo certificato sul PC, player e chat di Twitch funzionano come in locale (vedi [docs/RASPBERRY.md](docs/RASPBERRY.md)).
+- Apri la dashboard da **`http://localhost:3000`**: Twitch mostra player e chat solo su `localhost` (non su `127.0.0.1`). Sul Raspberry la dashboard ha anche un indirizzo https (`https://twitchgestor.local`): dopo aver installato una volta il suo certificato sul PC, player e chat di Twitch funzionano come in locale (vedi [docs/RASPBERRY.md](docs/RASPBERRY.md)).
 - Per scrivere in chat devi essere collegato a twitch.tv nello stesso browser; se il riquadro non te lo permette usa **Finestra ↗**.
 - Con **Nascondi** togli player o chat e risparmi risorse del PC durante la live.
 - La chat si adatta all'altezza della finestra. Per sceglierla tu, **trascina la maniglia** sotto la chat (o usala con le frecce ↑ ↓ della tastiera); doppio clic sulla maniglia per tornare all'altezza automatica. Ogni PC o browser ricorda la sua.

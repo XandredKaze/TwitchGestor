@@ -34,6 +34,12 @@ status() {
   echo "aggiornamento: $1 ${2:-}"
 }
 
+# servizi di sistema non aggiornati (es. installati con una versione precedente): si sistemano subito
+if [ -f scripts/raspberry/system-setup.sh ] && ! grep -q CAP_NET_BIND_SERVICE /etc/systemd/system/twitchgestor.service 2>/dev/null; then
+  bash scripts/raspberry/system-setup.sh "$DIR" "$OWNER" && systemctl restart twitchgestor
+  echo "aggiornamento: servizi di sistema sistemati"
+fi
+
 if [ "$MODE" = auto ]; then
   read -r AUTO HOUR < <(as_user node -e '
     let s = {}; try { s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); } catch {}
@@ -94,6 +100,8 @@ started() {
 }
 
 if as_user git reset --hard --quiet "$NEW" && deps "$OLD" "$NEW"; then
+  # servizi di sistema della versione nuova (se sono cambiati)
+  [ -f scripts/raspberry/system-setup.sh ] && bash scripts/raspberry/system-setup.sh "$DIR" "$OWNER"
   systemctl restart twitchgestor
   if started "$NEW"; then
     VERSION="$(as_user node -p 'require("./package.json").version')"
@@ -107,6 +115,7 @@ fi
 as_user git reset --hard --quiet "$OLD"
 deps "$NEW" "$OLD"
 as_user tar -xzf "$BACKUP" -C "$DIR" config/config.json 2>/dev/null
+[ -f scripts/raspberry/system-setup.sh ] && bash scripts/raspberry/system-setup.sh "$DIR" "$OWNER"
 systemctl reset-failed twitchgestor 2>/dev/null
 systemctl restart twitchgestor
 started "$OLD"
