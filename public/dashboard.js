@@ -353,17 +353,36 @@
 
   // Versione demo: al posto di player e chat di Twitch mostra l'overlay e una chat simulata.
   function renderDemoEmbeds() {
-    $('stream-panel').querySelector('h2').textContent = 'Overlay (come in OBS)';
+    $('stream-panel').querySelector('h2').textContent = 'Alert e chat (come in OBS)';
     $('chat-panel').querySelector('h2').textContent = 'Chat (simulata)';
     for (const id of ['stream-open', 'chat-popout', 'btn-stream-toggle', 'btn-chat-toggle', 'stream-channel']) $(id).hidden = true;
     if (embeddedChannel.stream !== 'demo') {
       embeddedChannel.stream = 'demo';
+      // scena 1920×1080 rimpicciolita, come in OBS: overlay degli alert e (se scelta) la chat per OBS
+      const pref = (() => { try { return JSON.parse(localStorage.getItem('tg-demo-obs-chat')) ?? {}; } catch { return {}; } })();
+      const scene = el('div', { className: 'demo-scene' },
+        el('iframe', { className: 'demo-alerts', src: state.overlayUrl, title: 'Overlay degli alert' }),
+        el('iframe', { className: 'demo-obs-chat', src: state.overlayUrl.replace('overlay', 'chat'), title: 'Chat per OBS' }));
+      const applyPref = () => {
+        scene.classList.toggle('with-chat', pref.show !== false);
+        scene.classList.toggle('chat-left', pref.side === 'left');
+        try { localStorage.setItem('tg-demo-obs-chat', JSON.stringify(pref)); } catch { /* non importante */ }
+      };
+      const side = el('select', { onchange: (e) => { pref.side = e.target.value; applyPref(); } },
+        el('option', { value: 'right' }, 'a destra'), el('option', { value: 'left' }, 'a sinistra'));
+      side.value = pref.side === 'left' ? 'left' : 'right';
+      applyPref();
       $('stream-body').replaceChildren(
-        el('div', { className: 'stream-frame demo-overlay' }, el('iframe', { src: state.overlayUrl, title: 'Overlay degli alert' })),
-        el('p', { className: 'muted small' }, 'Qui vedi gli alert come li vedrebbero gli spettatori. Prova i pulsanti "Prova gli alert" o avvia la simulazione.'));
+        el('div', { className: 'stream-frame demo-overlay' }, scene),
+        el('div', { className: 'demo-scene-opts' },
+          el('label', { className: 'inline small' },
+            el('input', { type: 'checkbox', checked: pref.show !== false, onchange: (e) => { pref.show = e.target.checked; applyPref(); } }),
+            'Mostra la chat per OBS'),
+          side,
+          el('span', { className: 'muted small' }, 'Aspetto della chat nella scheda 💬 Chat.')),
+        el('p', { className: 'muted small' }, 'Qui vedi alert e chat come li vedrebbero gli spettatori. Prova i pulsanti "Prova gli alert" o avvia la simulazione.'));
       new ResizeObserver(([entry]) => {
-        const frame = entry.target.querySelector('iframe');
-        if (frame) frame.style.transform = `scale(${entry.contentRect.width / 1920})`;
+        scene.style.transform = `scale(${entry.contentRect.width / 1920})`;
       }).observe($('stream-body').querySelector('.stream-frame'));
     }
     const lines = state.demo.chat;

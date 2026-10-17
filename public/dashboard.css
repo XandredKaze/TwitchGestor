@@ -486,7 +486,15 @@ input, select, textarea { transition: border-color 0.15s, box-shadow 0.15s; }
 .banner:has(.demo-banner) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
 .demo-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .demo-overlay { background: repeating-conic-gradient(#3a3a44 0% 25%, #2a2a32 0% 50%) 50% / 24px 24px; }
-.demo-overlay iframe { width: 1920px !important; height: 1080px !important; transform-origin: 0 0; pointer-events: none; }
+.demo-scene { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; pointer-events: none; }
+.demo-overlay .demo-scene iframe { position: absolute; border: 0; inset: auto; color-scheme: normal; }
+.demo-overlay .demo-scene .demo-alerts { left: 0; top: 0; width: 1920px; height: 1080px; z-index: 1; }
+/* la chat come sorgente browser di OBS (450×700), in basso a destra o a sinistra */
+.demo-overlay .demo-scene .demo-obs-chat { display: none; right: 40px; bottom: 40px; width: 450px; height: 700px; }
+.demo-overlay .demo-scene.with-chat .demo-obs-chat { display: block; }
+.demo-overlay .demo-scene.chat-left .demo-obs-chat { right: auto; left: 40px; }
+.demo-scene-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
+.demo-scene-opts select { width: auto; padding: 3px 8px; font-size: 13px; }
 .demo-chat { height: var(--chat-h); overflow-y: auto; padding: 10px 12px; border-radius: 12px; background: var(--inset); font-size: 14px; display: flex; flex-direction: column; gap: 6px; }
 .demo-chat .bot b { color: var(--accent); }
 .demo-chat > div { overflow-wrap: anywhere; }
