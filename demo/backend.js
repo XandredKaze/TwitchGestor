@@ -442,6 +442,23 @@ class DemoBackend {
     switch (route) {
       case 'GET /api/state': return ok(this.getState());
       // ⚙ Sistema: nella demo niente aggiornamenti né copie di sicurezza (le impostazioni stanno in questo browser)
+      // storico dei titoli: live di prova
+      case 'GET /api/titles': {
+        const day = 86400000;
+        const at = (d, h) => Date.now() - d * day - (Date.now() % day) + h * 3600000;
+        const lives = [
+          { startedAt: at(1, 19), endedAt: at(1, 22.5), changes: [{ at: at(1, 19), title: 'Elden Ring alla cieca: oggi si batte Malenia!', game: 'Elden Ring', gameId: '512953' }, { at: at(1, 21), title: 'Elden Ring alla cieca: MALENIA CI HA DISTRUTTO', game: 'Elden Ring', gameId: '512953' }] },
+          { startedAt: at(3, 20), endedAt: at(3, 23), changes: [{ at: at(3, 20), title: 'Chiacchiere e caffè con la chat ☕', game: 'Just Chatting', gameId: '509658' }] },
+          { startedAt: at(5, 18), endedAt: at(5, 21.25), changes: [{ at: at(5, 18), title: 'Minecraft hardcore: giorno 12', game: 'Minecraft', gameId: '27471' }] },
+          { startedAt: at(8, 20), endedAt: at(8, 22), changes: [{ at: at(8, 20), title: 'Chiacchiere e caffè con la chat ☕', game: 'Just Chatting', gameId: '509658' }] },
+        ];
+        const map = new Map();
+        for (const l of lives) for (const c of l.changes) {
+          const t = map.get(c.title) ?? { ...c, lastUsed: 0, count: 0 };
+          t.count += 1; t.lastUsed = Math.max(t.lastUsed, c.at); map.set(c.title, t);
+        }
+        return ok({ lives, titles: [...map.values()].sort((a, b) => b.lastUsed - a.lastUsed) });
+      }
       case 'GET /api/update': return ok({ managed: false, commit: '', settings: { auto: true, hour: 5 }, check: {} });
       case 'GET /api/backup': case 'POST /api/backup/restore':
         return fail(400, 'Nella demo non c\'è niente da esportare o importare: le impostazioni restano solo in questo browser.');

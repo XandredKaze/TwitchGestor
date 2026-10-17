@@ -167,6 +167,35 @@
     return { wrap, more, values: () => [...wrap.querySelectorAll('input')].map((i) => i.value) };
   }
 
+  const dateIt = (ms) => new Date(ms).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
+  const duration = (ms) => { const m = Math.round(ms / 60000); return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`; };
+
+  /** Storico delle live: data, durata, categoria e titoli (anche quelli cambiati durante la diretta). */
+  async function openTitleHistory() {
+    let dlg = $('titles-dialog');
+    if (!dlg) {
+      dlg = el('dialog', { id: 'titles-dialog', className: 'sys-dialog titles-dialog' });
+      dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+      document.body.append(dlg);
+    }
+    const list = el('div', { className: 'titles-list' }, el('p', { className: 'muted small' }, 'Carico…'));
+    dlg.replaceChildren(
+      el('div', { className: 'sys-head' }, el('h2', {}, 'Storico delle live'), el('button', { type: 'button', className: 'small-btn', onclick: () => dlg.close() }, '✕')),
+      el('div', { className: 'sys-sec' }, list));
+    dlg.showModal();
+    const { lives = [] } = await call('/api/titles', { method: 'GET' }).catch(() => ({}));
+    if (!lives.length) { list.replaceChildren(el('p', { className: 'muted small' }, 'Ancora nessuna live registrata: dalla prossima diretta TwitchGestor segna qui titolo e categoria.')); return; }
+    list.replaceChildren(...lives.map((l) => el('div', { className: 'titles-live' },
+      el('div', { className: 'titles-when' },
+        el('b', {}, new Date(l.startedAt).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })),
+        el('span', {}, ` ${new Date(l.startedAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`),
+        el('span', { className: 'muted' }, l.endedAt ? ` · ${duration(l.endedAt - l.startedAt)}` : ' · in corso')),
+      ...l.changes.map((c, i) => el('div', { className: 'titles-change' },
+        i ? el('span', { className: 'muted small' }, `${new Date(c.at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} → `) : null,
+        el('span', {}, c.title || '(senza titolo)'),
+        c.game ? el('small', { className: 'muted' }, ` · ${c.game}`) : null)))));
+  }
+
   const FORMS = {
     info() {
       const ch = val(qa?.channel) ?? {};
@@ -189,10 +218,27 @@
           } catch (err) { message(err.message, 'err'); }
         }, 300);
       };
+      // titoli già usati nelle live: un clic li rimette (con la loro categoria), poi "Salva"
+      const used = el('div', { className: 'qa-used' });
+      call('/api/titles', { method: 'GET' }).then(({ titles }) => {
+        if (!titles?.length) return;
+        used.replaceChildren(el('span', { className: 'qa-used-head' }, 'Titoli usati nelle live'),
+          ...titles.slice(0, 10).map((t) => el('button', {
+            type: 'button', className: 'qa-used-title', title: `${t.game ? `${t.game} · ` : ''}usato in ${t.count} live, l'ultima il ${dateIt(t.lastUsed)}`,
+            onclick: () => {
+              title.value = t.title;
+              if (t.gameId) { game = { id: t.gameId, name: t.game }; gameInput.value = t.game; }
+              results.replaceChildren();
+              title.focus();
+            },
+          }, el('b', {}, t.title), t.game ? el('small', {}, t.game) : null)));
+      }).catch(() => {});
       return form(() => run('info', { title: title.value, ...(game.id && game.name === gameInput.value ? { gameId: game.id } : {}) }),
         label('Titolo', title),
         label('Categoria', gameInput), results,
-        row(submit('Salva'), val(qa?.channel) ? null : el('span', { className: 'muted small' }, qa?.channel?.error ?? '')));
+        row(submit('Salva'), el('button', { type: 'button', className: 'small-btn', onclick: openTitleHistory }, '📜 Storico delle live'),
+          val(qa?.channel) ? null : el('span', { className: 'muted small' }, qa?.channel?.error ?? '')),
+        used);
     },
     raid() {
       const name = input({ placeholder: 'nome del canale', maxlength: '30' });

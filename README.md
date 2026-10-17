@@ -143,6 +143,10 @@ Nella scheda **📡 Live**, tra l'anteprima della live e la coda degli alert, ci
 
 Con **⚙ Personalizza** scegli quali azioni mostrare. La prima volta servono nuovi permessi: **Esci** e **Accedi con Twitch**. Pubblicità, sondaggi, pronostici e clip Twitch li permette solo ai canali affiliate o partner.
 
+## Storico dei titoli
+
+TwitchGestor segna ogni live: data, ora, durata, titolo e categoria, compresi i cambi fatti durante la diretta. In **Azioni rapide → Titolo e categoria** trovi i **titoli usati nelle live**: un clic li rimette insieme alla loro categoria, poi premi **Salva**. Con **📜 Storico delle live** vedi l'elenco completo. Lo storico sta in `data/titles.json`.
+
 ## Comandi della chat
 
 Nella scheda **🤖 Comandi** crei i comandi che gli spettatori scrivono in chat con il "!" (es. `!discord`): TwitchGestor legge la chat con il tuo account e risponde con il bot (es. Wolfery), oppure con il tuo account se il bot non è collegato.

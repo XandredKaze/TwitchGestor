@@ -354,6 +354,7 @@ export function createServer(app) {
           setTimeout(() => process.exit(0), 500);
           return undefined;
         }
+        if (route === 'GET /api/titles') return send(res, 200, { lives: app.titleLog?.lives ?? [], titles: app.titleLog?.titles() ?? [] });
         if (route === 'GET /api/obs') return send(res, 200, app.obs?.state() ?? null);
         if (route === 'PUT /api/obs/settings') {
           if (!app.obs) return send(res, 400, { error: 'Collegamento a OBS non disponibile' });

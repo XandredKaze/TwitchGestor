@@ -20,6 +20,7 @@ import { ChatModerator } from './core/moderation.js';
 import { ChatFeed, toChatMessage, shouldShow, badgeMap } from './core/chatOverlay.js';
 import { ChatCommands, humanDuration } from './core/commands.js';
 import { AutoShoutout, shoutoutCard } from './core/shoutout.js';
+import { TitleLog } from './core/titles.js';
 import { sanitizeConfig } from './core/schema.js';
 import { createLogger } from './logger.js';
 
@@ -275,6 +276,43 @@ const autoShoutout = new AutoShoutout({
   onCard: (info) => chatFeed.push(shoutoutCard(info)),
 });
 
+// --- Storico dei titoli delle live (data/titles.json) ---
+const TITLES_FILE = path.join(DATA_DIR, 'titles.json');
+const titleLog = new TitleLog({
+  store: {
+    load: () => JSON.parse(fs.readFileSync(TITLES_FILE, 'utf8')),
+    save: (data) => fs.writeFile(TITLES_FILE, JSON.stringify(data), () => {}),
+  },
+  onChange: () => web?.toDashboards({ type: 'titles' }),
+});
+/** Live in corso secondo Twitch (titolo e categoria compresi), o null. */
+async function currentLive() {
+  return (await helix.request('GET', `/streams?user_id=${auth.user.id}`)).data?.[0] ?? null;
+}
+/** Inizio live: Twitch a volte la mostra con qualche secondo di ritardo, quindi riprova. */
+async function recordLiveStart(startedAt) {
+  for (let i = 0; i < 4; i++) {
+    try {
+      const live = await currentLive();
+      if (live) return titleLog.online({ startedAt: live.started_at, title: live.title, game: live.game_name, gameId: live.game_id });
+    } catch { /* riprova */ }
+    await new Promise((r) => setTimeout(r, 15000));
+  }
+  const c = await channelInfo().catch(() => ({}));
+  return titleLog.online({ startedAt, title: c.title, game: c.game_name, gameId: c.game_id });
+}
+/** All'avvio: se sei in live la registra, se una live era rimasta aperta la chiude. */
+async function syncLiveTitles() {
+  try {
+    const live = await currentLive();
+    if (live) titleLog.online({ startedAt: live.started_at, title: live.title, game: live.game_name, gameId: live.game_id });
+    else if (titleLog.current) titleLog.offline(titleLog.current.lastSeen ?? Date.now());
+  } catch (err) {
+    log.warn(`Storico dei titoli: stato della live non disponibile (${err.message})`);
+  }
+}
+setInterval(() => titleLog.seen(), 5 * 60000).unref();
+
 /** Prova della moderazione dalla dashboard: non fa nulla in chat. */
 function testModeration(text, role = 'everyone', draft) {
   const settings = draft ? sanitizeConfig({ ...config.get(), moderation: draft }, config.defaults()).moderation : config.get().moderation;
@@ -298,6 +336,7 @@ const app = {
   moderator,
   testModeration,
   autoShoutout,
+  titleLog,
   chatFeed,
   /** In live adesso? (OBS sta trasmettendo o Twitch ti mostra in live): lo script di aggiornamento aspetta. */
   async isBusy() {
@@ -455,6 +494,9 @@ function startEventSub() {
         .catch((err) => log.warn(`Messaggio della chat non gestito: ${err.message}`));
       return;
     }
+    if (type === 'stream.online') { recordLiveStart(payload.started_at).catch((err) => log.warn(`Storico dei titoli: ${err.message}`)); return; }
+    if (type === 'stream.offline') { titleLog.offline(); return; }
+    if (type === 'channel.update') { titleLog.update({ title: payload.title, game: payload.category_name, gameId: payload.category_id }); return; }
     if (type === 'channel.chat.message_delete') { chatFeed.remove(payload.message_id); return; }
     if (type === 'channel.chat.clear_user_messages') { chatFeed.removeUser(payload.target_user_id); return; }
     if (type === 'channel.chat.clear') { chatFeed.clear(); return;
@@ -573,6 +615,7 @@ web.server.listen(port, host, async () => {
   try {
     if (await auth.validate()) {
       startEventSub();
+      syncLiveTitles();
       creditsScheduler.onStart();
       loadBadges();
     }

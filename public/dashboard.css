@@ -670,6 +670,21 @@ input, select, textarea { transition: border-color 0.15s, box-shadow 0.15s; }
 .qa-results:empty { display: none; }
 .qa-cat { display: flex; align-items: center; gap: 10px; text-align: left; padding: 4px 8px; }
 .qa-cat img { border-radius: 4px; flex: none; }
+/* titoli già usati e storico delle live */
+.qa-used { display: flex; flex-wrap: wrap; gap: 6px; }
+.qa-used:empty { display: none; }
+.qa-used-head { flex-basis: 100%; font-size: 12px; font-weight: 600; color: var(--muted); }
+.qa-used-title { display: grid; gap: 1px; max-width: 100%; padding: 5px 10px; text-align: left; font-size: 13px; }
+.qa-used-title b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qa-used-title small { color: var(--muted); font-size: 11px; }
+.titles-dialog { width: min(640px, calc(100vw - 32px)); }
+.titles-list { display: grid; gap: 8px; max-height: 65vh; overflow-y: auto; }
+.titles-live { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--inset); font-size: 14px; display: grid; gap: 3px; }
+.titles-when { font-size: 12px; }
+[data-ui="brutal"] .qa-used-head { font-family: var(--mono); font-weight: 400; text-transform: uppercase; }
+[data-ui="brutal"] .qa-used-title { text-transform: none; font-family: 'Outfit', sans-serif; }
+[data-ui="brutal"] .titles-live { background: transparent; border: 1.5px solid #5a5a5a; }
+[data-ui="brutal"] .titles-when { font-family: var(--mono); }
 .qa-bar { position: relative; display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; }
 .qa-bar span, .qa-bar b { position: relative; z-index: 1; }
 .qa-bar i { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--accent) 22%, transparent); }
