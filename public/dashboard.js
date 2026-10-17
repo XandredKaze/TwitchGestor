@@ -704,6 +704,7 @@
     if (name === 'theme') openThemeTab();
     if (name === 'commands') window.dispatchEvent(new Event('commands:open'));
     if (name === 'chat') window.dispatchEvent(new Event('chat:open'));
+    window.dispatchEvent(new Event(`tab:${name}`));
     if (name === 'credits' && !$('credits-frame').src) {
       // Il pannello dei titoli di coda è una pagina a sé: si carica solo quando apri la scheda.
       $('credits-frame').src = `/credits?pannello${token ? `&token=${encodeURIComponent(token)}` : ''}`;
@@ -776,6 +777,7 @@
       }
       if (msg.type === 'moderation') window.dispatchEvent(new CustomEvent('tg:moderation', { detail: msg.history }));
       if (msg.type === 'shoutouts') window.dispatchEvent(new CustomEvent('tg:shoutouts', { detail: msg }));
+      if (msg.type === 'stats') window.dispatchEvent(new Event('tg:stats'));
       if (msg.type === 'stream' && state) {
         state.obs = { ...state.obs, stream: msg.stream };
         window.dispatchEvent(new CustomEvent('tg:stream', { detail: msg.stream }));

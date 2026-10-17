@@ -10,6 +10,8 @@ import { NotificationManager } from './core/NotificationManager.js';
 import { sanitizeConfig, ANIMATIONS, POSITIONS, SOUND_PRESETS, UI_THEMES } from './core/schema.js';
 import { recentLogs } from './logger.js';
 import * as updates from './updates.js';
+import { sendTelegram, findTelegramChat } from './telegram.js';
+import { recapText } from './core/livestats.js';
 import { API_LEVEL, APP_VERSION, BUILD_ID } from './version.js';
 import { parseKofi, parseGenericDonation } from './sources/webhooks.js';
 import { createLogger } from './logger.js';
@@ -353,6 +355,28 @@ export function createServer(app) {
           // (sul Raspberry si riavvia da solo; sul PC va riaperto)
           setTimeout(() => process.exit(0), 500);
           return undefined;
+        }
+        // --- Statistiche, riepiloghi e Telegram ---
+        if (route === 'GET /api/stats') {
+          const days = Math.min(Math.max(Number(url.searchParams.get('days')) || 90, 7), 800);
+          return send(res, 200, app.liveStats?.overview(days) ?? { days, lives: [], daily: [] });
+        }
+        if (route === 'GET /api/recaps') return send(res, 200, { recaps: app.liveStats?.recaps ?? [], live: Boolean(app.liveStats?.current) });
+        if (route === 'PUT /api/telegram') {
+          const body = await readBody(req);
+          const config = app.config.save({ ...app.config.get(), telegram: { ...app.config.get().telegram, ...body.telegram } });
+          return send(res, 200, { telegram: config.telegram });
+        }
+        if (route === 'POST /api/telegram/find') {
+          const body = await readBody(req);
+          const found = await findTelegramChat(body.token ?? app.config.get().telegram?.token);
+          return send(res, 200, found);
+        }
+        if (route === 'POST /api/telegram/test') {
+          const t = app.config.get().telegram ?? {};
+          const last = app.liveStats?.recaps?.[0];
+          await sendTelegram(t, last ? recapText(last) : '✅ TwitchGestor è collegato: qui arriveranno i riepiloghi delle tue live.');
+          return send(res, 200, { ok: true });
         }
         if (route === 'GET /api/titles') return send(res, 200, { lives: app.titleLog?.lives ?? [], titles: app.titleLog?.titles() ?? [] });
         if (route === 'GET /api/obs') return send(res, 200, app.obs?.state() ?? null);

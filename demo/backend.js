@@ -20,6 +20,7 @@ import { createQuickActions } from '../src/quickActions.js';
 import { summarizeStream } from '../src/core/streamHealth.js';
 import { ChatModerator } from '../src/core/moderation.js';
 import { AutoShoutout, shoutoutCard } from '../src/core/shoutout.js';
+import { LiveStats, computeRecap } from '../src/core/livestats.js';
 import { ChatFeed, shouldShow } from '../src/core/chatOverlay.js';
 
 const CHANNEL = { id: '0', login: 'canale_demo' };
@@ -96,6 +97,51 @@ function demoCreditsData() {
 const VIEWER_CHAT = ['ciao a tutti!', 'che bella live 🔥', 'GG', 'ahahah', 'forza!', 'da dove stai giocando?', 'quel salto era perfetto', 'LUL', 'buonasera chat', '💜💜💜'];
 const VIEWERS = ['PizzaConAnanas', 'LupoSolitario', 'GattoNinja', 'CaffèCorretto', 'MarioRossi92', 'SuperNonna', 'VolpeRossa', 'NebbiaZeta'];
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+/** Statistiche e riepiloghi di prova: 16 live nelle ultime 8 settimane (sempre gli stessi numeri). */
+function demoStats() {
+  let seed = 7;
+  const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  const stats = new LiveStats({});
+  const GAMES = [['Elden Ring', 'Elden Ring alla cieca: oggi si batte Malenia!'], ['Just Chatting', 'Chiacchiere e caffè con la chat ☕'], ['Minecraft', 'Minecraft hardcore: giorno 12'], ['Elden Ring', 'Elden Ring: DLC tutto da scoprire']];
+  const day = 86400000;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let followers = 812;
+  for (let d = 70; d >= 0; d--) {
+    followers += Math.round(rnd() * 3);
+    stats.daily[new Date(today - d * day + 43200000).toISOString().slice(0, 10)] = { followers, subscribers: 14 + Math.round((70 - d) / 12) };
+  }
+  const NAMES = ['LunaRossa', 'Drago_TV', 'ModAnna', 'PixelGamer', 'NeveNera', 'GattoNinja', 'SuperNonna', 'VolpeRossa'];
+  let f = 812;
+  for (let i = 0; i < 16; i++) {
+    const dayOffset = 56 - i * 3.5 - Math.round(rnd());
+    const start = today.getTime() - Math.round(dayOffset) * day + (19 + Math.round(rnd() * 3)) * 3600000;
+    const [game, title] = GAMES[i % GAMES.length];
+    const minutes = 120 + Math.round(rnd() * 120);
+    const base = (game === 'Just Chatting' ? 9 : 14) + i * 0.8;
+    const samples = [];
+    for (let m = 0; m < minutes; m += 2) samples.push([start + m * 60000, Math.max(1, Math.round(base * (0.6 + Math.sin((m / minutes) * Math.PI) * 0.6) + rnd() * 4 + (m > minutes * 0.6 && i % 3 === 0 ? 12 : 0)))]);
+    const chatters = {};
+    let messages = 0;
+    for (const n of NAMES) { const c = Math.round(rnd() * 40); if (c) { chatters[n.toLowerCase()] = { name: n, count: c }; messages += c; } }
+    const gained = 2 + Math.round(rnd() * 8);
+    const live = { startedAt: start, endedAt: start + minutes * 60000, samples, messages, chatters, followersStart: f, followersEnd: f + gained, subscribersStart: 14, subscribersEnd: 14 + (i % 4 === 0 ? 1 : 0) };
+    f += gained;
+    const pick = (k) => NAMES.filter(() => rnd() < k);
+    live.recap = computeRecap(live, {
+      session: {
+        follows: pick(0.3), subs: i % 4 === 0 ? ['NeveNera'] : [], resubs: i % 3 === 0 ? [{ name: 'LunaRossa', value: 7 + i }] : [],
+        gifters: i % 5 === 0 ? [{ name: 'Drago_TV', value: 5 }] : [], cheers: i % 2 ? [{ name: 'PixelGamer', value: 100 * (1 + (i % 4)) }] : [],
+        donations: i % 4 === 1 ? [{ name: 'SuperNonna', value: 5, currency: 'EUR' }] : [], raids: i % 3 === 0 ? [{ name: 'StreamerAmico', value: 12 + i }] : [], redemptions: pick(0.4),
+      },
+      titles: [{ at: start, title, game }],
+      previous: stats.recaps,
+    });
+    stats.lives.unshift(live);
+  }
+  stats.now = () => Date.now();
+  return stats;
+}
+
 /** Immagine del canale inventata (lettera iniziale su un colore) per gli shoutout della demo. */
 function demoAvatar(login) {
   const hue = [...login].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
@@ -459,6 +505,16 @@ class DemoBackend {
         }
         return ok({ lives, titles: [...map.values()].sort((a, b) => b.lastUsed - a.lastUsed) });
       }
+      case 'GET /api/stats': {
+        this.stats ??= demoStats();
+        return ok(this.stats.overview(Math.min(Math.max(Number(url.searchParams.get('days')) || 90, 7), 800)));
+      }
+      case 'GET /api/recaps': this.stats ??= demoStats(); return ok({ recaps: this.stats.recaps, live: Boolean(this.simulation) });
+      case 'PUT /api/telegram':
+        this.config = sanitizeConfig({ ...this.config, telegram: { ...this.config.telegram, ...body?.telegram } }, this.defaults);
+        return ok({ telegram: this.config.telegram });
+      case 'POST /api/telegram/find': case 'POST /api/telegram/test':
+        return fail(400, 'Nella demo Telegram non è collegato: nel programma vero qui trovi la chat e mandi un messaggio di prova.');
       case 'GET /api/update': return ok({ managed: false, commit: '', settings: { auto: true, hour: 5 }, check: {} });
       case 'GET /api/backup': case 'POST /api/backup/restore':
         return fail(400, 'Nella demo non c\'è niente da esportare o importare: le impostazioni restano solo in questo browser.');

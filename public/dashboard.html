@@ -19,6 +19,8 @@
       <button class="tab" data-tab="credits" role="tab">🎬 Titoli di coda</button>
       <button class="tab" data-tab="chat" role="tab">💬 Chat</button>
       <button class="tab" data-tab="commands" role="tab">🤖 Comandi</button>
+      <button class="tab" data-tab="stats" role="tab">📈 Statistiche</button>
+      <button class="tab" data-tab="recaps" role="tab">📋 Riepiloghi</button>
       <button class="tab" data-tab="theme" role="tab">🖌 Tema</button>
     </nav>
     <div id="statuses" class="statuses"></div>
@@ -378,6 +380,31 @@
     </div>
   </main>
 
+  <main id="tab-stats" class="stats-tab" hidden>
+    <div class="page-head">
+      <div><h2>📈 Statistiche</h2><p>Come sta andando il canale nel tempo: follower, spettatori e quando le live vanno meglio. Si aggiornano da sole a ogni live.</p></div>
+      <nav class="subtabs" id="stats-range" aria-label="Periodo">
+        <button type="button" data-days="30">30 giorni</button>
+        <button type="button" data-days="90" class="active">3 mesi</button>
+        <button type="button" data-days="365">1 anno</button>
+      </nav>
+    </div>
+    <div id="trend-body" class="stats-body"></div>
+  </main>
+
+  <main id="tab-recaps" class="recaps-tab" hidden>
+    <div class="page-head">
+      <div><h2>📋 Riepiloghi delle live</h2><p>A fine di ogni live TwitchGestor prepara un resoconto: pubblico, crescita, supporto e chat, confrontati con le live precedenti.</p></div>
+    </div>
+    <div class="recaps-layout">
+      <aside class="recaps-side">
+        <section class="panel"><h2>Le tue live</h2><div id="recap-list" class="rc-items"></div></section>
+        <section class="panel"><h2>Telegram</h2><div id="recap-telegram" class="rc-telegram"></div></section>
+      </aside>
+      <section class="panel" id="recap-detail"></section>
+    </div>
+  </main>
+
   <main id="tab-theme" class="theme-tab" hidden>
     <div class="page-head">
       <div><h2>🖌 Tema</h2><p>L'aspetto di TwitchGestor, degli alert e dei titoli di coda.</p></div>
@@ -419,6 +446,9 @@
   <script src="/moderation.js"></script>
   <script src="/shoutouts.js"></script>
   <script src="/system.js"></script>
+  <script src="/charts.js"></script>
+  <script src="/stats.js"></script>
+  <script src="/recaps.js"></script>
   <script src="/chatoverlay.js"></script>
 </body>
 </html>

@@ -221,6 +221,17 @@ function sanitizeShoutouts(input, base) {
   return out;
 }
 
+/** Telegram: bot e chat dove mandare riepiloghi e avvisi. */
+function sanitizeTelegram(input, base) {
+  const out = { ...base };
+  if (!isObject(input)) return out;
+  for (const k of ['enabled', 'sendRecap', 'sendLiveStart']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  if (typeof input.token === 'string' && (input.token === '' || /^\d+:[\w-]{20,}$/.test(input.token.trim()))) out.token = input.token.trim();
+  if (typeof input.chatId === 'string' && /^-?\d{1,20}$|^$/.test(input.chatId.trim())) out.chatId = input.chatId.trim();
+  if (typeof input.chatName === 'string') out.chatName = input.chatName.slice(0, 80);
+  return out;
+}
+
 /** Ritorna la configurazione completa e valida, partendo dai predefiniti. */
 export function sanitizeConfig(input, defaults) {
   const out = structuredClone(defaults);
@@ -233,6 +244,7 @@ export function sanitizeConfig(input, defaults) {
   if (out.commands) out.commands = sanitizeCommands(input.commands, out.commands);
   if (out.moderation) out.moderation = sanitizeModeration(input.moderation, out.moderation);
   if (out.shoutouts) out.shoutouts = sanitizeShoutouts(input.shoutouts, out.shoutouts);
+  if (out.telegram) out.telegram = sanitizeTelegram(input.telegram, out.telegram);
   if (out.chatOverlay) out.chatOverlay = sanitizeChatOverlay(input.chatOverlay, out.chatOverlay);
 
   for (const type of Object.keys(out.types)) {

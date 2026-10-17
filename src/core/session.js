@@ -26,11 +26,13 @@ function totals(items, valueOf, keyOf = nameOf) {
 /**
  * @param history notifiche normalizzate (le più recenti per prime, come nello storico)
  * @param since   inizio della live (Date, ISO o millisecondi)
+ * @param until   fine della live (facoltativo)
  */
-export function liveSession(history, since) {
+export function liveSession(history, since, until) {
   const t0 = new Date(since).getTime();
+  const t1 = until ? new Date(until).getTime() : Infinity;
   const items = history
-    .filter((h) => h.source !== 'test' && new Date(h.timestamp).getTime() >= t0)
+    .filter((h) => h.source !== 'test' && new Date(h.timestamp).getTime() >= t0 && new Date(h.timestamp).getTime() <= t1)
     .reverse(); // dalla più vecchia alla più recente
   const of = (type) => items.filter((h) => h.type === type);
 

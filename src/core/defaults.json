@@ -302,6 +302,14 @@
     "message": "📣 Passate a trovare {user}! L'ultima volta era in live con {game} → {link}",
     "users": []
   },
+  "telegram": {
+    "enabled": false,
+    "token": "",
+    "chatId": "",
+    "chatName": "",
+    "sendRecap": true,
+    "sendLiveStart": false
+  },
   "chatOverlay": {
     "style": "classic",
     "font": "Poppins",

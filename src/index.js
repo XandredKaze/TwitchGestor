@@ -21,6 +21,9 @@ import { ChatFeed, toChatMessage, shouldShow, badgeMap } from './core/chatOverla
 import { ChatCommands, humanDuration } from './core/commands.js';
 import { AutoShoutout, shoutoutCard } from './core/shoutout.js';
 import { TitleLog } from './core/titles.js';
+import { LiveStats, computeRecap, recapText } from './core/livestats.js';
+import { liveSession } from './core/session.js';
+import { sendTelegram } from './telegram.js';
 import { sanitizeConfig } from './core/schema.js';
 import { createLogger } from './logger.js';
 
@@ -289,29 +292,114 @@ const titleLog = new TitleLog({
 async function currentLive() {
   return (await helix.request('GET', `/streams?user_id=${auth.user.id}`)).data?.[0] ?? null;
 }
+// --- Statistiche e riepiloghi delle live (data/stats.json) ---
+const STATS_FILE = path.join(DATA_DIR, 'stats.json');
+const liveStats = new LiveStats({
+  store: {
+    load: () => JSON.parse(fs.readFileSync(STATS_FILE, 'utf8')),
+    save: (data) => fs.writeFile(STATS_FILE, JSON.stringify(data), () => {}),
+  },
+  onChange: () => web?.toDashboards({ type: 'stats' }),
+});
+
+/** Follower e abbonati totali del canale (per le statistiche dei giorni e della live). */
+async function refreshTotals() {
+  if (!auth.user) return;
+  const id = auth.user.id;
+  const [f, sub] = await Promise.allSettled([
+    helix.request('GET', `/channels/followers?broadcaster_id=${id}&first=1`),
+    helix.request('GET', `/subscriptions?broadcaster_id=${id}&first=1`),
+  ]);
+  liveStats.totals({
+    followers: f.status === 'fulfilled' ? f.value.total : undefined,
+    subscribers: sub.status === 'fulfilled' ? sub.value.total : undefined,
+  });
+}
+setInterval(() => refreshTotals().catch(() => {}), 6 * 3600 * 1000).unref();
+
+function telegramSettings() {
+  const t = config.get().telegram ?? {};
+  return t.enabled && t.token && t.chatId ? t : null;
+}
+
+/** Live iniziata (o ritrovata): storico dei titoli, statistiche e, se vuoi, avviso su Telegram. */
+function liveStarted(stream) {
+  titleLog.online({ startedAt: stream.started_at, title: stream.title, game: stream.game_name, gameId: stream.game_id });
+  const isNew = !liveStats.current;
+  liveStats.start(stream.started_at);
+  if (!isNew) return;
+  refreshTotals().catch(() => {});
+  const tg = telegramSettings();
+  if (tg?.sendLiveStart) {
+    const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    sendTelegram(tg, `🔴 <b>In live!</b>\n${esc(stream.title)}\n🎮 ${esc(stream.game_name)}\nhttps://twitch.tv/${auth.user.login}`)
+      .catch((err) => log.warn(`Avviso di inizio live su Telegram non inviato: ${err.message}`));
+  }
+}
+
+/** Live finita: chiude statistiche e storico e prepara il riepilogo (più Telegram, se attivo). */
+async function liveEnded(at = Date.now()) {
+  titleLog.offline(at);
+  const live = liveStats.current;
+  if (!live) return;
+  await refreshTotals().catch(() => {});
+  liveStats.end(at);
+  const titles = titleLog.lives.find((l) => Math.abs(l.startedAt - live.startedAt) < 60000)?.changes ?? [];
+  live.recap = computeRecap(live, { session: liveSession(manager.history, live.startedAt, live.endedAt), titles, previous: liveStats.recaps });
+  liveStats.save();
+  log.info(`Riepilogo della live pronto (${Math.round(live.recap.durationMs / 60000)} minuti, media ${live.recap.viewers.average} spettatori)`);
+  const tg = telegramSettings();
+  if (tg?.sendRecap) sendTelegram(tg, recapText(live.recap)).catch((err) => log.warn(`Riepilogo su Telegram non inviato: ${err.message}`));
+}
+
 /** Inizio live: Twitch a volte la mostra con qualche secondo di ritardo, quindi riprova. */
 async function recordLiveStart(startedAt) {
   for (let i = 0; i < 4; i++) {
     try {
       const live = await currentLive();
-      if (live) return titleLog.online({ startedAt: live.started_at, title: live.title, game: live.game_name, gameId: live.game_id });
+      if (live) return liveStarted(live);
     } catch { /* riprova */ }
     await new Promise((r) => setTimeout(r, 15000));
   }
   const c = await channelInfo().catch(() => ({}));
-  return titleLog.online({ startedAt, title: c.title, game: c.game_name, gameId: c.game_id });
+  return liveStarted({ started_at: startedAt, title: c.title, game_name: c.game_name, game_id: c.game_id });
 }
-/** All'avvio: se sei in live la registra, se una live era rimasta aperta la chiude. */
-async function syncLiveTitles() {
-  try {
-    const live = await currentLive();
-    if (live) titleLog.online({ startedAt: live.started_at, title: live.title, game: live.game_name, gameId: live.game_id });
-    else if (titleLog.current) titleLog.offline(titleLog.current.lastSeen ?? Date.now());
-  } catch (err) {
-    log.warn(`Storico dei titoli: stato della live non disponibile (${err.message})`);
+
+/**
+ * Ogni minuto: spettatori della live in corso. Serve anche da rete di sicurezza se Twitch non avvisa
+ * dell'inizio o della fine (es. programma riavviato): dopo 3 controlli "non in live" la chiude.
+ */
+let offlineChecks = 0;
+async function liveTick() {
+  if (!auth.user) return;
+  let stream;
+  try { stream = await currentLive(); } catch { return; }
+  if (stream) {
+    offlineChecks = 0;
+    if (!liveStats.current || !titleLog.current) liveStarted(stream);
+    liveStats.sample(stream.viewer_count);
+    titleLog.seen();
+  } else if (liveStats.current && ++offlineChecks >= 3) {
+    offlineChecks = 0;
+    await liveEnded(liveStats.current.samples.at(-1)?.[0] ?? Date.now());
   }
 }
-setInterval(() => titleLog.seen(), 5 * 60000).unref();
+setInterval(() => liveTick().catch((err) => log.warn(`Statistiche della live: ${err.message}`)), 60000).unref();
+
+/** All'avvio: se sei in live la ritrova, se una live era rimasta aperta la chiude con il suo riepilogo. */
+async function syncLiveTitles() {
+  try {
+    refreshTotals().catch(() => {});
+    const live = await currentLive();
+    if (live) liveStarted(live);
+    else {
+      if (titleLog.current) titleLog.offline(titleLog.current.lastSeen ?? Date.now());
+      if (liveStats.current) await liveEnded(liveStats.current.samples.at(-1)?.[0] ?? liveStats.current.startedAt);
+    }
+  } catch (err) {
+    log.warn(`Stato della live non disponibile (${err.message})`);
+  }
+}
 
 /** Prova della moderazione dalla dashboard: non fa nulla in chat. */
 function testModeration(text, role = 'everyone', draft) {
@@ -337,6 +425,7 @@ const app = {
   testModeration,
   autoShoutout,
   titleLog,
+  liveStats,
   chatFeed,
   /** In live adesso? (OBS sta trasmettendo o Twitch ti mostra in live): lo script di aggiornamento aspetta. */
   async isBusy() {
@@ -476,6 +565,7 @@ function startEventSub() {
         if (shouldShow(shown, config.get().chatOverlay)) chatFeed.push(shown);
         return;
       }
+      liveStats.chat(payload.chatter_user_login, payload.chatter_user_name); // per il riepilogo della live
       const msg = {
         id: payload.message_id,
         text: payload.message?.text,
@@ -495,7 +585,7 @@ function startEventSub() {
       return;
     }
     if (type === 'stream.online') { recordLiveStart(payload.started_at).catch((err) => log.warn(`Storico dei titoli: ${err.message}`)); return; }
-    if (type === 'stream.offline') { titleLog.offline(); return; }
+    if (type === 'stream.offline') { liveEnded().catch((err) => log.warn(`Fine live: ${err.message}`)); return; }
     if (type === 'channel.update') { titleLog.update({ title: payload.title, game: payload.category_name, gameId: payload.category_id }); return; }
     if (type === 'channel.chat.message_delete') { chatFeed.remove(payload.message_id); return; }
     if (type === 'channel.chat.clear_user_messages') { chatFeed.removeUser(payload.target_user_id); return; }
