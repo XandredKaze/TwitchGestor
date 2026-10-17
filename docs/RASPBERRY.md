@@ -75,6 +75,14 @@ Indirizzo e password della dashboard del Raspberry restano i suoi. Se importi da
 - Impostazioni, accessi, immagini, suoni e dati **non vengono mai toccati** dagli aggiornamenti. Le opzioni nuove partono con il loro valore predefinito.
 - Overlay, chat e titoli di coda in OBS **si ricaricano da soli** dopo l'aggiornamento: non serve "Aggiorna la cache". Anche la dashboard si ricarica da sola, a meno che tu non stia modificando qualcosa senza aver salvato.
 
+## La scheda Live
+
+Twitch mostra il suo player e la sua chat solo su pagine aperte da "localhost". Dalla dashboard del Raspberry vedi quindi:
+- l'**anteprima presa da OBS**: la scena in onda, aggiornata ogni secondo e senza ritardo;
+- la **chat di TwitchGestor**: con i messaggi di tutti, compreso Wolfery, e una casella per scrivere con il tuo account.
+
+Per vedere la live come gli spettatori c'è sempre il pulsante **Apri su Twitch**.
+
 ## Accedere a Twitch (raramente)
 
 Twitch accetta l'accesso solo da "localhost". Quindi, quando serve un nuovo accesso (un permesso nuovo, oppure ricollegare il bot), si fa così:

@@ -167,6 +167,24 @@ const quickActions = createQuickActions({
   },
 });
 
+// --- Chat nella dashboard: tutti i messaggi (anche del bot), quando la chat di Twitch non si può incorporare
+// (es. dashboard aperta dall'indirizzo del Raspberry). Si scrive con il tuo account. ---
+const dashboardChat = [];
+function dashboardChatEvent(event) {
+  if (event.type === 'chat') {
+    dashboardChat.push(event.message);
+    if (dashboardChat.length > 150) dashboardChat.shift();
+  } else if (event.type === 'chat-remove') {
+    const i = dashboardChat.findIndex((m) => m.id === event.id);
+    if (i !== -1) dashboardChat.splice(i, 1);
+  } else if (event.type === 'chat-remove-user') {
+    for (let i = dashboardChat.length - 1; i >= 0; i--) if (dashboardChat[i].userId === event.userId) dashboardChat.splice(i, 1);
+  } else if (event.type === 'chat-clear') {
+    dashboardChat.length = 0;
+  }
+  web?.toDashboards(event);
+}
+
 // --- Chat per OBS (pagina /chat): messaggi della chat, senza bot, comandi e messaggi moderati ---
 const chatFeed = new ChatFeed({ send: (m) => web?.toChat(m) });
 chatFeed.badges = {};
@@ -291,6 +309,14 @@ const app = {
   testModeration,
   autoShoutout,
   chatFeed,
+  dashboardChat,
+  /** Messaggio in chat scritto dalla dashboard: con il tuo account (non con il bot). */
+  async sendAsChannel(text) {
+    if (!auth.user) throw Object.assign(new Error('Collega prima il tuo account Twitch'), { status: 409 });
+    const message = String(text ?? '').trim().slice(0, 500);
+    if (!message) throw Object.assign(new Error('Messaggio vuoto'), { status: 400 });
+    await helix.sendChatMessage(message, auth.user.id);
+  },
   /** In live adesso? (OBS sta trasmettendo o Twitch ti mostra in live): lo script di aggiornamento aspetta. */
   async isBusy() {
     if (obs.state().stream?.active) return true;
@@ -421,6 +447,7 @@ function startEventSub() {
   eventsub = new EventSubClient({ helix, userId: auth.user.id, url: env.EVENTSUB_WS_URL });
   eventsub.on('event', (type, payload, messageId) => {
     if (type === 'channel.chat.message') {
+      dashboardChatEvent({ type: 'chat', message: toChatMessage(payload, { botId: botAuth.user?.id }) });
       if (payload.chatter_user_id === botAuth.user?.id) {
         // il bot non risponde a sé stesso; nella chat di OBS compare solo se non è nascosto
         const shown = toChatMessage(payload, { botId: botAuth.user.id });
@@ -445,9 +472,9 @@ function startEventSub() {
         .catch((err) => log.warn(`Messaggio della chat non gestito: ${err.message}`));
       return;
     }
-    if (type === 'channel.chat.message_delete') { chatFeed.remove(payload.message_id); return; }
-    if (type === 'channel.chat.clear_user_messages') { chatFeed.removeUser(payload.target_user_id); return; }
-    if (type === 'channel.chat.clear') { chatFeed.clear(); return;
+    if (type === 'channel.chat.message_delete') { chatFeed.remove(payload.message_id); dashboardChatEvent({ type: 'chat-remove', id: payload.message_id }); return; }
+    if (type === 'channel.chat.clear_user_messages') { chatFeed.removeUser(payload.target_user_id); dashboardChatEvent({ type: 'chat-remove-user', userId: payload.target_user_id }); return; }
+    if (type === 'channel.chat.clear') { chatFeed.clear(); dashboardChatEvent({ type: 'chat-clear' }); return;
     }
     const n = fromEventSub(type, payload, messageId);
     if (n) manager.ingest(n);

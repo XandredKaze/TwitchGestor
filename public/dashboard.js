@@ -316,13 +316,82 @@
     }, input, el('button', { type: 'submit' }, 'Mostra'));
   }
 
-  function embedBlocked() {
-    // Twitch accetta gli embed solo se la pagina è aperta da "localhost" o da un sito https.
-    const host = location.hostname;
-    if (host === 'localhost' || location.protocol === 'https:') return null;
-    const url = `${location.protocol}//localhost:${location.port}${location.pathname}`;
-    return el('div', { className: 'embed-off' }, 'Twitch mostra l\'anteprima solo se apri la dashboard da ',
-      el('a', { href: url }, url), '.');
+  // Twitch accetta gli embed solo se la pagina è aperta da "localhost" o da un sito https
+  // (non dall'indirizzo del Raspberry): allora l'anteprima arriva da OBS e la chat da TwitchGestor.
+  const embedBlocked = () => !(location.hostname === 'localhost' || location.protocol === 'https:');
+
+  // ---------- Anteprima da OBS: un'immagine al secondo della scena in onda ----------
+  let previewTimer = null;
+  function renderObsPreview(body) {
+    const img = el('img', { className: 'obs-preview-img', alt: 'Anteprima da OBS' });
+    const note = el('div', { className: 'obs-preview-note' }, 'Collegamento a OBS…');
+    body.replaceChildren(
+      el('div', { className: 'stream-frame obs-preview' }, img, note),
+      el('p', { className: 'muted small' }, 'Anteprima presa da OBS (quello che stai trasmettendo, senza ritardo), aggiornata ogni secondo. Per vedere la live come gli spettatori usa "Apri su Twitch".'));
+    clearInterval(previewTimer);
+    let busy = false;
+    const tick = async () => {
+      if (!img.isConnected) { clearInterval(previewTimer); return; }
+      if (busy || document.hidden || $('tab-live').hidden) return;
+      busy = true;
+      const r = await window.TG.api('/api/obs/preview', { method: 'GET', quiet: true });
+      busy = false;
+      if (r?.image) { img.src = r.image; note.hidden = true; }
+      else if (!r) { note.hidden = false; note.textContent = state?.obs?.status === 'connesso' ? 'Anteprima non disponibile.' : 'OBS non è collegato: l\'anteprima arriva da OBS (riquadro "Scene OBS" → Collegamento).'; }
+    };
+    tick();
+    previewTimer = setInterval(tick, 1000);
+  }
+
+  // ---------- Chat di TwitchGestor: legge la chat (anche il bot) e scrive con il tuo account ----------
+  const ownChat = { box: null, badges: {} };
+  const CHAT_COLORS = ['#ff4a4a', '#4a6bff', '#2fbf4a', '#ff7f50', '#9acd32', '#ff4500', '#2e8b57', '#daa520', '#d2691e', '#1e90ff', '#ff69b4', '#8a2be2'];
+  const colorFor = (login) => CHAT_COLORS[[...String(login)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % CHAT_COLORS.length];
+  function chatLine(m) {
+    const who = el('span', { className: 'oc-who' },
+      ...(m.badges ?? []).map((b) => ownChat.badges[`${b.set}/${b.id}`]).filter(Boolean).map((src) => el('img', { className: 'oc-badge', src, alt: '' })),
+      el('b', { style: { color: m.color || colorFor(m.login) } }, m.name), ': ');
+    const text = el('span', {}, ...(m.fragments ?? [{ type: 'text', text: m.text }]).map((f) => (f.type === 'emote' && f.id
+      ? el('img', { className: 'oc-emote', src: `https://static-cdn.jtvnw.net/emoticons/v2/${encodeURIComponent(f.id)}/default/dark/1.0`, alt: f.text, title: f.text })
+      : f.text)));
+    return el('div', { className: m.bot ? 'bot' : '', 'data-id': m.id, 'data-user': m.userId }, who, text);
+  }
+  function ownChatEvent(msg) {
+    const box = ownChat.box;
+    if (!box?.isConnected) return;
+    const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+    if (msg.type === 'chat') {
+      box.querySelector('.oc-empty')?.remove();
+      box.append(chatLine(msg.message));
+      while (box.children.length > 150) box.firstChild.remove();
+    } else if (msg.type === 'chat-remove') box.querySelectorAll(`[data-id="${CSS.escape(msg.id)}"]`).forEach((n) => n.remove());
+    else if (msg.type === 'chat-remove-user') box.querySelectorAll(`[data-user="${CSS.escape(msg.userId)}"]`).forEach((n) => n.remove());
+    else if (msg.type === 'chat-clear') box.replaceChildren();
+    if (atBottom) box.scrollTop = box.scrollHeight;
+  }
+  async function renderOwnChat(body) {
+    const box = el('div', { className: 'demo-chat own-chat' }, el('p', { className: 'muted small oc-empty' }, 'Qui compaiono i messaggi della chat (anche quelli di Wolfery).'));
+    ownChat.box = box;
+    const input = el('input', { type: 'text', maxlength: '500', placeholder: `Scrivi in chat come ${state?.twitch?.user?.login ?? 'te'}…`, autocomplete: 'off' });
+    const form = el('form', {
+      className: 'channel-form',
+      onsubmit: async (e) => {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+        input.disabled = true;
+        if (await window.TG.api('/api/chat/send', { body: { text } })) input.value = '';
+        input.disabled = false;
+        input.focus();
+      },
+    }, input, el('button', { type: 'submit' }, 'Invia'));
+    body.replaceChildren(box, form);
+    updateChatGrip();
+    const r = await window.TG.api('/api/chat/recent', { method: 'GET', quiet: true });
+    if (!r || ownChat.box !== box) return;
+    ownChat.badges = r.badges ?? {};
+    if (r.messages?.length) box.replaceChildren(...r.messages.map(chatLine));
+    box.scrollTop = box.scrollHeight;
   }
 
   function updateChatGrip() {
@@ -348,9 +417,9 @@
         'Collega il tuo account Twitch, oppure scrivi il nome del canale:', channelForm()));
       return;
     }
-    const blocked = embedBlocked();
-    if (blocked) {
-      body.replaceChildren(blocked);
+    if (embedBlocked()) {
+      if (kind === 'stream') renderObsPreview(body);
+      else renderOwnChat(body);
       return;
     }
     const parent = encodeURIComponent(location.hostname);
@@ -741,6 +810,7 @@
         state.obs = msg.obs;
         renderObs();
       }
+      if (msg.type?.startsWith('chat')) ownChatEvent(msg);
       if (msg.type === 'queue' && state) {
         state.queue = msg.queue;
         renderQueue(msg.queue);
