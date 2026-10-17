@@ -2,6 +2,8 @@
 
 Con TwitchGestor sul Raspberry il bot, i comandi, le parole bannate e gli shoutout funzionano sempre, anche a PC spento. La dashboard si apre da qualsiasi dispositivo di casa. Gli aggiornamenti arrivano da soli: non devi reinserire niente.
 
+La stessa guida, da stampare: [TwitchGestor-Raspberry-guida.pdf](TwitchGestor-Raspberry-guida.pdf).
+
 Va bene un **Raspberry Pi 3** o più recente. Serve una microSD da almeno 16 GB. Il cavo di rete è consigliato.
 
 ## 1. Prepara la microSD (una volta)
