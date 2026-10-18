@@ -26,6 +26,7 @@ import { LiveStats, computeRecap, recapText } from './core/livestats.js';
 import { liveSession } from './core/session.js';
 import { sendTelegram } from './telegram.js';
 import { TelegramNotifier, whenText, fillText } from './core/telegramNotify.js';
+import { Goals } from './core/goals.js';
 import { Schedule, fromLocal } from './core/schedule.js';
 import { MusicPlayer } from './core/music.js';
 import { scanLibrary } from './musiclib.js';
@@ -316,7 +317,34 @@ const liveStats = new LiveStats({
   onChange: () => web?.toDashboards({ type: 'stats' }),
 });
 
-/** Follower e abbonati totali del canale (per le statistiche dei giorni e della live). */
+// --- Goal (barre in OBS): follower, abbonati, bits, donazioni (conteggi in data/goals.json) ---
+const GOALS_FILE = path.join(DATA_DIR, 'goals.json');
+const goals = new Goals({
+  getConfig: () => config.get().goals,
+  store: {
+    load: () => JSON.parse(fs.readFileSync(GOALS_FILE, 'utf8')),
+    save: (data) => fs.writeFile(GOALS_FILE, JSON.stringify(data), () => {}),
+  },
+  onChange: () => {
+    const list = goals.snapshot();
+    web?.toGoals({ type: 'goals', goals: list });
+    web?.toDashboards({ type: 'goals', goals: list });
+  },
+});
+// i totali di Twitch si rileggono ogni 2 minuti (se c'è un goal di follower o abbonati) e poco dopo ogni follow/sub
+setInterval(() => {
+  if (goals.list.some((g) => g.type === 'followers' || g.type === 'subs')) refreshTotals().catch(() => {});
+}, 120000).unref();
+let goalRefresh = null;
+manager.on('notification', (n) => {
+  goals.notification(n);
+  if (['follow', 'sub', 'giftsub'].includes(n.type) && !n.test) {
+    clearTimeout(goalRefresh);
+    goalRefresh = setTimeout(() => refreshTotals().catch(() => {}), 8000);
+  }
+});
+
+/** Follower e abbonati totali del canale (per le statistiche dei giorni e della live e per i goal). */
 async function refreshTotals() {
   if (!auth.user) return;
   const id = auth.user.id;
@@ -327,6 +355,10 @@ async function refreshTotals() {
   liveStats.totals({
     followers: f.status === 'fulfilled' ? f.value.total : undefined,
     subscribers: sub.status === 'fulfilled' ? sub.value.total : undefined,
+  });
+  goals.setTotals({
+    followers: f.status === 'fulfilled' ? f.value.total : undefined,
+    subs: sub.status === 'fulfilled' ? sub.value.total : undefined,
   });
 }
 setInterval(() => refreshTotals().catch(() => {}), 6 * 3600 * 1000).unref();
@@ -578,6 +610,7 @@ const app = {
   },
   chatAccount,
   telegramPreview,
+  goals,
   getState() {
     return {
       apiLevel: API_LEVEL,
@@ -896,6 +929,7 @@ web.server.listen(port, host, async () => {
   try {
     if (await auth.validate()) {
       startEventSub();
+      refreshTotals().catch(() => {});
       syncLiveTitles();
       creditsScheduler.onStart();
       loadBadges();

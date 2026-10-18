@@ -804,6 +804,7 @@
       if (msg.type === 'stats') window.dispatchEvent(new Event('tg:stats'));
       if (msg.type === 'schedule') window.dispatchEvent(new Event('tg:schedule'));
       if (msg.type === 'music') window.dispatchEvent(new CustomEvent('tg:music', { detail: msg }));
+      if (msg.type === 'goals') window.dispatchEvent(new CustomEvent('tg:goals', { detail: msg.goals }));
       if (msg.type === 'stream' && state) {
         state.obs = { ...state.obs, stream: msg.stream };
         window.dispatchEvent(new CustomEvent('tg:stream', { detail: msg.stream }));

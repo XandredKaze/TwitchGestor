@@ -242,6 +242,21 @@ function sanitizeTelegram(input, base) {
   return out;
 }
 
+/** Goal (barra in OBS): follower, abbonati, bits o donazioni. */
+const GOAL_KINDS = ['subs', 'followers', 'bits', 'donations'];
+function sanitizeGoals(input, base) {
+  if (!Array.isArray(input)) return base;
+  const seen = new Set();
+  return input.filter(isObject).slice(0, 10).map((g) => ({
+    id: /^[\w-]{1,30}$/.test(String(g.id ?? '')) ? String(g.id) : `g${Math.random().toString(36).slice(2, 8)}`,
+    type: GOAL_KINDS.includes(g.type) ? g.type : 'subs',
+    title: String(g.title ?? '').slice(0, 40),
+    target: Math.min(Math.max(Math.round(Number(g.target) * 100) / 100 || 1, 1), 10_000_000),
+    mode: g.mode === 'new' ? 'new' : 'total',
+    showPercent: g.showPercent !== false,
+  })).filter((g) => !seen.has(g.id) && seen.add(g.id));
+}
+
 /** Musica: abbassa il volume durante gli alert. */
 function sanitizeMusic(input, base) {
   const out = { ...base };
@@ -266,6 +281,7 @@ export function sanitizeConfig(input, defaults) {
   if (out.shoutouts) out.shoutouts = sanitizeShoutouts(input.shoutouts, out.shoutouts);
   if (out.telegram) out.telegram = sanitizeTelegram(input.telegram, out.telegram);
   if (out.music) out.music = sanitizeMusic(input.music, out.music);
+  if (out.goals) out.goals = sanitizeGoals(input.goals, out.goals);
   if (out.chatOverlay) out.chatOverlay = sanitizeChatOverlay(input.chatOverlay, out.chatOverlay);
 
   for (const type of Object.keys(out.types)) {

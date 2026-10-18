@@ -23,6 +23,7 @@
       <button class="tab" data-tab="recaps" role="tab">📋 Riepiloghi</button>
       <button class="tab" data-tab="schedule" role="tab">📅 Programmazione</button>
       <button class="tab" data-tab="music" role="tab">🎵 Musica</button>
+      <button class="tab" data-tab="goals" role="tab">🎯 Goal</button>
       <button class="tab" data-tab="theme" role="tab">🖌 Tema</button>
     </nav>
     <div id="statuses" class="statuses"></div>
@@ -450,6 +451,17 @@
     </div>
   </main>
 
+  <main id="tab-goals" class="goals-tab" hidden>
+    <div class="page-head">
+      <div><h2>🎯 Goal</h2><p>La barra dell'obiettivo da mettere in live: abbonati, follower, bits o donazioni. Si aggiorna da sola a ogni evento.</p></div>
+      <button type="button" id="goal-add">➕ Nuovo goal</button>
+    </div>
+    <div class="goals-layout">
+      <div id="goal-list" class="goal-list"></div>
+      <section class="panel goal-edit" id="goal-edit"></section>
+    </div>
+  </main>
+
   <main id="tab-theme" class="theme-tab" hidden>
     <div class="page-head">
       <div><h2>🖌 Tema</h2><p>L'aspetto di TwitchGestor, degli alert e dei titoli di coda.</p></div>
@@ -496,6 +508,7 @@
   <script src="/recaps.js"></script>
   <script src="/schedule.js"></script>
   <script src="/music-tab.js"></script>
+  <script src="/goals-tab.js"></script>
   <script src="/chatoverlay.js"></script>
 </body>
 </html>

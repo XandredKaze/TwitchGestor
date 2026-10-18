@@ -24,6 +24,7 @@ import { LiveStats, computeRecap } from '../src/core/livestats.js';
 import { Schedule, generateWeeks } from '../src/core/schedule.js';
 import { ChatFeed, shouldShow } from '../src/core/chatOverlay.js';
 import { MusicPlayer } from '../src/core/music.js';
+import { Goals } from '../src/core/goals.js';
 
 const CHANNEL = { id: '0', login: 'canale_demo' };
 const DEMO_SCENES = ['Inizio', 'Gioco', 'Chiacchiere', 'Pausa', 'Fine'];
@@ -163,7 +164,7 @@ class DemoBackend {
     this.defaults = defaults;
     this.config = sanitizeConfig(deepMerge(defaults, storage.get('tg-demo-config', {})), defaults);
     this.manager = new NotificationManager({ config: this.config });
-    this.clients = { overlay: new Set(), dashboard: new Set(), chat: new Set(), music: new Set() };
+    this.clients = { overlay: new Set(), dashboard: new Set(), chat: new Set(), music: new Set(), goal: new Set() };
     this.chatFeed = new ChatFeed({ send: (m) => this.#send('chat', m) });
     this.media = { sounds: [], images: [], music: [] };
     this.chat = [];
@@ -181,6 +182,18 @@ class DemoBackend {
     });
     this.manager.on('skip', (alert) => this.#send('overlay', { type: 'skip', id: alert.id }));
     this.manager.on('queue', (queue) => this.#send('dashboard', { type: 'queue', queue }));
+    // goal: stesso codice del programma vero, con totali inventati (gli alert simulati li fanno salire)
+    this.goals = new Goals({
+      getConfig: () => this.config.goals,
+      store: { load: () => storage.get('tg-demo-goals', null), save: (d) => storage.set('tg-demo-goals', d) },
+      onChange: () => {
+        const list = this.goals.snapshot();
+        this.#send('goal', { type: 'goals', goals: list });
+        this.#send('dashboard', { type: 'goals', goals: list });
+      },
+    });
+    this.goals.setTotals({ followers: 812, subs: 12 });
+    this.manager.on('notification', (n) => this.goals.notification({ ...n, test: false }));
     this.manager.on('notification', () => {
       this.broadcastState();
       const data = this.credits.state.data;
@@ -396,6 +409,7 @@ class DemoBackend {
     const role = socket.role in this.clients ? socket.role : 'dashboard';
     this.clients[role].add(socket);
     socket.deliver(role === 'overlay' ? { type: 'hello', overlay: this.config.overlay }
+      : role === 'goal' ? { type: 'hello', goals: this.goals.snapshot() }
       : role === 'chat' ? { type: 'hello', settings: this.config.chatOverlay, badges: {}, messages: this.chatFeed.messages }
         : { type: 'state', state: this.getState() });
     this.broadcastState();
@@ -513,6 +527,11 @@ class DemoBackend {
     const draft = (b) => (b?.config ? sanitizeConfig(b.config, this.defaults) : null);
     const m = this.manager;
 
+    const goalAction = /^POST \/api\/goals\/([\w-]+)\/(reset|adjust)$/.exec(route);
+    if (goalAction) {
+      const done = goalAction[2] === 'reset' ? this.goals.reset(goalAction[1]) : this.goals.adjust(goalAction[1], body?.delta);
+      return done ? ok({ goals: this.goals.snapshot() }) : fail(404, 'Goal non trovato');
+    }
     switch (route) {
       case 'GET /api/state': return ok(this.getState());
       // ⚙ Sistema: nella demo niente aggiornamenti né copie di sicurezza (le impostazioni stanno in questo browser)
@@ -574,6 +593,14 @@ class DemoBackend {
         if (r.step === 'installed') return ok({ ...base, installed: true, state: 'NeedsLogin', connected: false, authUrl: '' });
         if (r.step === 'login') return ok({ ...base, installed: true, state: 'NeedsLogin', connected: false, authUrl: 'https://login.tailscale.com/' });
         return ok({ ...base, installed: true, state: 'Running', connected: true, ip: '100.101.102.103', dnsName: 'twitchgestor.tail1234.ts.net', account: 'tuo-account@gmail.com' });
+      }
+      case 'GET /api/goals': return ok({ goals: this.goals.snapshot() });
+      case 'PUT /api/goals': {
+        this.config = sanitizeConfig({ ...this.config, goals: body?.goals }, this.defaults);
+        storage.set('tg-demo-config', diffConfig(this.config, this.defaults) ?? {});
+        this.goals.prune();
+        this.goals.onChange();
+        return ok({ goals: this.goals.snapshot(), config: this.config.goals });
       }
       case 'GET /api/music':
         return ok({

@@ -36,6 +36,7 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 - **Telegram** (gratis): riepiloghi e avvisi importanti in privato (raid, donazioni, bits, problemi di connessione) e un **canale per la community** con "in live!", promemoria, programmazione della settimana e saluto di fine live.
 - **Programmazione delle live** (scheda 📅 Programmazione): le live in programma, titolo e categoria impostati da soli poco prima, calendario di Twitch e immagine della settimana da condividere.
 - **Accesso da fuori casa** (sul Raspberry, ⚙ Sistema): apri la dashboard da telefono o portatile ovunque tu sia, con Tailscale (gratis, nessuna porta aperta sul router).
+- **Goal** (scheda 🎯 Goal): la barra dell'obiettivo in live (abbonati, follower, bits o donazioni), con percentuale facoltativa; si aggiorna da sola.
 - **Musica** (scheda 🎵 Musica): la musica di sottofondo con playlist, suonata da OBS e comandata dalla dashboard; si abbassa da sola durante gli alert. Sul Raspberry c'è una **cartella condivisa** per copiarci musica, immagini e suoni dal PC.
 - **Ringraziamenti automatici in chat** (facoltativi) con testi personalizzabili, scritti dal tuo account o da un **account bot** (es. Wolfery).
 - **Anti-duplicati**, riconnessione automatica a Twitch, rinnovo automatico del token.
@@ -177,6 +178,17 @@ I testi del canale si personalizzano con le variabili (`{channel}`, `{title}`, `
 ## Programmazione delle live
 
 Nella scheda **📅 Programmazione** scrivi le prossime live (giorno, ora, durata, titolo, categoria) oppure le crei per **più settimane in un colpo** (es. martedì e giovedì alle 21 per 4 settimane). Per ogni live puoi far impostare **titolo e categoria da soli 10 minuti prima**. Con **Calendario di Twitch** le pubblichi sul tuo canale (la prima volta serve un permesso in più: **Esci** e **Accedi con Twitch**) e con **Immagine della settimana** scarichi un'immagine pronta per social e Discord. In chat `{nextlive}` dice quando è la prossima live (es. un comando `!prossima`).
+
+## Goal
+
+Nella scheda **🎯 Goal** crei le barre degli obiettivi da mettere in live (anche più di una):
+
+- **Cosa conta**: abbonati, follower, bits o donazioni.
+- **Abbonati e follower**: il totale del canale (letto da Twitch ogni 2 minuti e subito dopo ogni follow/sub) oppure **solo i nuovi** da quando premi **Azzera**.
+- **Bits e donazioni**: la somma da quando premi **Azzera**.
+- Scritta (es. `SUB GOAL`), obiettivo e **percentuale visibile o no**; i pulsanti **−/+** correggono il numero a mano.
+
+In OBS aggiungi una **Sorgente browser** con l'indirizzo del goal (es. `http://localhost:3000/goal?id=sub`), larga 1800 × 260 (o 900 × 130: si adatta alla larghezza). Il font Nunito è incluso in TwitchGestor.
 
 ## Musica
 

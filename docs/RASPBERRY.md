@@ -62,6 +62,7 @@ Indirizzo e password della dashboard del Raspberry restano i suoi. Se importi da
   - `http://192.168.1.50:3000/overlay`
   - `http://192.168.1.50:3000/chat`
   - `http://192.168.1.50:3000/credits`
+  - `http://192.168.1.50:3000/goal?id=sub` per la barra del goal (facoltativa, scheda 🎯 Goal)
   - `http://192.168.1.50:3000/music` per la musica (nuova, facoltativa: spunta **Controlla l'audio tramite OBS**)
 - **Dock dei titoli di coda:** `http://192.168.1.50:3000/credits?pannello&token=LA-PASSWORD`.
 - Se avevi lo script `twitchgestor.lua` in **Strumenti → Script** (quello che avviava TwitchGestor insieme a OBS), toglilo: ora TwitchGestor è sempre acceso sul Raspberry.

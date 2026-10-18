@@ -36,6 +36,7 @@ const MIME = {
   '.gif': 'image/gif',
   '.webp': 'image/webp',
   '.svg': 'image/svg+xml',
+  '.woff2': 'font/woff2',
   '.mp3': 'audio/mpeg',
   '.ogg': 'audio/ogg',
   '.wav': 'audio/wav',
@@ -238,6 +239,7 @@ export function createServer(app) {
       if (route === 'GET /dashboard') return serveStatic(res, '/dashboard.html');
       if (route === 'GET /credits') return serveStatic(res, '/credits.html');
       if (route === 'GET /chat') return serveStatic(res, '/chat.html');
+      if (route === 'GET /goal') return serveStatic(res, '/goal.html');
       if (route === 'GET /music') return serveStatic(res, '/music.html');
       // Titoli di coda: la sorgente OBS legge lo stato senza token (contiene solo nomi e impostazioni).
       if (route === 'GET /api/credits/state' && app.credits) {
@@ -443,6 +445,22 @@ export function createServer(app) {
           const results = await app.schedule.publish(Array.isArray(body.ids) ? body.ids.map(String) : []);
           return send(res, 200, { ...app.schedule.state(), results });
         }
+        // --- Goal (barre in OBS) ---
+        if (route === 'GET /api/goals') return send(res, 200, { goals: app.goals?.snapshot() ?? [] });
+        if (route === 'PUT /api/goals') {
+          const body = await readBody(req, 100_000);
+          const config = app.config.save({ ...app.config.get(), goals: body.goals });
+          app.goals.prune();
+          app.goals.onChange();
+          return send(res, 200, { goals: app.goals.snapshot(), config: config.goals });
+        }
+        if (req.method === 'POST' && /^\/api\/goals\/[\w-]+\/(reset|adjust)$/.test(url.pathname)) {
+          const [, , , id, action] = url.pathname.split('/');
+          const body = await readBody(req);
+          const ok = action === 'reset' ? app.goals.reset(id) : app.goals.adjust(id, body.delta);
+          if (!ok) return send(res, 404, { error: 'Goal non trovato' });
+          return send(res, 200, { goals: app.goals.snapshot() });
+        }
         // --- Musica ---
         if (route === 'GET /api/music') {
           const lib = app.music?.library() ?? [];
@@ -629,7 +647,7 @@ export function createServer(app) {
 
   // --- WebSocket ---
   const wss = new WebSocketServer({ noServer: true });
-  const clients = { overlay: new Set(), dashboard: new Set(), chat: new Set(), music: new Set() };
+  const clients = { overlay: new Set(), dashboard: new Set(), chat: new Set(), music: new Set(), goal: new Set() };
 
   server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, 'http://localhost');
@@ -650,6 +668,7 @@ export function createServer(app) {
         chat: () => ({ type: 'hello', build: BUILD_ID, settings: app.config.get().chatOverlay, badges: app.chatFeed?.badges ?? {}, messages: app.chatFeed?.messages ?? [] }),
         dashboard: () => ({ type: 'state', state: app.getState() }),
         music: () => ({ ...(app.music?.player.pageState() ?? {}), type: 'hello', build: BUILD_ID }),
+        goal: () => ({ type: 'hello', build: BUILD_ID, goals: app.goals?.snapshot() ?? [] }),
       }[role];
       ws.send(JSON.stringify(hello()));
       // la pagina della musica avvisa quando un brano finisce e a che punto è
@@ -686,6 +705,7 @@ export function createServer(app) {
     toDashboards: (m) => broadcast('dashboard', m),
     toChat: (m) => broadcast('chat', m),
     toMusic: (m) => broadcast('music', m),
+    toGoals: (m) => broadcast('goal', m),
     musicPages,
   };
 }

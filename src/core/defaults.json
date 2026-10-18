@@ -362,5 +362,15 @@
   "music": {
     "duck": true,
     "duckLevel": 0.3
-  }
+  },
+  "goals": [
+    {
+      "id": "sub",
+      "type": "subs",
+      "title": "SUB GOAL",
+      "target": 30,
+      "mode": "total",
+      "showPercent": true
+    }
+  ]
 }

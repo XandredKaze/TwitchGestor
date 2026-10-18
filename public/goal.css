@@ -1,0 +1,49 @@
+/* Goal per OBS: misure del progetto Figma (riquadro 1798×255), poi scalato alla larghezza della sorgente. */
+/* Nunito incluso in TwitchGestor (funziona anche senza internet); se manca si usa quello di Google Fonts */
+@font-face { font-family: 'Nunito Local'; font-weight: 400; src: url('/fonts/nunito-400.woff2') format('woff2'); }
+@font-face { font-family: 'Nunito Local'; font-weight: 700; src: url('/fonts/nunito-700.woff2') format('woff2'); }
+@font-face { font-family: 'Nunito Local'; font-weight: 800; src: url('/fonts/nunito-800.woff2') format('woff2'); }
+html, body { margin: 0; background: transparent; overflow: hidden; }
+#stage { position: absolute; left: 0; top: 0; width: 1798px; height: 255px; transform-origin: 0 0; }
+#stage[hidden], #missing[hidden] { display: none; }
+
+.goal {
+  --accent: #e36dc9;
+  --text: #d7b2df;
+  --white: #d9d9d9;
+  position: absolute; left: 0; top: 15px; width: 1768px; height: 226px;
+  font-family: 'Nunito Local', 'Nunito', sans-serif;
+}
+/* glow leggero: una copia sfocata sotto (come il livello sfocato del Figma) */
+.goal.glow { filter: blur(3.6px); }
+
+.g-side { position: absolute; left: 0; top: 0; width: 10px; height: 226px; border-radius: 5px; background: var(--white); }
+.g-main { position: absolute; left: 58px; top: 0; width: 1710px; height: 226px; }
+
+.g-title {
+  position: absolute; left: 0; top: 11px; max-width: 1150px;
+  font-weight: 700; font-size: 48px; line-height: 65px; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.g-count {
+  position: absolute; right: 0; top: 0;
+  font-size: 64px; line-height: 87px; color: var(--white); white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.g-count b { font-weight: 800; }
+.g-count span { font-weight: 400; }
+
+.g-bar { position: absolute; left: 0; top: 103px; width: 1710px; height: 52px; }
+.g-track, .g-fill { position: absolute; left: 0; top: 10px; height: 32px; border-radius: 16px; }
+.g-track { width: 100%; background: rgba(35, 35, 35, 0.5); box-shadow: inset 0 0 0 2px var(--white); box-sizing: border-box; }
+.g-fill { width: 0; background: var(--accent); transition: width 0.9s cubic-bezier(.2, .8, .2, 1); }
+.g-knob {
+  position: absolute; left: 0; top: 0; width: 32px; height: 52px; border-radius: 5px; background: var(--white);
+  transition: left 0.9s cubic-bezier(.2, .8, .2, 1);
+}
+
+.g-bottom { position: absolute; left: 0; top: 171px; width: 1710px; height: 55px; display: flex; align-items: center; gap: 18px; }
+.g-pct { font-weight: 800; font-size: 40px; line-height: 55px; color: var(--text); font-variant-numeric: tabular-nums; }
+.g-line { flex: 1; height: 5px; border-radius: 3px; background: var(--white); }
+.g-bottom.no-pct .g-pct { display: none; }
+
+#missing { margin: 8px; font: 600 16px sans-serif; color: #fff; background: rgba(0, 0, 0, .6); padding: 8px 12px; border-radius: 8px; display: inline-block; }
