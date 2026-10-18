@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Aggiorna TwitchGestor sul Raspberry. Lo lancia il servizio twitchgestor-update:
 #   - subito, quando premi "Aggiorna ora" nella dashboard (file data/update-request)
-#   - ogni ora: aggiorna solo all'ora scelta nella dashboard, se l'aggiornamento automatico è attivo e non sei in live
+#   - ogni 5 minuti: se c'è una versione nuova aggiorna subito (o solo all'ora scelta, se hai scelto "di notte"),
+#     se l'aggiornamento automatico è attivo e mai durante la live
 # Prima salva una copia di impostazioni e dati; se la versione nuova non parte, torna da solo a quella di prima.
 # Impostazioni (config/config.json), dati (data/) e .env non vengono mai sovrascritti dall'aggiornamento.
 set -uo pipefail
@@ -41,15 +42,22 @@ if [ -f scripts/raspberry/system-setup.sh ] && ! grep -q CAP_NET_BIND_SERVICE /e
 fi
 
 if [ "$MODE" = auto ]; then
-  read -r AUTO HOUR < <(as_user node -e '
+  read -r AUTO WHEN HOUR < <(as_user node -e '
     let s = {}; try { s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); } catch {}
-    console.log(s.auto !== false, Number.isInteger(s.hour) ? s.hour : 5);
+    console.log(s.auto !== false, s.when === "night" ? "night" : "always", Number.isInteger(s.hour) ? s.hour : 5);
   ' "$DIR/data/update-settings.json")
   [ "$AUTO" = true ] || exit 0
-  [ "$(date +%-H)" = "$HOUR" ] || exit 0
+  # "solo di notte": all'ora scelta; "sempre": a ogni controllo (ogni 5 minuti)
+  if [ "$WHEN" = night ] && [ "$(date +%-H)" != "$HOUR" ]; then exit 0; fi
+  # durante la live non si controlla nemmeno
+  if system_info | grep -q '"busy":true'; then exit 0; fi
 fi
 
-as_user git fetch --quiet origin main || { status error "GitHub non raggiungibile"; exit 1; }
+if ! as_user git fetch --quiet origin main; then
+  # senza internet: a mano lo si dice, da solo si riprova tra 5 minuti
+  if [ "$MODE" = manual ]; then status error "GitHub non raggiungibile"; exit 1; fi
+  exit 0
+fi
 OLD="$(as_user git rev-parse HEAD)"
 NEW="$(as_user git rev-parse origin/main)"
 if [ "$OLD" = "$NEW" ]; then
@@ -59,10 +67,8 @@ fi
 # una versione che non è partita non si ritenta da sola ogni notte (si aspetta la prossima; a mano si può riprovare)
 BAD_FILE="$DIR/data/update-bad-commit"
 if [ "$MODE" = auto ] && [ "$(cat "$BAD_FILE" 2>/dev/null)" = "$NEW" ]; then exit 0; fi
-if [ "$MODE" = auto ] && system_info | grep -q '"busy":true'; then
-  status skipped-live "riprovo la prossima notte"
-  exit 0
-fi
+# (ricontrollato: la live potrebbe essere appena iniziata)
+if [ "$MODE" = auto ] && system_info | grep -q '"busy":true'; then exit 0; fi
 
 status running
 # copia di sicurezza (le ultime 5)

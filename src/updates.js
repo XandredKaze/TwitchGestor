@@ -71,12 +71,17 @@ export async function checkForUpdates({ force = false } = {}) {
   return cached;
 }
 
+/**
+ * Aggiornamento automatico (sul Raspberry): when = 'always' (controllo ogni 5 minuti e aggiorna appena c'è
+ * una versione nuova) oppure 'night' (solo all'ora scelta). Mai durante la live.
+ */
 export function updateSettings() {
-  return { auto: true, hour: 5, ...readJson(SETTINGS_FILE, {}) };
+  return { auto: true, when: 'always', hour: 5, ...readJson(SETTINGS_FILE, {}) };
 }
 export function saveUpdateSettings(input = {}) {
   const s = updateSettings();
   if (typeof input.auto === 'boolean') s.auto = input.auto;
+  if (['always', 'night'].includes(input.when)) s.when = input.when;
   if (Number.isInteger(input.hour) && input.hour >= 0 && input.hour <= 23) s.hour = input.hour;
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(s, null, 2));

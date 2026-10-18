@@ -104,7 +104,7 @@ Usa i pulsanti **Prova gli alert** nella dashboard per vedere subito come appaio
 
 ## Su Raspberry Pi (sempre acceso, aggiornamenti automatici)
 
-TwitchGestor può stare su un Raspberry Pi (dal 3 in su). Così bot, comandi, parole bannate e shoutout funzionano anche a PC spento, e la dashboard si apre da ogni dispositivo di casa. Si installa con un solo comando. Impostazioni e accessi si portano dal PC con **⚙ Sistema → Esporta / Importa**, e gli aggiornamenti arrivano da soli ogni notte (mai durante la live), con copia di sicurezza e ritorno automatico alla versione precedente se qualcosa non va. Guida passo passo: [docs/RASPBERRY.md](docs/RASPBERRY.md).
+TwitchGestor può stare su un Raspberry Pi (dal 3 in su). Così bot, comandi, parole bannate e shoutout funzionano anche a PC spento, e la dashboard si apre da ogni dispositivo di casa. Si installa con un solo comando. Impostazioni e accessi si portano dal PC con **⚙ Sistema → Esporta / Importa**, e gli aggiornamenti arrivano da soli appena escono (controllo ogni 5 minuti, mai durante la live), con copia di sicurezza e ritorno automatico alla versione precedente se qualcosa non va. Guida passo passo: [docs/RASPBERRY.md](docs/RASPBERRY.md).
 
 ## Anteprima della live e chat
 

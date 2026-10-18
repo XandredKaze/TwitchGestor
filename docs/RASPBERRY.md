@@ -70,7 +70,7 @@ Indirizzo e password della dashboard del Raspberry restano i suoi. Se importi da
 
 ## Aggiornamenti: non devi fare niente
 
-- **Ogni notte alle 5** il Raspberry controlla se c'è una versione nuova e, se c'è, si aggiorna. **Mai durante la live:** se sei in diretta riprova la notte dopo.
+- **Ogni 5 minuti** il Raspberry controlla se c'è una versione nuova e, se c'è, si aggiorna subito (si riavvia in circa un minuto). **Mai durante la live:** in diretta non controlla nemmeno, riprende quando hai finito. In **⚙ Sistema** puoi scegliere invece "solo di notte" (all'ora che vuoi) oppure "mai da solo".
 - Vuoi aggiornare subito? Apri **⚙ Sistema** nella dashboard: vedi cosa cambia e premi **⬆ Aggiorna ora**.
 - Prima di ogni aggiornamento salva una **copia di sicurezza** di impostazioni e dati (tiene le ultime 5, in `data/backups`).
 - Se la versione nuova non riuscisse a partire, **torna da sola a quella di prima**. In ⚙ Sistema vedi com'è andata.

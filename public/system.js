@@ -50,12 +50,20 @@
     } else {
       lines.push(el('p', { className: 'muted small' }, `✓ È l'ultima versione${c.checkedAt ? ` (controllato ${when(new Date(c.checkedAt).toISOString())})` : ''}.`));
     }
-    lines.push(el('label', { className: 'inline small' },
-      el('input', {
-        type: 'checkbox', checked: info.settings?.auto !== false,
-        onchange: async (e) => { const res = await api('/api/update/settings', { method: 'PUT', body: { auto: e.target.checked } }); if (res) { info = res; render(); } },
-      }),
-      `Aggiorna da solo ogni notte alle ${info.settings?.hour ?? 5}:00 (mai durante la live)`));
+    const s = info.settings ?? {};
+    const mode = el('select', {
+      onchange: async (e) => {
+        const v = e.target.value;
+        const res = await api('/api/update/settings', { method: 'PUT', body: v === 'off' ? { auto: false } : { auto: true, when: v } });
+        if (res) { info = res; render(); }
+      },
+    },
+    el('option', { value: 'always' }, 'Appena c\'è una versione nuova (controllo ogni 5 minuti)'),
+    el('option', { value: 'night' }, `Solo di notte, alle ${s.hour ?? 5}:00`),
+    el('option', { value: 'off' }, 'Mai da solo (solo con "Aggiorna ora")'));
+    mode.value = s.auto === false ? 'off' : s.when === 'night' ? 'night' : 'always';
+    lines.push(el('label', { className: 'field sys-auto' }, el('span', { className: 'field-label' }, 'Aggiornamento automatico'), mode,
+      el('span', { className: 'hint' }, 'Mai durante la live: in diretta non controlla nemmeno. Dopo l\'aggiornamento TwitchGestor si riavvia (circa un minuto) e le pagine aperte si ricaricano da sole.')));
     if (last?.at) {
       lines.push(el('p', { className: `small ${last.result === 'rollback' || last.result === 'error' ? 'mod-error' : 'muted'}` },
         `Ultimo aggiornamento: ${when(last.at)} — ${RESULT[last.result] ?? last.result}${last.message ? ` (${last.message})` : ''}`));

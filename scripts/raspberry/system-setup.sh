@@ -49,13 +49,13 @@ Unit=twitchgestor-update.service
 WantedBy=multi-user.target
 UNIT
 
-# controllo ogni ora: aggiorna solo all'ora scelta nella dashboard (predefinita le 5) e mai durante la live
+# controllo ogni 5 minuti: aggiorna appena c'è una versione nuova (o solo all'ora scelta), mai durante la live
 cat > /etc/systemd/system/twitchgestor-update.timer <<UNIT
 [Unit]
-Description=Aggiornamento notturno di TwitchGestor
+Description=Aggiornamento automatico di TwitchGestor
 
 [Timer]
-OnCalendar=*-*-* *:07:00
+OnCalendar=*:0/5
 Unit=twitchgestor-update.service
 
 [Install]
@@ -65,6 +65,7 @@ UNIT
 systemctl daemon-reload
 systemctl enable twitchgestor.service twitchgestor-update.path twitchgestor-update.timer >/dev/null 2>&1
 systemctl start twitchgestor-update.path twitchgestor-update.timer
+systemctl restart twitchgestor-update.timer # il nuovo orario vale subito
 
 # --- cartella condivisa in rete (Samba): da Windows \\twitchgestor\TwitchGestor ---
 # dentro: music (musica, una sottocartella per playlist), images e sounds (alert).
