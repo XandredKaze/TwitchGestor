@@ -323,21 +323,28 @@
   // Twitch accetta gli embed solo se la pagina è aperta da "localhost" o da un sito https
   // (non dall'indirizzo http del Raspberry): allora si passa all'indirizzo https.
   // (In https sulla porta 3443 Twitch rifiuta lo stesso: serve la porta standard, che il Raspberry sistema da solo.)
-  const embedBlocked = () => !(location.hostname === 'localhost' || (location.protocol === 'https:' && !location.port));
+  // Twitch accetta come "parent" solo nomi (es. twitchgestor.local), non indirizzi numerici (tranne 127.0.0.1)
+  const isIp = (h) => /^\d+\.\d+\.\d+\.\d+$/.test(h) || h.includes(':');
+  const embedBlocked = () => !(['localhost', '127.0.0.1'].includes(location.hostname)
+    || (location.protocol === 'https:' && !location.port && !isIp(location.hostname)));
 
   // ---------- Dashboard aperta in http dall'indirizzo del Raspberry: per player e chat di Twitch serve l'https ----------
   // Se il certificato è già installato su questo PC si passa da soli all'indirizzo https.
   let httpsChecked = false;
-  // indirizzo https con lo stesso nome usato adesso (es. 100.x di Tailscale fuori casa), se il certificato lo copre
+  // indirizzo https da usare: lo stesso nome con cui hai aperto la dashboard, se il certificato lo copre;
+  // da un indirizzo numerico si passa al nome (twitchgestor.local, o il nome .ts.net fuori casa con Tailscale)
   const httpsUrl = () => {
     if (!state?.httpsUrl) return null;
-    if (!state.httpsHosts?.includes(location.hostname)) return state.httpsUrl;
+    const host = location.hostname;
     const u = new URL(state.httpsUrl);
-    u.hostname = location.hostname;
+    const hosts = state.httpsHosts ?? [];
+    if (!isIp(host) && hosts.includes(host)) u.hostname = host;
+    else if (/^100\./.test(host) && hosts.find((h) => h.endsWith('.ts.net'))) u.hostname = hosts.find((h) => h.endsWith('.ts.net'));
     return u.origin;
   };
   function tryHttps() {
-    if (httpsChecked || !state?.httpsUrl || state.httpsNeedsSetup || location.protocol === 'https:') return;
+    // già in https con il nome giusto: niente da fare (in https con un indirizzo numerico si passa al nome)
+    if (httpsChecked || !state?.httpsUrl || state.httpsNeedsSetup || (location.protocol === 'https:' && !isIp(location.hostname))) return;
     httpsChecked = true;
     const ctrl = new AbortController();
     setTimeout(() => ctrl.abort(), 4000);
@@ -357,6 +364,14 @@
       return;
     }
     const tok = window.TG.token();
+    if (location.protocol === 'https:' && isIp(location.hostname)) {
+      // il certificato c'è già, ma Twitch non accetta gli indirizzi numerici: serve il nome
+      body.replaceChildren(el('div', { className: 'embed-off https-help' },
+        el('b', {}, 'Twitch mostra anteprima e chat solo se apri la dashboard con il nome, non con l\'indirizzo numerico.'),
+        el('p', {}, 'Apri ', el('a', { href: `${httpsUrl()}/dashboard${tok ? `?token=${encodeURIComponent(tok)}` : ''}` }, httpsUrl().replace('https://', '')),
+          ' e salva quello tra i preferiti.')));
+      return;
+    }
     const firefox = /firefox/i.test(navigator.userAgent);
     body.replaceChildren(el('div', { className: 'embed-off https-help' },
       el('b', {}, 'Per vedere l\'anteprima di Twitch (una volta sola su questo PC):'),
