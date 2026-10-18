@@ -448,6 +448,7 @@ class DemoBackend {
       shoutouts: { enabled: Boolean(this.config.shoutouts?.enabled), by: this.bot ? this.bot.login : CHANNEL.login, byBot: Boolean(this.bot), botMissingScope: false },
       overlays: this.clients.overlay.size,
       musicPages: 1,
+      remoteDemo: true, // ⚙ Sistema mostra l'accesso da fuori casa simulato (nel programma vero c'è solo sul Raspberry)
       obsBase: 'http://localhost:3000',
       chatReplies: Boolean(this.config.chat?.enabled),
       chatAccount: this.chatAccount(),
@@ -559,6 +560,20 @@ class DemoBackend {
           return ok({ ...state(), results: ids.map((id) => ({ id, ok: true })) });
         }
         return ok(state());
+      }
+      // accesso da fuori casa simulato: Attiva → (installazione) → Collega → link → collegato
+      case 'GET /api/remote': case 'POST /api/remote/install': case 'POST /api/remote/connect': case 'POST /api/remote/disconnect': {
+        const r = (this.remoteSim ??= { step: 'off', at: 0 });
+        if (route === 'POST /api/remote/install') Object.assign(r, { step: 'installing', at: Date.now() });
+        if (route === 'POST /api/remote/connect') Object.assign(r, { step: 'login', at: Date.now() });
+        if (route === 'POST /api/remote/disconnect') Object.assign(r, { step: 'installed', at: Date.now() });
+        if (r.step === 'installing' && Date.now() - r.at > 5000) r.step = 'installed';
+        if (r.step === 'login' && Date.now() - r.at > 8000) r.step = 'connected';
+        const base = { httpPort: 3000, pending: false, install: r.step === 'off' ? null : { result: r.step === 'installing' ? 'running' : 'ok' } };
+        if (r.step === 'off' || r.step === 'installing') return ok({ ...base, installed: false, state: 'NotInstalled', connected: false });
+        if (r.step === 'installed') return ok({ ...base, installed: true, state: 'NeedsLogin', connected: false, authUrl: '' });
+        if (r.step === 'login') return ok({ ...base, installed: true, state: 'NeedsLogin', connected: false, authUrl: 'https://login.tailscale.com/' });
+        return ok({ ...base, installed: true, state: 'Running', connected: true, ip: '100.101.102.103', dnsName: 'twitchgestor.tail1234.ts.net', account: 'tuo-account@gmail.com' });
       }
       case 'GET /api/music':
         return ok({

@@ -101,7 +101,7 @@
 
   function renderRemote() {
     const sec = $('sys-remote-sec');
-    sec.hidden = !state?.managed;
+    sec.hidden = !state?.managed && !state?.remoteDemo;
     if (sec.hidden) return;
     const box = $('sys-remote');
     const r = remote;
@@ -172,7 +172,7 @@
   }
 
   async function loadRemote() {
-    if (!state?.managed) { renderRemote(); return; }
+    if (!state?.managed && !state?.remoteDemo) { renderRemote(); return; }
     remote = null;
     renderRemote();
     remote = await api('/api/remote', { method: 'GET', quiet: true });
