@@ -32,7 +32,8 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 - **Filtri**: disattiva un tipo, imposta un minimo, ignora ricompense specifiche. Le sub regalate non generano un doppio alert.
 - **Storico e statistiche** della sessione: conteggi, bits totali, donazioni per valuta, top donatori. Lo storico viene salvato su disco.
 - **Statistiche nel tempo** (scheda 📈 Statistiche): spettatori, follower, abbonati, ore di live e chat, settimana per settimana, spiegati in parole semplici.
-- **Riepilogo di fine live** (scheda 📋 Riepiloghi): tutti i riepiloghi delle live passate, con il confronto con le precedenti; facoltativo anche su **Telegram**.
+- **Riepilogo di fine live** (scheda 📋 Riepiloghi): tutti i riepiloghi delle live passate, con il confronto con le precedenti.
+- **Telegram** (gratis): riepiloghi e avvisi importanti in privato (raid, donazioni, bits, problemi di connessione) e un **canale per la community** con "in live!", promemoria, programmazione della settimana e saluto di fine live.
 - **Programmazione delle live** (scheda 📅 Programmazione): le live in programma, titolo e categoria impostati da soli poco prima, calendario di Twitch e immagine della settimana da condividere.
 - **Accesso da fuori casa** (sul Raspberry, ⚙ Sistema): apri la dashboard da telefono o portatile ovunque tu sia, con Tailscale (gratis, nessuna porta aperta sul router).
 - **Musica** (scheda 🎵 Musica): la musica di sottofondo con playlist, suonata da OBS e comandata dalla dashboard; si abbassa da sola durante gli alert. Sul Raspberry c'è una **cartella condivisa** per copiarci musica, immagini e suoni dal PC.
@@ -156,11 +157,22 @@ TwitchGestor segna ogni live: data, ora, durata, titolo e categoria, compresi i 
 
 La scheda **📈 Statistiche** raccoglie i dati di ogni live (da quando usi questa versione): media e picco di spettatori, follower e abbonati guadagnati, ore in diretta, messaggi in chat e chi scrive di più. Scegli il periodo (4 settimane, 3 mesi, 1 anno, tutto); ogni numero ha una frase che spiega cosa vuol dire. I dati stanno in `data/livestats.json`.
 
-## Riepilogo di fine live (e Telegram)
+## Riepilogo di fine live
 
 Quando la live finisce TwitchGestor prepara il **riepilogo**: durata, spettatori, nuovi follower, abbonamenti, bits, donazioni, raid, chat, titoli usati e il confronto con le live precedenti. Li trovi tutti nella scheda **📋 Riepiloghi**.
 
-Per riceverli anche sul telefono con **Telegram** (gratis): nella scheda Riepiloghi segui i passaggi di **Telegram** (crei un bot con @BotFather, incolli il codice, scrivi un messaggio al bot e premi **Trova la chat**). Puoi ricevere anche un avviso quando inizia la live.
+## Telegram: chat privata e canale
+
+Nella scheda **📋 Riepiloghi → Telegram** colleghi un bot gratuito (creato con @BotFather). Scrive in due posti, ognuno con i suoi interruttori:
+
+- **🔒 Chat privata** (solo per te; scrivi `/start` al bot e premi **Trova la chat**): riepilogo a fine live, avviso di inizio live, raid, donazioni e bits sopra la soglia che scegli, problemi di connessione durante la live (da OBS: connessione pessima o disconnessa per più di 20 secondi).
+- **📣 Canale pubblico** (per la community; aggiungi il bot come amministratore del canale, pubblica un messaggio e premi **Trova il canale**):
+  - 🔴 "in live!" quando inizi (con titolo, categoria e link);
+  - ⏰ promemoria N minuti prima di una live in programma (scheda 📅 Programmazione);
+  - 📅 programmazione della settimana nel giorno e all'ora che scegli;
+  - 💜 saluto a fine live con la prossima live.
+
+I testi del canale si personalizzano con le variabili (`{channel}`, `{title}`, `{game}`, `{link}`, `{minutes}`, `{when}`, `{list}`, `{next}`) e si provano con **✉ Prova sul canale**. Dalla scheda Programmazione, **📣 Manda al canale Telegram** pubblica l'immagine della settimana.
 
 ## Programmazione delle live
 

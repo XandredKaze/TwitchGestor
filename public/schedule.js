@@ -314,7 +314,17 @@
             const a = el('a', { href: URL.createObjectURL(b), download: `programmazione-${toLocal(mondayOf(Date.now()) + Number(week.value) * 7 * 86400000).slice(0, 10)}.png` });
             document.body.append(a); a.click(); a.remove();
           }, 'image/png'),
-        }, '⬇ Scarica l\'immagine')));
+        }, '⬇ Scarica l\'immagine'),
+        el('button', {
+          type: 'button',
+          onclick: (ev) => canvas.toBlob(async (b) => {
+            const btn = ev.target;
+            btn.disabled = true;
+            const r = await api('/api/telegram/photo', { body: b, headers: { 'Content-Type': 'image/png' } });
+            btn.disabled = false;
+            if (r) { btn.textContent = '✓ Inviata al canale'; setTimeout(() => { btn.textContent = '📣 Manda al canale Telegram'; }, 2500); }
+          }, 'image/png'),
+        }, '📣 Manda al canale Telegram')));
     box.redraw = draw;
   }
 

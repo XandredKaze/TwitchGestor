@@ -541,8 +541,8 @@ class DemoBackend {
       case 'PUT /api/telegram':
         this.config = sanitizeConfig({ ...this.config, telegram: { ...this.config.telegram, ...body?.telegram } }, this.defaults);
         return ok({ telegram: this.config.telegram });
-      case 'POST /api/telegram/find': case 'POST /api/telegram/test':
-        return fail(400, 'Nella demo Telegram non è collegato: nel programma vero qui trovi la chat e mandi un messaggio di prova.');
+      case 'POST /api/telegram/find': case 'POST /api/telegram/test': case 'POST /api/telegram/photo':
+        return fail(400, 'Nella demo Telegram non è collegato: nel programma vero qui trovi la chat privata o il canale e mandi i messaggi di prova.');
       case 'GET /api/schedule': case 'PUT /api/schedule': case 'POST /api/schedule/publish': {
         if (!this.schedule) {
           this.schedule = new Schedule({ onChange: () => this.#send('dashboard', { type: 'schedule' }) });

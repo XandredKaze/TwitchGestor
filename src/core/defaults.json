@@ -308,7 +308,28 @@
     "chatId": "",
     "chatName": "",
     "sendRecap": true,
-    "sendLiveStart": false
+    "sendLiveStart": false,
+    "alertRaid": true,
+    "alertDonation": true,
+    "donationMin": 5,
+    "alertBits": true,
+    "bitsMin": 500,
+    "alertStream": true,
+    "channelId": "",
+    "channelName": "",
+    "channelLiveStart": true,
+    "channelReminder": true,
+    "reminderMin": 30,
+    "channelWeekly": true,
+    "weeklyDay": 1,
+    "weeklyHour": 10,
+    "channelLiveEnd": false,
+    "texts": {
+      "liveStart": "",
+      "reminder": "",
+      "liveEnd": "",
+      "weekly": ""
+    }
   },
   "chatOverlay": {
     "style": "classic",

@@ -25,6 +25,7 @@ import { TitleLog } from './core/titles.js';
 import { LiveStats, computeRecap, recapText } from './core/livestats.js';
 import { liveSession } from './core/session.js';
 import { sendTelegram } from './telegram.js';
+import { TelegramNotifier, whenText, fillText } from './core/telegramNotify.js';
 import { Schedule, fromLocal } from './core/schedule.js';
 import { MusicPlayer } from './core/music.js';
 import { scanLibrary } from './musiclib.js';
@@ -330,10 +331,44 @@ async function refreshTotals() {
 }
 setInterval(() => refreshTotals().catch(() => {}), 6 * 3600 * 1000).unref();
 
-function telegramSettings() {
-  const t = config.get().telegram ?? {};
-  return t.enabled && t.token && t.chatId ? t : null;
+// --- Telegram: chat privata (riepiloghi e avvisi per te) e canale pubblico (per la community) ---
+const TELEGRAM_STATE = path.join(DATA_DIR, 'telegram-state.json');
+const telegram = new TelegramNotifier({
+  getConfig: () => config.get().telegram,
+  send: (where, text) => {
+    const t = config.get().telegram ?? {};
+    return sendTelegram({ token: t.token, chatId: where === 'channel' ? t.channelId : t.chatId }, text);
+  },
+  store: {
+    load: () => JSON.parse(fs.readFileSync(TELEGRAM_STATE, 'utf8')),
+    save: (data) => fs.writeFile(TELEGRAM_STATE, JSON.stringify(data), () => {}),
+  },
+  log,
+});
+/** Variabili per i messaggi di Telegram: nome del canale, link, prossima live. */
+function telegramVars(extra = {}) {
+  const n = schedule.next();
+  return {
+    channel: auth.user?.display_name || auth.user?.login || '',
+    link: auth.user ? `https://twitch.tv/${auth.user.login}` : '',
+    next: n ? `${whenText(fromLocal(n.start))}${n.title ? ` — ${n.title}` : ''}` : 'presto, resta sintonizzato!',
+    title: '', game: '',
+    ...extra,
+  };
 }
+manager.on('notification', (n) => telegram.notification(n));
+/** Anteprima dei messaggi del canale (pulsante "Prova" nella dashboard), con dati veri o di esempio. */
+function telegramPreview(key) {
+  const vars = telegramVars({ title: titleLog.titles()[0]?.title ?? 'Titolo della live', game: titleLog.titles()[0]?.game ?? 'Just Chatting', minutes: config.get().telegram?.reminderMin ?? 30 });
+  const week = schedule.upcoming().filter((e) => fromLocal(e.start) < Date.now() + 7 * 86400000).map((e) => ({ id: e.id, start: fromLocal(e.start), title: e.title, game: e.game }));
+  if (key === 'weeklyCaption') return `📅 Le live di questa settimana\n👉 ${vars.link}`;
+  if (key === 'weekly') return week.length ? telegram.weeklyText(week, vars) : '📅 Nessuna live in programma nei prossimi 7 giorni (aggiungile in Programmazione).';
+  return fillText(telegram.text(['liveStart', 'reminder', 'liveEnd'].includes(key) ? key : 'liveStart'), vars);
+}
+setInterval(() => {
+  const entries = schedule.upcoming().map((e) => ({ id: e.id, start: fromLocal(e.start), title: e.title, game: e.game }));
+  telegram.tick(entries, telegramVars());
+}, 60000).unref();
 
 /** Live iniziata (o ritrovata): storico dei titoli, statistiche e, se vuoi, avviso su Telegram. */
 function liveStarted(stream) {
@@ -342,11 +377,9 @@ function liveStarted(stream) {
   liveStats.start(stream.started_at);
   if (!isNew) return;
   refreshTotals().catch(() => {});
-  const tg = telegramSettings();
-  if (tg?.sendLiveStart) {
-    const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
-    sendTelegram(tg, `🔴 <b>In live!</b>\n${esc(stream.title)}\n🎮 ${esc(stream.game_name)}\nhttps://twitch.tv/${auth.user.login}`)
-      .catch((err) => log.warn(`Avviso di inizio live su Telegram non inviato: ${err.message}`));
+  // solo se la live è iniziata da poco (non quando TwitchGestor si riaccende a live già in corso)
+  if (Date.now() - new Date(stream.started_at).getTime() < 15 * 60000) {
+    telegram.liveStart(telegramVars({ title: stream.title, game: stream.game_name }));
   }
 }
 
@@ -361,8 +394,7 @@ async function liveEnded(at = Date.now()) {
   live.recap = computeRecap(live, { session: liveSession(manager.history, live.startedAt, live.endedAt), titles, previous: liveStats.recaps });
   liveStats.save();
   log.info(`Riepilogo della live pronto (${Math.round(live.recap.durationMs / 60000)} minuti, media ${live.recap.viewers.average} spettatori)`);
-  const tg = telegramSettings();
-  if (tg?.sendRecap) sendTelegram(tg, recapText(live.recap)).catch((err) => log.warn(`Riepilogo su Telegram non inviato: ${err.message}`));
+  telegram.liveEnd(recapText(live.recap), telegramVars());
 }
 
 // --- Musica: libreria in data/media/music, riprodotta dalla pagina /music in OBS ---
@@ -545,6 +577,7 @@ const app = {
     }
   },
   chatAccount,
+  telegramPreview,
   getState() {
     return {
       apiLevel: API_LEVEL,
@@ -656,6 +689,7 @@ async function checkTwitchLive() {
   }
 }
 obs.on('stream', (stream) => {
+  telegram.streamHealth(stream);
   if (stream.active) checkTwitchLive();
   else Object.assign(twitchLive, { checkedAt: 0, startedAt: null });
   stream.liveSince = stream.active ? twitchLive.startedAt ?? null : null; // ms (orologio del PC)

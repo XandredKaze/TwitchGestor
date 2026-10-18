@@ -1322,3 +1322,19 @@ html:root[data-ui="brutal"] {
 #sys-remote > .sys-copy { justify-self: stretch; }
 #sys-remote-sec[hidden] { display: none; }
 [data-ui="brutal"] .sys-copy code { border-radius: 0; }
+
+/* ===== Telegram (scheda Riepiloghi) ===== */
+.rc-tg-sec { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; display: grid; gap: 8px; }
+.rc-tg-sec > summary { cursor: pointer; font-weight: 600; }
+.rc-tg-sec[open] > summary { margin-bottom: 4px; }
+.rc-tg-sec .row { display: flex; flex-wrap: wrap; gap: 6px; }
+.rc-tg-opts { display: grid; gap: 2px; }
+.rc-tg-opts .check { display: block; margin-top: 6px; padding-left: 24px; text-indent: -24px; line-height: 1.9; }
+.rc-tg-opts .check input[type=checkbox] { margin: 0 6px 0 2px; vertical-align: -2px; text-indent: 0; }
+.rc-tg-opts .check .rc-num, .rc-tg-opts .check select { text-indent: 0; line-height: normal; }
+.rc-num { font: inherit; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--inset); color: var(--text); }
+.rc-tg-texts > summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.rc-tg-texts textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--inset); color: var(--text); resize: vertical; }
+.rc-tg-texts .field { gap: 4px; }
+.rc-tg-texts .small-btn { justify-self: start; }
+[data-ui="brutal"] .rc-tg-sec, [data-ui="brutal"] .rc-num, [data-ui="brutal"] .rc-tg-texts textarea { border-radius: 0; }

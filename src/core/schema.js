@@ -221,14 +221,24 @@ function sanitizeShoutouts(input, base) {
   return out;
 }
 
-/** Telegram: bot e chat dove mandare riepiloghi e avvisi. */
+/** Telegram: bot, chat privata (riepiloghi e avvisi per te) e canale pubblico (per la community). */
 function sanitizeTelegram(input, base) {
-  const out = { ...base };
+  const out = { ...base, texts: { ...base.texts } };
   if (!isObject(input)) return out;
-  for (const k of ['enabled', 'sendRecap', 'sendLiveStart']) if (typeof input[k] === 'boolean') out[k] = input[k];
+  for (const k of ['enabled', 'sendRecap', 'sendLiveStart', 'alertRaid', 'alertDonation', 'alertBits', 'alertStream',
+    'channelLiveStart', 'channelReminder', 'channelWeekly', 'channelLiveEnd']) if (typeof input[k] === 'boolean') out[k] = input[k];
   if (typeof input.token === 'string' && (input.token === '' || /^\d+:[\w-]{20,}$/.test(input.token.trim()))) out.token = input.token.trim();
-  if (typeof input.chatId === 'string' && /^-?\d{1,20}$|^$/.test(input.chatId.trim())) out.chatId = input.chatId.trim();
-  if (typeof input.chatName === 'string') out.chatName = input.chatName.slice(0, 80);
+  for (const k of ['chatId', 'channelId']) if (typeof input[k] === 'string' && /^-?\d{1,20}$|^$/.test(input[k].trim())) out[k] = input[k].trim();
+  for (const k of ['chatName', 'channelName']) if (typeof input[k] === 'string') out[k] = input[k].slice(0, 80);
+  const n = (v, min, max) => { const x = Number(v); return Number.isFinite(x) ? Math.min(Math.max(Math.round(x), min), max) : undefined; };
+  out.donationMin = n(input.donationMin, 0, 100000) ?? out.donationMin;
+  out.bitsMin = n(input.bitsMin, 1, 1000000) ?? out.bitsMin;
+  out.reminderMin = n(input.reminderMin, 5, 240) ?? out.reminderMin;
+  out.weeklyDay = n(input.weeklyDay, 1, 7) ?? out.weeklyDay;
+  out.weeklyHour = n(input.weeklyHour, 0, 23) ?? out.weeklyHour;
+  if (isObject(input.texts)) {
+    for (const k of Object.keys(out.texts)) if (typeof input.texts[k] === 'string') out.texts[k] = input.texts[k].slice(0, 1000);
+  }
   return out;
 }
 

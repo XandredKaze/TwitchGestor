@@ -10,7 +10,7 @@ import { NotificationManager } from './core/NotificationManager.js';
 import { sanitizeConfig, ANIMATIONS, POSITIONS, SOUND_PRESETS, UI_THEMES } from './core/schema.js';
 import { recentLogs } from './logger.js';
 import * as updates from './updates.js';
-import { sendTelegram, findTelegramChat } from './telegram.js';
+import { sendTelegram, sendTelegramPhoto, findTelegramChat } from './telegram.js';
 import { recapText } from './core/livestats.js';
 import { API_LEVEL, APP_VERSION, BUILD_ID } from './version.js';
 import { parseKofi, parseGenericDonation } from './sources/webhooks.js';
@@ -401,13 +401,35 @@ export function createServer(app) {
         }
         if (route === 'POST /api/telegram/find') {
           const body = await readBody(req);
-          const found = await findTelegramChat(body.token ?? app.config.get().telegram?.token);
+          const found = await findTelegramChat(body.token ?? app.config.get().telegram?.token, body.kind === 'channel' ? 'channel' : 'private');
           return send(res, 200, found);
         }
         if (route === 'POST /api/telegram/test') {
+          const body = await readBody(req);
           const t = app.config.get().telegram ?? {};
-          const last = app.liveStats?.recaps?.[0];
-          await sendTelegram(t, last ? recapText(last) : '✅ TwitchGestor è collegato: qui arriveranno i riepiloghi delle tue live.');
+          if (body.where === 'channel') {
+            if (!t.channelId) return send(res, 400, { error: 'Canale Telegram non ancora trovato' });
+            await sendTelegram({ token: t.token, chatId: t.channelId }, app.telegramPreview?.(body.text ?? 'liveStart') ?? '✅ TwitchGestor è collegato al canale.');
+          } else {
+            const last = app.liveStats?.recaps?.[0];
+            await sendTelegram(t, last ? recapText(last) : '✅ TwitchGestor è collegato: qui arriveranno i riepiloghi delle tue live.');
+          }
+          return send(res, 200, { ok: true });
+        }
+        // immagine della programmazione (fatta nella dashboard) sul canale
+        if (route === 'POST /api/telegram/photo') {
+          const t = app.config.get().telegram ?? {};
+          if (!t.token || !t.channelId) return send(res, 400, { error: 'Collega prima un canale Telegram: scheda 📋 Riepiloghi → Telegram → Canale pubblico.' });
+          const chunks = [];
+          let size = 0;
+          for await (const chunk of req) {
+            size += chunk.length;
+            if (size > 10 * 1024 * 1024) return send(res, 413, { error: 'Immagine troppo grande' });
+            chunks.push(chunk);
+          }
+          const png = Buffer.concat(chunks);
+          if (png.subarray(1, 4).toString() !== 'PNG') return send(res, 400, { error: 'Non è un\'immagine PNG' });
+          await sendTelegramPhoto({ token: t.token, chatId: t.channelId }, png, app.telegramPreview?.('weeklyCaption') ?? '');
           return send(res, 200, { ok: true });
         }
         // --- Programmazione delle live ---

@@ -135,38 +135,97 @@
   }
 
   // ---------- Telegram ----------
+  // Chat privata = solo per te (riepiloghi e avvisi); canale = per la community (live, promemoria, programmazione).
   let tg = null;
+  const TEXTS = {
+    liveStart: { label: 'Quando inizi la live', vars: '{channel} {title} {game} {link} {next}' },
+    reminder: { label: 'Promemoria prima della live', vars: '{minutes} {title} {game} {when} {link}' },
+    weekly: { label: 'Programmazione della settimana', vars: '{list} {link} {channel}' },
+    liveEnd: { label: 'Fine live', vars: '{next} {channel} {link}' },
+  };
+  const DAYS = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
+
   function renderTelegram() {
     const box = $('recap-telegram');
     if (!tg) return;
-    const token = el('input', { type: 'password', value: tg.token ?? '', placeholder: '123456789:ABC-def…', autocomplete: 'off' });
-    const out = el('p', { className: 'muted small' });
+    const out = el('p', { className: 'muted small', 'aria-live': 'polite' });
     const save = async (patch) => {
       const r = await window.TG.api('/api/telegram', { method: 'PUT', body: { telegram: patch } });
       if (r) { tg = r.telegram; renderTelegram(); }
     };
+    const check = (key, label, def = false) => el('label', { className: 'check' },
+      el('input', { type: 'checkbox', checked: tg[key] ?? def, onchange: (e) => save({ [key]: e.target.checked }) }), ' ', label);
+    const num = (key, min, max, width = '5em') => el('input', {
+      type: 'number', min: String(min), max: String(max), value: String(tg[key] ?? ''), className: 'rc-num', style: { width },
+      onchange: (e) => save({ [key]: Number(e.target.value) }),
+    });
+    const find = (kind) => async () => {
+      out.textContent = 'Cerco…';
+      const r = await window.TG.api('/api/telegram/find', { body: { token: tg.token, kind } });
+      if (!r) { out.textContent = ''; return; }
+      await save(kind === 'channel' ? { channelId: r.chatId, channelName: r.name, enabled: true } : { chatId: r.chatId, chatName: r.name, enabled: true });
+      out.textContent = `✓ Trovato: "${r.name}".`;
+    };
+    const test = (where, text) => async () => {
+      if (await window.TG.api('/api/telegram/test', { body: { where, text } })) out.textContent = '✓ Messaggio inviato: controlla Telegram.';
+    };
+
+    // 1. il bot
+    const token = el('input', { type: 'password', value: tg.token ?? '', placeholder: '123456789:ABC-def…', autocomplete: 'off' });
+    const botBox = el('details', { className: 'rc-tg-sec', open: !tg.token || undefined },
+      el('summary', {}, tg.token ? '🤖 Bot collegato' : '🤖 1. Crea il bot (una volta, gratis)'),
+      el('ol', { className: 'rc-steps' },
+        el('li', {}, 'Su Telegram scrivi a ', el('b', {}, '@BotFather'), ', invia ', el('code', {}, '/newbot'), ' e scegli un nome: ti dà un ', el('b', {}, 'token'), '.'),
+        el('li', {}, 'Incolla qui il token: ', token, ' ', el('button', { type: 'button', className: 'small-btn', onclick: () => save({ token: token.value.trim() }) }, 'Salva'))));
+
+    // 2. chat privata
+    const priv = el('details', { className: 'rc-tg-sec', open: (tg.token && !tg.chatId) || undefined },
+      el('summary', {}, tg.chatId ? `🔒 Chat privata: ${tg.chatName || tg.chatId}` : '🔒 2. Chat privata (solo per te)'),
+      tg.chatId ? null : el('p', { className: 'small' }, 'Apri il tuo bot su Telegram, scrivigli ', el('code', {}, '/start'), ' e premi:'),
+      el('div', { className: 'row' },
+        el('button', { type: 'button', className: 'small-btn', disabled: !tg.token || undefined, onclick: find('private') }, tg.chatId ? '🔎 Cambia chat' : '🔎 Trova la chat'),
+        tg.chatId ? el('button', { type: 'button', className: 'small-btn', onclick: test('private') }, '✉ Prova') : null),
+      el('div', { className: 'rc-tg-opts' },
+        check('sendRecap', 'Riepilogo a fine live', true),
+        check('sendLiveStart', 'Avviso quando inizi la live'),
+        check('alertRaid', 'Raid ricevuti', true),
+        el('label', { className: 'check' }, el('input', { type: 'checkbox', checked: tg.alertDonation !== false, onchange: (e) => save({ alertDonation: e.target.checked }) }), ' Donazioni da ', num('donationMin', 0, 100000), ' € in su'),
+        el('label', { className: 'check' }, el('input', { type: 'checkbox', checked: tg.alertBits !== false, onchange: (e) => save({ alertBits: e.target.checked }) }), ' Bits da ', num('bitsMin', 1, 1000000, '6em'), ' in su'),
+        check('alertStream', 'Problemi di connessione durante la live (da OBS)', true)));
+
+    // 3. canale pubblico
+    const textBoxes = Object.entries(TEXTS).map(([key, t]) => {
+      const area = el('textarea', { rows: '4', maxlength: '1000', placeholder: '' });
+      area.value = tg.texts?.[key] || '';
+      area.placeholder = { liveStart: '🔴 {channel} è in live!\n{title}\n🎮 {game}\n👉 {link}', reminder: '⏰ Tra {minutes} minuti si va in live!\n{title}\n🎮 {game}\n👉 {link}', weekly: '📅 Le live di questa settimana\n\n{list}\n\n👉 {link}', liveEnd: '💜 Live finita, grazie a tutti!\n📅 Prossima live: {next}' }[key];
+      area.onchange = () => save({ texts: { [key]: area.value } });
+      return el('label', { className: 'field' }, el('span', { className: 'field-label' }, t.label), area,
+        el('span', { className: 'hint' }, 'Variabili: ', t.vars, ' · vuoto = testo predefinito'),
+        tg.channelId ? el('button', { type: 'button', className: 'small-btn', onclick: test('channel', key) }, '✉ Prova sul canale') : null);
+    });
+    const day = el('select', { className: 'rc-num', onchange: (e) => save({ weeklyDay: Number(e.target.value) }) }, ...DAYS.map((d, i) => el('option', { value: String(i + 1) }, d)));
+    day.value = String(tg.weeklyDay ?? 1);
+    const chan = el('details', { className: 'rc-tg-sec', open: (tg.chatId && !tg.channelId) || undefined },
+      el('summary', {}, tg.channelId ? `📣 Canale: ${tg.channelName || tg.channelId}` : '📣 3. Canale pubblico (facoltativo)'),
+      tg.channelId ? null : el('ol', { className: 'rc-steps' },
+        el('li', {}, 'Su Telegram crea un ', el('b', {}, 'canale'), ' (✏ → Nuovo canale).'),
+        el('li', {}, 'Nelle impostazioni del canale: ', el('b', {}, 'Amministratori → Aggiungi amministratore'), ', scegli il tuo bot e lascia il permesso ', el('b', {}, 'Pubblica messaggi'), '.'),
+        el('li', {}, 'Pubblica un messaggio qualsiasi nel canale e premi:')),
+      el('div', { className: 'row' },
+        el('button', { type: 'button', className: 'small-btn', disabled: !tg.token || undefined, onclick: find('channel') }, tg.channelId ? '🔎 Cambia canale' : '🔎 Trova il canale'),
+        tg.channelId ? el('button', { type: 'button', className: 'small-btn', onclick: () => confirm('Togliere il canale? Non riceverà più messaggi da TwitchGestor.') && save({ channelId: '', channelName: '' }) }, 'Togli') : null),
+      el('div', { className: 'rc-tg-opts' },
+        check('channelLiveStart', '🔴 Quando inizi la live', true),
+        el('label', { className: 'check' }, el('input', { type: 'checkbox', checked: tg.channelReminder !== false, onchange: (e) => save({ channelReminder: e.target.checked }) }), ' ⏰ Promemoria ', num('reminderMin', 5, 240), ' minuti prima di una live in programma'),
+        el('label', { className: 'check' }, el('input', { type: 'checkbox', checked: tg.channelWeekly !== false, onchange: (e) => save({ channelWeekly: e.target.checked }) }), ' 📅 Programmazione della settimana ogni ', day, ' alle ', num('weeklyHour', 0, 23, '4em'), ':00'),
+        check('channelLiveEnd', '💜 Saluto a fine live con la prossima live')),
+      el('p', { className: 'muted small' }, 'Promemoria e programmazione usano le live della scheda 📅 Programmazione; lì puoi anche mandare al canale l\'immagine della settimana.'),
+      el('details', { className: 'rc-tg-texts' }, el('summary', {}, '✏ Personalizza i testi del canale'), ...textBoxes));
+
     box.replaceChildren(
       el('label', { className: 'switch' }, el('input', { type: 'checkbox', checked: Boolean(tg.enabled), onchange: (e) => save({ enabled: e.target.checked }) }), 'Invia su Telegram'),
-      el('details', { open: !tg.chatId || undefined },
-        el('summary', {}, tg.chatId ? `Collegato a: ${tg.chatName || tg.chatId}` : 'Come si collega (una volta, gratis)'),
-        el('ol', { className: 'rc-steps' },
-          el('li', {}, 'Su Telegram scrivi a ', el('b', {}, '@BotFather'), ', invia ', el('code', {}, '/newbot'), ' e scegli un nome: ti dà un ', el('b', {}, 'token'), '.'),
-          el('li', {}, 'Incolla qui il token: ', token, ' ', el('button', { type: 'button', className: 'small-btn', onclick: () => save({ token: token.value.trim() }) }, 'Salva')),
-          el('li', {}, 'Apri il tuo nuovo bot su Telegram e scrivigli ', el('code', {}, '/start'), ' (o aggiungilo a un gruppo e scrivi lì).'),
-          el('li', {}, el('button', {
-            type: 'button', className: 'small-btn',
-            onclick: async () => {
-              out.textContent = 'Cerco…';
-              const r = await window.TG.api('/api/telegram/find', { body: { token: token.value.trim() || tg.token } });
-              if (r) { await save({ token: token.value.trim() || tg.token, chatId: r.chatId, chatName: r.name, enabled: true }); out.textContent = `✓ Trovata la chat "${r.name}".`; } else out.textContent = '';
-            },
-          }, '🔎 Trova la chat'), ' e poi ', el('button', {
-            type: 'button', className: 'small-btn',
-            onclick: async () => { if (await window.TG.api('/api/telegram/test', { body: {} })) out.textContent = '✓ Messaggio inviato: controlla Telegram.'; },
-          }, '✉ Prova')))),
-      el('label', { className: 'check' }, el('input', { type: 'checkbox', checked: tg.sendRecap !== false, onchange: (e) => save({ sendRecap: e.target.checked }) }), 'Riepilogo a fine live'),
-      el('label', { className: 'check' }, el('input', { type: 'checkbox', checked: Boolean(tg.sendLiveStart), onchange: (e) => save({ sendLiveStart: e.target.checked }) }), 'Avviso quando inizi la live (titolo, categoria e link)'),
-      out);
+      el('p', { className: 'muted small' }, 'Un bot gratuito che scrive a te in privato (riepiloghi e avvisi) e, se vuoi, in un canale per la tua community.'),
+      botBox, priv, chan, out);
   }
 
   async function load() {
