@@ -22,6 +22,7 @@
       body: body === undefined ? undefined : isFile ? body : JSON.stringify(body),
     }).catch(() => null);
     const data = res ? await res.json().catch(() => ({})) : { error: 'Programma non raggiungibile' };
+    if (res?.status === 401) { askPassword(Boolean(token)); return null; }
     if (!res?.ok) {
       if (!quiet) alert(data.error ?? `Errore ${res.status}`);
       return null;
@@ -56,6 +57,44 @@
   const RESTART_HELP = 'Il programma TwitchGestor acceso è una versione precedente rispetto a questa pagina (succede se aggiorni i file mentre è acceso). Riavvialo: clicca "⏻ Spegni" in alto a destra, poi riapri OBS (oppure fai doppio clic su "Avvia TwitchGestor.vbs") e ricarica questa pagina con Ctrl+F5.';
 
   window.TG = { api, el, money, token: () => token, API_LEVEL, RESTART_HELP, version: '' };
+
+  // Password della dashboard (DASHBOARD_TOKEN): su un dispositivo nuovo (es. il telefono) si chiede qui
+  // e resta ricordata in questo browser.
+  let passwordBox = null;
+  function askPassword(wrong = false) {
+    if (passwordBox || !document.body) return;
+    const input = el('input', { type: 'password', autocomplete: 'current-password', placeholder: 'password della dashboard', style: { width: '100%', boxSizing: 'border-box', font: 'inherit', padding: '10px 12px', borderRadius: '10px', border: '1px solid #8886', background: 'transparent', color: 'inherit' } });
+    const msg = el('p', { style: { margin: '0', color: '#e5484d', minHeight: '1.2em' } }, wrong ? 'La password salvata non è più valida: scrivila di nuovo.' : '');
+    const form = el('form', {
+      style: { display: 'grid', gap: '12px', width: 'min(420px, calc(100vw - 32px))', padding: '22px', borderRadius: '16px', background: 'var(--panel, #1c1a24)', color: 'var(--text, #fff)', boxShadow: '0 20px 60px rgba(0,0,0,.5)', font: '15px/1.45 system-ui, sans-serif' },
+      onsubmit: async (e) => {
+        e.preventDefault();
+        const value = input.value.trim();
+        if (!value) return;
+        msg.textContent = 'Controllo…';
+        const res = await fetch('/api/state', { headers: { 'x-dashboard-token': value } }).catch(() => null);
+        if (res?.ok) {
+          try { localStorage.setItem('dashboardToken', value); } catch { /* storage non disponibile */ }
+          location.replace(location.pathname + location.search.replace(/([?&])token=[^&]*&?/, '$1').replace(/[?&]$/, '') + location.hash);
+        } else msg.textContent = res ? 'Password sbagliata.' : 'Programma non raggiungibile.';
+      },
+    },
+    el('b', { style: { fontSize: '18px' } }, '🔒 Password della dashboard'),
+    el('span', {}, 'Su questo dispositivo serve una volta sola, poi resta ricordata.'),
+    input, msg,
+    el('button', { type: 'submit', className: 'primary', style: { padding: '10px', fontWeight: '700' } }, 'Entra'),
+    el('span', { style: { fontSize: '13px', opacity: '.75' } }, 'È la stessa che usi sul PC: la trovi nell\'indirizzo della dashboard dopo "token=", oppure sul PC in 🎵 Musica → Cartella condivisa (sul Raspberry).'));
+    passwordBox = el('div', { role: 'dialog', 'aria-modal': 'true', style: { position: 'fixed', inset: '0', zIndex: '1000', display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,.6)' } }, form);
+    document.body.append(passwordBox);
+    input.focus();
+  }
+  window.TG.askPassword = askPassword;
+  // all'apertura: se il programma chiede la password e qui non c'è (o è sbagliata), la si chiede subito
+  const checkPassword = () => fetch('/api/state', { headers: token ? { 'x-dashboard-token': token } : {} })
+    .then((r) => { if (r.status === 401) askPassword(Boolean(token)); }).catch(() => {});
+  if (!/\bdemo\b/.test(location.search)) {
+    if (document.body) checkPassword(); else window.addEventListener('DOMContentLoaded', checkPassword);
+  }
 
   /** Mostra un errore della pagina in un riquadro, con un pulsante per copiarlo e mandarlo a chi ti aiuta. */
   let errorBox = null;
