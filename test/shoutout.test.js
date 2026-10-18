@@ -64,6 +64,10 @@ test('solo le persone scelte, solo al primo messaggio della live', async (t) => 
 test('fuori dalla live non fa nulla (e saluta alla prossima), a meno che non sia scelto', async () => {
   const off = setup({}, { live: null });
   assert.equal(await off.so.handle(msg('luna')), null);
+  assert.match(off.so.history[0].chat, /saltato: non sei in live/, 'nell\'elenco si vede perché');
+  await off.so.handle(msg('luna'));
+  assert.equal(off.so.history.length, 1, 'segnato una volta sola');
+  assert.equal(off.sent.length, 0);
   off.setLive('2026-10-16T18:00:00Z');
   assert.ok(await off.so.handle(msg('luna')), 'appena vai in live lo saluta');
 

@@ -92,7 +92,7 @@
     const status = (label, v) => (v == null ? null : el('span', { className: v === 'ok' || v === 'in coda' ? '' : 'mod-error' }, ` · ${label}: ${v === 'ok' ? '✓' : v}`));
     box.replaceChildren(...history.map((r) => el('div', { className: `mod-entry ${/non riuscito/.test(`${r.chat} ${r.official}`) ? 'err' : ''}` },
       el('span', { className: 'mod-time' }, new Date(r.at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })),
-      el('span', { className: 'mod-what' }, el('b', {}, r.name), status('messaggio', r.chat), status('shoutout', r.official)),
+      el('span', { className: 'mod-what' }, el('b', {}, r.name), status(r.skipped ? 'stato' : 'messaggio', r.chat), status('shoutout', r.official)),
       el('span'))));
   }
 

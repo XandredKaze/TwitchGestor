@@ -46,6 +46,7 @@ export class AutoShoutout {
   #lastByChannel = new Map();
   #timer = null;
   #busy = new Set(); // login in lavorazione (due messaggi ravvicinati non fanno due shoutout)
+  #skipNoted = new Map(); // login → quando abbiamo segnato "saltato: non sei in live" (per non riempire l'elenco)
 
   constructor({ getConfig, send, shoutout, channelInfo, liveSince, store, onChange, onCard, now = () => Date.now(), log = console }) {
     Object.assign(this, { getConfig, send, shoutoutFn: shoutout, channelInfo, liveSince, store, onChange, onCard, now, log });
@@ -84,7 +85,17 @@ export class AutoShoutout {
     this.#busy.add(login);
     try {
       const started = await this.liveSince?.();
-      if (!started && cfg.onlyLive !== false) return null; // offline: niente, e resta da salutare per la prossima live
+      if (!started && cfg.onlyLive !== false) {
+        // offline: niente, e resta da salutare per la prossima live; lo si segna nell'elenco per capire perché
+        if (this.now() - (this.#skipNoted.get(login) ?? -Infinity) > 30 * 60000) {
+          this.#skipNoted.set(login, this.now());
+          this.history.unshift({ at: this.now(), login, name: msg.user?.name || login, chat: 'saltato: non sei in live (Twitch dice che sei offline)', official: null, skipped: true });
+          this.history.length = Math.min(this.history.length, 50);
+          this.log.info?.(`Shoutout a ${login} saltato: non sei in live`);
+          this.onChange?.();
+        }
+        return null;
+      }
       // una "sessione" è la live in corso; fuori dalla live vale per tutto il giorno
       const key = started ? `live:${started}` : `day:${new Date(this.now()).toISOString().slice(0, 10)}`;
       if (key !== this.#key) { this.#key = key; this.#seen = new Set(); }
