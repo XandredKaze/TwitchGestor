@@ -119,3 +119,28 @@ SMB
   return 0
 }
 setup_share || true
+
+# --- accesso da fuori casa: il pulsante "Attiva" in ⚙ Sistema crea data/remote-access-request ---
+cat > /etc/systemd/system/twitchgestor-remote.service <<UNIT
+[Unit]
+Description=Accesso da fuori casa per TwitchGestor (Tailscale)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash $DIR/scripts/raspberry/remote-access.sh
+UNIT
+
+cat > /etc/systemd/system/twitchgestor-remote.path <<UNIT
+[Unit]
+Description=Accesso da fuori casa chiesto dalla dashboard
+
+[Path]
+PathExists=$DIR/data/remote-access-request
+Unit=twitchgestor-remote.service
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now twitchgestor-remote.path >/dev/null 2>&1 || true

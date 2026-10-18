@@ -113,7 +113,7 @@ export async function updateState() {
 // Cosa entra nella copia: impostazioni, dati (accessi a Twitch, storico, immagini e suoni, titoli di coda...) e .env.
 // La musica no: può pesare gigabyte e resta comunque nella cartella (o sul tuo PC).
 const MUSIC_IN_DATA = path.join('media', 'music');
-const SKIP_IN_DATA = new Set(['backups', 'twitchgestor.pid', 'twitchgestor.log', 'update-request', 'update-status.json', 'update-bad-commit', 'system-setup-requested', 'tts', 'piper']);
+const SKIP_IN_DATA = new Set(['backups', 'twitchgestor.pid', 'twitchgestor.log', 'update-request', 'update-status.json', 'update-bad-commit', 'system-setup-requested', 'remote-access-request', 'remote-access-status.json', 'tts', 'piper']);
 
 /** Crea un file .tar.gz con tutto quello che serve per ripartire su un altro computer. Ritorna il percorso. */
 export async function createBackup() {

@@ -76,8 +76,113 @@
     }, 4000);
   }
 
+  // ---------- Accesso da fuori casa (Tailscale) ----------
+  let remote = null;
+  let remotePoll = null;
+  let remoteBusy = false;
+
+  function copyLine(text) {
+    const btn = el('button', {
+      type: 'button', className: 'small-btn',
+      onclick: async () => { try { await navigator.clipboard.writeText(text); btn.textContent = 'Copiato!'; } catch { btn.textContent = 'Selezionalo'; } setTimeout(() => { btn.textContent = 'Copia'; }, 1500); },
+    }, 'Copia');
+    return el('div', { className: 'sys-copy' }, el('code', {}, text), btn);
+  }
+
+  async function remoteCall(action) {
+    remoteBusy = true;
+    renderRemote();
+    const res = await api(`/api/remote/${action}`);
+    remoteBusy = false;
+    if (res) remote = res;
+    renderRemote();
+    watchRemote();
+  }
+
+  function renderRemote() {
+    const sec = $('sys-remote-sec');
+    sec.hidden = !state?.managed;
+    if (sec.hidden) return;
+    const box = $('sys-remote');
+    const r = remote;
+    if (!r) { box.replaceChildren(el('p', { className: 'muted small' }, 'Controllo…')); return; }
+    const intro = el('p', { className: 'muted small' }, 'Apri la dashboard da ovunque (telefono, portatile) con ', el('b', {}, 'Tailscale'),
+      ': una rete privata gratuita tra i tuoi dispositivi. Nessuna porta aperta sul router: entra solo chi usa il tuo account Tailscale.');
+    const installing = r.pending || r.install?.result === 'running';
+    if (remoteBusy) { box.replaceChildren(intro, el('p', { className: 'cmd-ok' }, '⏳ Un momento…')); return; }
+
+    if (!r.installed || installing || r.install?.result === 'error' || (r.state === 'NoState' && r.error)) {
+      const lines = [intro];
+      if (installing) lines.push(el('p', { className: 'cmd-ok' }, '⏳ Installo Tailscale sul Raspberry: ci vogliono 1–3 minuti. Puoi chiudere questa finestra.'));
+      else {
+        if (r.install?.result === 'error') lines.push(el('p', { className: 'cmd-warn' }, `✕ ${r.install.message || 'Installazione non riuscita'}`));
+        lines.push(el('ol', { className: 'small sys-steps' },
+          el('li', {}, 'Premi ', el('b', {}, 'Attiva'), ': il Raspberry installa Tailscale (1–3 minuti).'),
+          el('li', {}, 'Premi ', el('b', {}, 'Collega'), ' e apri il link che compare: accedi a Tailscale (anche con Google). Si fa una volta sola, da casa.'),
+          el('li', {}, 'Installa l\'app Tailscale sul telefono con lo stesso account: fatto.')),
+        el('button', { type: 'button', className: 'primary', onclick: () => remoteCall('install') }, r.install?.result === 'error' ? '↻ Riprova' : '🌍 Attiva l\'accesso da fuori casa'));
+      }
+      box.replaceChildren(...lines);
+      return;
+    }
+
+    if (!r.connected) {
+      box.replaceChildren(intro,
+        el('p', { className: 'cmd-ok' }, '✓ Tailscale è installato sul Raspberry. Ora collegalo al tuo account (gratis):'),
+        r.authUrl
+          ? el('div', { className: 'sys-remote-login' },
+            el('a', { href: r.authUrl, target: '_blank', rel: 'noopener', className: 'btn primary' }, '🔑 Apri il link e accedi a Tailscale'),
+            el('p', { className: 'muted small' }, 'Accedi (anche con Google o Microsoft) e premi ', el('b', {}, 'Connect'), '. Questa finestra si aggiorna da sola quando hai finito.'))
+          : el('button', { type: 'button', className: 'primary', onclick: () => remoteCall('connect') }, '🔗 Collega'));
+      return;
+    }
+
+    const port = r.httpPort ?? 3000;
+    const name = r.dnsName || r.ip;
+    const here = [r.ip, r.dnsName].includes(location.hostname);
+    box.replaceChildren(
+      el('p', { className: 'cmd-ok' }, `✓ Collegato${r.account ? ` (account ${r.account})` : ''}${here ? ': stai usando proprio questo accesso' : ''}.`),
+      el('p', { className: 'small' }, el('b', {}, 'Sul telefono'), ': installa l\'app ', el('a', { href: 'https://tailscale.com/download', target: '_blank', rel: 'noopener' }, 'Tailscale'),
+        ', accedi con lo stesso account e tienila attiva. Poi apri nel browser:'),
+      copyLine(`http://${name}:${port}/dashboard`),
+      r.dnsName ? el('p', { className: 'muted small' }, 'Se non si apre, usa l\'indirizzo numerico: ', el('code', {}, `http://${r.ip}:${port}/dashboard`)) : null,
+      el('p', { className: 'muted small' }, 'La prima volta chiede la password della dashboard. Funziona tutto tranne anteprima e chat di Twitch nella scheda Live (su un portatile funzionano se installi il certificato, vedi sotto): per la chat dal telefono usa l\'app di Twitch.'),
+      el('p', { className: 'muted small' }, el('b', {}, 'Scheda Live su un PC o portatile fuori casa'), ': il certificato di TwitchGestor ora vale anche per Tailscale. Su ogni PC dove l\'avevi già installato, ',
+        el('a', { href: '/twitchgestor-certificato.crt' }, 'scaricalo di nuovo'), ' e installalo come la prima volta (stessi passaggi della scheda Live).'),
+      el('p', { className: 'muted small' }, 'Anche la cartella condivisa funziona da fuori casa: ', el('code', {}, `\\\\${r.ip}\\TwitchGestor`), '.'),
+      el('button', {
+        type: 'button', className: 'small-btn',
+        onclick: () => confirm(here ? 'Stai usando proprio l\'accesso da fuori casa: scollegandolo questa pagina smette di funzionare finché non torni a casa. Scollegare?' : 'Scollegare l\'accesso da fuori casa? Potrai ricollegarlo quando vuoi.') && remoteCall('disconnect'),
+      }, 'Scollega'),
+    );
+  }
+
+  function watchRemote() {
+    clearInterval(remotePoll);
+    const waiting = remote && (remote.pending || remote.install?.result === 'running' || (remote.installed && !remote.connected && remote.authUrl));
+    if (!waiting || !dialog.open) return;
+    remotePoll = setInterval(async () => {
+      if (!dialog.open) { clearInterval(remotePoll); return; }
+      const res = await api('/api/remote', { method: 'GET', quiet: true });
+      if (!res) return;
+      remote = res;
+      renderRemote();
+      if (!(res.pending || res.install?.result === 'running' || (res.installed && !res.connected && res.authUrl))) clearInterval(remotePoll);
+    }, 4000);
+  }
+
+  async function loadRemote() {
+    if (!state?.managed) { renderRemote(); return; }
+    remote = null;
+    renderRemote();
+    remote = await api('/api/remote', { method: 'GET', quiet: true });
+    renderRemote();
+    watchRemote();
+  }
+
   async function open() {
     dialog.showModal();
+    loadRemote();
     info = null;
     render();
     info = await api('/api/update', { method: 'GET', quiet: true });
@@ -87,8 +192,8 @@
 
   $('btn-system').onclick = open;
   $('app-version').onclick = open;
-  $('sys-close').onclick = () => { dialog.close(); clearInterval(poll); };
-  dialog.addEventListener('click', (e) => { if (e.target === dialog) { dialog.close(); clearInterval(poll); } });
+  $('sys-close').onclick = () => { dialog.close(); clearInterval(poll); clearInterval(remotePoll); };
+  dialog.addEventListener('click', (e) => { if (e.target === dialog) { dialog.close(); clearInterval(poll); clearInterval(remotePoll); } });
 
   $('sys-export').onclick = async () => {
     const out = $('sys-backup-out');

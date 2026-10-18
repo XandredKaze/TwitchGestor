@@ -34,6 +34,7 @@ Gestore di notifiche per il tuo canale Twitch. Raccoglie in un unico posto tutto
 - **Statistiche nel tempo** (scheda 📈 Statistiche): spettatori, follower, abbonati, ore di live e chat, settimana per settimana, spiegati in parole semplici.
 - **Riepilogo di fine live** (scheda 📋 Riepiloghi): tutti i riepiloghi delle live passate, con il confronto con le precedenti; facoltativo anche su **Telegram**.
 - **Programmazione delle live** (scheda 📅 Programmazione): le live in programma, titolo e categoria impostati da soli poco prima, calendario di Twitch e immagine della settimana da condividere.
+- **Accesso da fuori casa** (sul Raspberry, ⚙ Sistema): apri la dashboard da telefono o portatile ovunque tu sia, con Tailscale (gratis, nessuna porta aperta sul router).
 - **Musica** (scheda 🎵 Musica): la musica di sottofondo con playlist, suonata da OBS e comandata dalla dashboard; si abbassa da sola durante gli alert. Sul Raspberry c'è una **cartella condivisa** per copiarci musica, immagini e suoni dal PC.
 - **Ringraziamenti automatici in chat** (facoltativi) con testi personalizzabili, scritti dal tuo account o da un **account bot** (es. Wolfery).
 - **Anti-duplicati**, riconnessione automatica a Twitch, rinnovo automatico del token.

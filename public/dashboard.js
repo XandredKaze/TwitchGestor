@@ -328,14 +328,22 @@
   // ---------- Dashboard aperta in http dall'indirizzo del Raspberry: per player e chat di Twitch serve l'https ----------
   // Se il certificato è già installato su questo PC si passa da soli all'indirizzo https.
   let httpsChecked = false;
+  // indirizzo https con lo stesso nome usato adesso (es. 100.x di Tailscale fuori casa), se il certificato lo copre
+  const httpsUrl = () => {
+    if (!state?.httpsUrl) return null;
+    if (!state.httpsHosts?.includes(location.hostname)) return state.httpsUrl;
+    const u = new URL(state.httpsUrl);
+    u.hostname = location.hostname;
+    return u.origin;
+  };
   function tryHttps() {
     if (httpsChecked || !state?.httpsUrl || state.httpsNeedsSetup || location.protocol === 'https:') return;
     httpsChecked = true;
     const ctrl = new AbortController();
     setTimeout(() => ctrl.abort(), 4000);
-    fetch(`${state.httpsUrl}/https-ok`, { mode: 'no-cors', signal: ctrl.signal, cache: 'no-store' }).then(() => {
+    fetch(`${httpsUrl()}/https-ok`, { mode: 'no-cors', signal: ctrl.signal, cache: 'no-store' }).then(() => {
       const token = window.TG.token();
-      location.replace(`${state.httpsUrl}/dashboard${token ? `?token=${encodeURIComponent(token)}` : ''}${location.hash}`);
+      location.replace(`${httpsUrl()}/dashboard${token ? `?token=${encodeURIComponent(token)}` : ''}${location.hash}`);
     }).catch(() => { /* certificato non ancora installato: restano le istruzioni */ });
   }
   function renderHttpsHelp(body) {
@@ -363,8 +371,8 @@
           el('li', {}, el('b', {}, 'Installa certificato…'), ' → ', el('b', {}, 'Utente corrente'), ' → Avanti → ', el('b', {}, 'Colloca tutti i certificati nel seguente archivio'), ' → Sfoglia → ', el('b', {}, 'Autorità di certificazione radice attendibili'), ' → OK → Avanti → Fine → ', el('b', {}, 'Sì'), '.')),
       el('ol', { start: firefox ? 4 : 3 },
         el('li', {}, 'Chiudi e riapri il browser e torna qui: la dashboard passa da sola all\'indirizzo sicuro ',
-          el('a', { href: `${state.httpsUrl}/dashboard${tok ? `?token=${encodeURIComponent(tok)}` : ''}` }, state.httpsUrl.replace('https://', '')), '.')),
-      el('span', { className: 'muted small' }, 'Il certificato vale solo per TwitchGestor nella rete di casa. In OBS gli indirizzi restano quelli di sempre.')));
+          el('a', { href: `${httpsUrl()}/dashboard${tok ? `?token=${encodeURIComponent(tok)}` : ''}` }, httpsUrl().replace('https://', '')), '.')),
+      el('span', { className: 'muted small' }, 'Il certificato vale solo per TwitchGestor (rete di casa e accesso da fuori casa). In OBS gli indirizzi restano quelli di sempre.')));
   }
 
 

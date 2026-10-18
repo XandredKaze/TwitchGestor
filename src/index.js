@@ -13,6 +13,7 @@ import { isManaged } from './updates.js';
 import https from 'node:https';
 import os from 'node:os';
 import { ensureCertificates } from './https.js';
+import * as remote from './remote.js';
 import { CreditsStore, startCreditsScheduler } from './credits.js';
 import { ObsClient } from './obs.js';
 import { createQuickActions } from './quickActions.js';
@@ -40,6 +41,8 @@ let httpsPort = Number(env.HTTPS_PORT) || (isManaged() ? 443 : 0);
 let httpsReady = false;
 let httpsNeedsSetup = false; // la porta 443 non è permessa: va rilanciato lo script di installazione
 let caFile = null;
+let httpsHosts = []; // nomi e indirizzi per cui vale il certificato https
+let tailscaleInfo = null; // accesso da fuori casa collegato: { ip, dnsName }
 const publicUrl = (env.PUBLIC_URL || `http://localhost:${port}`).replace(/\/$/, '');
 
 const config = new ConfigStore();
@@ -550,6 +553,7 @@ const app = {
       managed: isManaged(), // installato sul Raspberry: aggiornamenti dalla dashboard
       httpsUrl: httpsReady ? httpsBase() : null,
       httpsNeedsSetup,
+      httpsHosts,
       restartNeeded: codeChangedSinceStart(),
       twitch: {
         configured: auth.configured,
@@ -757,13 +761,18 @@ function askSystemSetup() {
   }
 }
 const httpsBase = () => `https://${os.hostname().toLowerCase()}.local${httpsPort === 443 ? '' : `:${httpsPort}`}`;
+const secureServers = [];
+const CERT_DIR = path.join(DATA_DIR, 'https');
+const hostsOf = (names) => names.split(',').map((n) => n.replace(/^(DNS|IP):/, ''));
 async function startHttps() {
   if (!httpsPort) return;
-  const certs = await ensureCertificates(path.join(DATA_DIR, 'https'));
+  const certs = await ensureCertificates(CERT_DIR, { tailscale: tailscaleInfo });
   if (!certs) return;
   caFile = certs.caFile;
+  httpsHosts = hostsOf(certs.names);
   const listen = (port) => {
     const secure = https.createServer({ key: certs.key, cert: certs.cert }, (req, res) => web.server.emit('request', req, res));
+    secureServers.push(secure);
     secure.on('upgrade', (req, socket, head) => web.server.emit('upgrade', req, socket, head));
     secure.on('error', (err) => {
       if (err.code === 'EACCES' && port === 443) {
@@ -778,17 +787,57 @@ async function startHttps() {
       httpsReady = true;
       log.info(`Dashboard in https: ${httpsBase()}/dashboard`);
       app.broadcastState();
-      // chi ha ancora aperto il vecchio indirizzo con :3443 viene portato su quello nuovo
+      // chi ha ancora aperto il vecchio indirizzo con :3443 viene portato su quello nuovo (stesso nome o indirizzo)
       if (port === 443) {
-        https.createServer({ key: certs.key, cert: certs.cert }, (req, res) => {
-          res.writeHead(301, { Location: `${httpsBase()}${req.url}` });
+        const redirect = https.createServer({ key: certs.key, cert: certs.cert }, (req, res) => {
+          const name = String(req.headers.host ?? '').replace(/:\d+$/, '');
+          res.writeHead(301, { Location: `${httpsHosts.includes(name) ? `https://${name}` : httpsBase()}${req.url}` });
           res.end();
-        }).on('error', () => {}).listen(3443, host);
+        }).on('error', () => {});
+        secureServers.push(redirect);
+        redirect.listen(3443, host);
       }
     });
   };
   listen(httpsPort);
 }
+
+// Accesso da fuori casa (Tailscale): quando è collegato il certificato vale anche per l'indirizzo 100.x
+// e il nome .ts.net del Raspberry. Si controlla ogni minuto e il certificato si cambia senza riavviare.
+let httpsRefreshing = false;
+async function refreshRemote() {
+  if (!isManaged() || httpsRefreshing) return;
+  httpsRefreshing = true;
+  try {
+    const st = await remote.status();
+    const next = st.connected && st.ip ? { ip: st.ip, dnsName: st.dnsName } : null;
+    if (JSON.stringify(next) !== JSON.stringify(tailscaleInfo)) {
+      tailscaleInfo = next;
+      if (secureServers.length) {
+        const certs = await ensureCertificates(CERT_DIR, { tailscale: tailscaleInfo });
+        if (certs) {
+          for (const s of secureServers) s.setSecureContext({ key: certs.key, cert: certs.cert });
+          caFile = certs.caFile;
+          httpsHosts = hostsOf(certs.names);
+          app.broadcastState();
+        }
+      }
+    }
+  } catch (err) {
+    log.warn(`Accesso da fuori casa: ${err.message}`);
+  } finally {
+    httpsRefreshing = false;
+  }
+}
+setInterval(refreshRemote, 60000).unref();
+app.remote = {
+  httpPort: port,
+  status: () => remote.status(),
+  install: () => remote.requestInstall(),
+  connect: async () => { const url = await remote.connect(); setTimeout(refreshRemote, 3000); return url; },
+  disconnect: async () => { await remote.disconnect(); await refreshRemote(); },
+  refresh: refreshRemote,
+};
 app.httpsCertificate = () => caFile;
 
 // Numero del processo: serve allo script di OBS per spegnere il programma quando gira nascosto.
@@ -800,6 +849,7 @@ web.server.listen(port, host, async () => {
   log.info(`Dashboard: ${publicUrl}/dashboard${env.DASHBOARD_TOKEN ? '?token=…' : ''}`);
   log.info(`Overlay per OBS: ${publicUrl}/overlay`);
   obs.start();
+  await refreshRemote();
   startHttps();
   if (!auth.configured) {
     log.warn('TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET mancanti nel file .env: Twitch non verrà collegato');

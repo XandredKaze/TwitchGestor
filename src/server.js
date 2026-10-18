@@ -454,6 +454,19 @@ export function createServer(app) {
           else return send(res, 404, { error: 'Azione sconosciuta' });
           return send(res, 200, { player: p.snapshot(), pages: musicPages(), settings: app.config.get().music ?? {} });
         }
+        // --- Accesso da fuori casa (Tailscale, solo sul Raspberry) ---
+        if (url.pathname.startsWith('/api/remote')) {
+          if (!updates.isManaged() || !app.remote) return send(res, 400, { error: 'L\'accesso da fuori casa si attiva solo sul Raspberry.' });
+          if (route === 'POST /api/remote/install') app.remote.install();
+          else if (route === 'POST /api/remote/connect') {
+            const authUrl = await app.remote.connect();
+            const st = await app.remote.status();
+            return send(res, 200, { ...st, authUrl: authUrl || st.authUrl, httpPort: app.remote.httpPort });
+          }
+          else if (route === 'POST /api/remote/disconnect') await app.remote.disconnect();
+          else if (route !== 'GET /api/remote') return send(res, 404, { error: 'Non trovato' });
+          return send(res, 200, { ...(await app.remote.status()), httpPort: app.remote.httpPort });
+        }
         if (route === 'GET /api/titles') return send(res, 200, { lives: app.titleLog?.lives ?? [], titles: app.titleLog?.titles() ?? [] });
         if (route === 'GET /api/obs') return send(res, 200, app.obs?.state() ?? null);
         if (route === 'PUT /api/obs/settings') {

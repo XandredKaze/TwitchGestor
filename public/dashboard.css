@@ -1314,3 +1314,11 @@ html:root[data-ui="brutal"] {
 .music-tab .field input[type=text] { margin-top: 6px; }
 .music-tab .field input[hidden] { display: none; }
 [data-ui="brutal"] .music-tab input[type=range] { accent-color: var(--lilac); }
+.sys-steps { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.sys-copy { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.sys-copy code { flex: 1; min-width: 0; overflow-wrap: anywhere; padding: 6px 8px; border-radius: 8px; background: var(--inset); border: 1px solid var(--border); font-size: 13px; }
+.sys-remote-login { display: grid; gap: 6px; justify-items: start; }
+#sys-remote { display: grid; gap: 10px; justify-items: start; }
+#sys-remote > .sys-copy { justify-self: stretch; }
+#sys-remote-sec[hidden] { display: none; }
+[data-ui="brutal"] .sys-copy code { border-radius: 0; }

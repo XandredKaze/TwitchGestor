@@ -107,6 +107,17 @@ Il Raspberry ha una **cartella condivisa** in rete, così copi i file dal PC com
 
 Se `\\twitchgestor` non risponde, usa l'indirizzo del Raspberry, per esempio `\\192.168.1.50\TwitchGestor`. La cartella si vede solo nella rete di casa. Le copie di sicurezza non contengono la musica (pesa troppo): tienine una copia anche sul PC.
 
+## Accesso da fuori casa (facoltativo)
+
+Per aprire la dashboard quando non sei a casa (dal telefono o da un portatile) TwitchGestor usa **Tailscale**: una rete privata gratuita tra i tuoi dispositivi. Non si apre nessuna porta sul router: entra solo chi usa il tuo account Tailscale. Si fa **una volta, da casa**:
+
+1. Nella dashboard apri **⚙ Sistema → Accesso da fuori casa** e premi **🌍 Attiva l'accesso da fuori casa**. Il Raspberry installa Tailscale (1–3 minuti).
+2. Premi **🔗 Collega** e poi **🔑 Apri il link e accedi a Tailscale**: accedi (anche con Google o Microsoft) e premi **Connect**.
+3. Sul telefono installa l'app **Tailscale** e accedi con lo **stesso account**.
+4. Fuori casa, con l'app Tailscale attiva, apri l'indirizzo che trovi in ⚙ Sistema (es. `http://twitchgestor.tailXXXX.ts.net:3000/dashboard`). La prima volta chiede la password della dashboard.
+
+Funziona tutto; anteprima e chat di Twitch nella scheda Live funzionano su un PC o portatile con il certificato installato. Attivando l'accesso da fuori casa il certificato cambia (ora vale anche per Tailscale): **reinstallalo una volta** sui PC dove l'avevi già messo (link in ⚙ Sistema, stessi passaggi della scheda Live). Dal telefono, per la chat usa l'app di Twitch. Anche la cartella condivisa funziona da fuori casa, con l'indirizzo `\\100.x.x.x\TwitchGestor` indicato in ⚙ Sistema.
+
 ## Accedere a Twitch (raramente)
 
 Twitch accetta l'accesso solo da "localhost". Quindi, quando serve un nuovo accesso (un permesso nuovo, oppure ricollegare il bot), si fa così:
