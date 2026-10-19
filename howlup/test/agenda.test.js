@@ -27,7 +27,7 @@ test('impegni ricorrenti: settimanali, ogni 2 settimane, mensili, fino a, giorni
 test('agenda: salva, modifica un solo giorno della serie, elimina, cose da fare', () => {
   let saved = null;
   const a = new Agenda({ store: { load: () => saved, save: (d) => { saved = structuredClone(d); } } });
-  assert.equal(a.categories.length, 3);
+  assert.equal(a.categories.length, 4);
   const e = a.saveEvent({ title: 'Live', category: 'live', date: '2026-10-20', time: '21:00', endTime: '23:00', repeat: { freq: 'weekly', days: [2] } });
   const moved = a.saveOccurrence(e.id, '2026-10-27', { time: '22:00' });
   const list = occurrences(a.events, '2026-10-19', '2026-11-04');
@@ -55,4 +55,27 @@ test('calendario .ics per Google Calendar e il telefono', () => {
   assert.match(ics, /EXDATE:20261022T210000/);
   assert.match(ics, /SUMMARY:🔴 Live\\, Elden Ring/);
   assert.match(ics, /TRIGGER:-PT30M/);
+});
+
+test('turni di notte: si segnano i giorni del mese in un colpo, gli straordinari restano', async () => {
+  const { Agenda, toICS } = await import('../src/core/agenda.js');
+  const a = new Agenda({});
+  assert.ok(a.categories.some((c) => c.id === 'cube'));
+  assert.deepEqual([a.shift.time, a.shift.endTime], ['23:00', '07:00']);
+  const r = a.setShifts({ from: '2026-11-01', to: '2026-11-30', days: ['2026-11-02', '2026-11-03', '2026-12-01'] });
+  assert.deepEqual(r, { added: 2, removed: 0 });
+  const e = a.events.find((x) => x.date === '2026-11-02');
+  assert.deepEqual([e.title, e.category, e.time, e.endTime, e.source], ['Turno al Cube', 'cube', '23:00', '07:00', 'shift']);
+  assert.match(toICS([e], { categories: a.categories }), /DTSTART:20261102T230000\r\nDTEND:20261103T070000/);
+  // straordinario su un turno: resta com'è quando risalvi il mese
+  a.saveEvent({ ...e, endTime: '09:00' });
+  const again = a.setShifts({ from: '2026-11-01', to: '2026-11-30', days: ['2026-11-02', '2026-11-05'] });
+  assert.deepEqual(again, { added: 1, removed: 1 });
+  assert.equal(a.events.find((x) => x.date === '2026-11-02').endTime, '09:00');
+  // gli impegni normali non si toccano
+  a.saveEvent({ title: 'Riunione', date: '2026-11-03', time: '10:00', category: 'work' });
+  a.setShifts({ from: '2026-11-01', to: '2026-11-30', days: [], shift: { time: '22:00', endTime: '06:00' } });
+  assert.deepEqual(a.events.map((x) => x.title), ['Riunione']);
+  assert.equal(a.shift.time, '22:00');
+  assert.throws(() => a.setShifts({ from: '2026-11-30', to: '2026-11-01' }), /Periodo/);
 });

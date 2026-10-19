@@ -13,6 +13,9 @@ export const DEFAULT_CATEGORIES = [
   { id: 'work', name: 'Lavoro', color: '#6d8ce3', icon: '💼' },
   { id: 'personal', name: 'Personale', color: '#4fbf8a', icon: '🏠' },
 ];
+// turni da dipendente: orario sempre uguale, si segnano i giorni di un mese o di una settimana in un colpo solo
+export const SHIFT_CATEGORY = { id: 'cube', name: 'Cube', color: '#9b7be0', icon: '🌙' };
+export const DEFAULT_SHIFT = { title: 'Turno al Cube', category: 'cube', time: '23:00', endTime: '07:00', remindMin: 60 };
 export const FREQS = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
 export const WEEKDAYS = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
 
@@ -48,7 +51,8 @@ export function cleanEvent(e = {}, categories = DEFAULT_CATEGORIES) {
     category: categories.some((c) => c.id === e.category) ? e.category : categories[0]?.id ?? 'personal',
     date: e.date,
     time: allDay ? '' : e.time,
-    endTime: !allDay && TIME.test(String(e.endTime ?? '')) && e.endTime > e.time ? e.endTime : '',
+    // fine prima dell'inizio = finisce il giorno dopo (turni di notte: 23:00–07:00)
+    endTime: !allDay && TIME.test(String(e.endTime ?? '')) && e.endTime !== e.time ? e.endTime : '',
     allDay,
     notes: str(e.notes, 2000),
     remindMin: Number.isFinite(remind) && remind >= 0 && remind <= 10080 ? Math.round(remind) : null,
@@ -60,6 +64,20 @@ export function cleanEvent(e = {}, categories = DEFAULT_CATEGORIES) {
     },
     skip: Array.isArray(e.skip) ? e.skip.filter((d) => DATE.test(String(d))).slice(-500) : [],
     source: typeof e.source === 'string' ? e.source.slice(0, 40) : '',
+  };
+}
+
+/** Impostazioni del turno (titolo, tipo, orario, promemoria). */
+export function cleanShift(x = {}, categories = DEFAULT_CATEGORIES) {
+  const o = x && typeof x === 'object' ? x : {};
+  const d = DEFAULT_SHIFT;
+  const remind = Number(o.remindMin);
+  return {
+    title: str(o.title, 140).trim() || d.title,
+    category: categories.some((c) => c.id === o.category) ? o.category : (categories.some((c) => c.id === d.category) ? d.category : categories[0]?.id ?? 'personal'),
+    time: TIME.test(String(o.time ?? '')) ? o.time : d.time,
+    endTime: TIME.test(String(o.endTime ?? '')) ? o.endTime : d.endTime,
+    remindMin: o.remindMin === null ? null : Number.isFinite(remind) && remind >= 0 && remind <= 10080 ? Math.round(remind) : d.remindMin,
   };
 }
 
@@ -154,7 +172,7 @@ export function toICS(events, { name = 'Howl-UP', categories = DEFAULT_CATEGORIE
     else {
       lines.push(`DTSTART:${dt(e.date, e.time)}`);
       const end = e.endTime || (() => { const [h, m] = e.time.split(':').map(Number); return `${pad(Math.min(23, h + 1))}:${pad(h >= 23 ? 59 : m)}`; })();
-      lines.push(`DTEND:${dt(e.date, end)}`);
+      lines.push(`DTEND:${dt(end < e.time ? addDays(e.date, 1) : e.date, end)}`);
     }
     const r = e.repeat ?? { freq: 'none' };
     if (r.freq !== 'none') {
@@ -186,10 +204,41 @@ export class Agenda {
     this.categories = cleanCategories(saved?.categories);
     this.events = (saved?.events ?? []).map((e) => cleanEvent(e, this.categories)).filter(Boolean);
     this.tasks = (saved?.tasks ?? []).map((t) => cleanTask(t, this.categories)).filter(Boolean);
+    // il tipo "Cube" per i turni c'è sempre (si può rinominare o cambiare colore in Altro → Categorie)
+    if (!saved?.shift && !this.categories.some((c) => c.id === SHIFT_CATEGORY.id)) this.categories = [...this.categories, { ...SHIFT_CATEGORY }];
+    this.shift = cleanShift(saved?.shift, this.categories);
   }
 
   state() {
-    return { categories: this.categories, events: this.events, tasks: this.tasks };
+    return { categories: this.categories, events: this.events, tasks: this.tasks, shift: this.shift };
+  }
+
+  /**
+   * Turni da dipendente tra from e to (per esempio un mese o una settimana): days sono i giorni in cui lavori.
+   * I turni già segnati restano come sono (anche con lo straordinario), quelli tolti si cancellano, i nuovi
+   * prendono l'orario del turno. shift (facoltativo): nuove impostazioni del turno.
+   */
+  setShifts({ from, to, days = [], shift } = {}) {
+    if (!DATE.test(String(from ?? '')) || !DATE.test(String(to ?? '')) || to < from || daysBetween(from, to) > 62) throw Object.assign(new Error('Periodo non valido'), { status: 400 });
+    if (shift) {
+      if (shift.category === SHIFT_CATEGORY.id && !this.categories.some((c) => c.id === SHIFT_CATEGORY.id)) this.categories = [...this.categories, { ...SHIFT_CATEGORY }];
+      this.shift = cleanShift(shift, this.categories);
+    }
+    const want = new Set((Array.isArray(days) ? days : []).filter((d) => DATE.test(String(d)) && d >= from && d <= to));
+    const inRange = (e) => e.source === 'shift' && e.date >= from && e.date <= to;
+    const before = this.events.length;
+    this.events = this.events.filter((e) => !inRange(e) || want.has(e.date));
+    const removed = before - this.events.length;
+    const have = new Set(this.events.filter(inRange).map((e) => e.date));
+    const s = this.shift;
+    let added = 0;
+    for (const date of [...want].sort()) {
+      if (have.has(date)) continue;
+      this.events.push(cleanEvent({ title: s.title, category: s.category, date, time: s.time, endTime: s.endTime, remindMin: s.remindMin, source: 'shift' }, this.categories));
+      added++;
+    }
+    this.#save();
+    return { added, removed };
   }
 
   saveEvent(input) {
@@ -254,6 +303,7 @@ export class Agenda {
     const ids = new Set(this.categories.map((c) => c.id));
     for (const e of this.events) if (!ids.has(e.category)) e.category = this.categories[0].id;
     for (const t of this.tasks) if (t.category && !ids.has(t.category)) t.category = '';
+    this.shift = cleanShift(this.shift, this.categories);
     this.#save();
     return this.categories;
   }

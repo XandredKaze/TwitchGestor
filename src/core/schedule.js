@@ -117,3 +117,34 @@ export class Schedule {
     this.entries.sort((a, b) => a.start.localeCompare(b.start));
   }
 }
+
+/**
+ * Le live già nel calendario di Twitch (create da Twitch prima di TwitchGestor) entrano nella Programmazione.
+ * Ognuna una volta sola: se poi la cancelli qui non torna. segments: quelli di GET /helix/schedule.
+ * Le live ricorrenti di Twitch entrano come live singole senza collegamento (modificarle qui non tocca la serie su Twitch).
+ * Ritorna { added: [nuove live], seen: chiavi da ricordare }.
+ */
+export function segmentsToEntries(entries = [], segments = [], { seen = [], now = Date.now() } = {}) {
+  const known = new Set(seen);
+  const linked = new Set(entries.map((e) => e.twitchId).filter(Boolean));
+  const starts = new Set(entries.map((e) => e.start));
+  const added = [];
+  const keys = [];
+  for (const seg of segments) {
+    const at = Date.parse(seg?.start_time ?? '');
+    if (!seg?.id || !Number.isFinite(at) || seg.canceled_until) continue;
+    const key = `${seg.id}@${seg.start_time}`;
+    if (known.has(key) || linked.has(seg.id) || at < now || at > now + 60 * 86400000) continue;
+    keys.push(key);
+    const start = toLocal(at);
+    if (starts.has(start)) continue; // c'è già una live a quell'ora
+    const end = Date.parse(seg.end_time ?? '');
+    const entry = cleanEntry({
+      start, durationMin: Number.isFinite(end) && end > at ? Math.round((end - at) / 60000) : 120,
+      title: seg.title ?? '', game: seg.category?.name ?? '', gameId: seg.category?.id ?? '',
+      twitchId: seg.is_recurring ? '' : seg.id, notes: seg.is_recurring ? 'Dal calendario di Twitch (live ricorrente)' : '',
+    });
+    if (entry) { added.push(entry); starts.add(start); }
+  }
+  return { added, seen: [...seen, ...keys].slice(-1000) };
+}

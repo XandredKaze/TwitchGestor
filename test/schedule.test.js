@@ -32,3 +32,24 @@ test('prossima live, titolo da impostare 10 minuti prima, niente doppioni', () =
   assert.deepEqual(s.due().map((e) => e.id), ['a']);
   assert.equal(toLocal(fromLocal('2026-10-20T21:00')), '2026-10-20T21:00');
 });
+
+test('le live già nel calendario di Twitch entrano nella Programmazione una volta sola', async () => {
+  const { segmentsToEntries, toLocal } = await import('../src/core/schedule.js');
+  const now = Date.parse('2026-10-19T12:00:00Z');
+  const seg = (id, start, extra = {}) => ({ id, start_time: start, end_time: new Date(Date.parse(start) + 3 * 3600000).toISOString(), title: 'Isaac', category: { id: '123', name: 'The Binding of Isaac' }, ...extra });
+  const segments = [
+    seg('a', '2026-10-21T19:00:00Z'),
+    seg('b', '2026-10-23T19:00:00Z', { is_recurring: true }),
+    seg('c', '2026-10-24T19:00:00Z', { canceled_until: '2026-10-25T00:00:00Z' }),
+    seg('old', '2026-10-01T19:00:00Z'),
+    seg('linked', '2026-10-25T19:00:00Z'),
+  ];
+  const existing = [{ id: 'x', start: '2026-10-30T21:00', twitchId: 'linked' }];
+  const r = segmentsToEntries(existing, segments, { now });
+  assert.equal(r.added.length, 2);
+  const [a, b] = r.added;
+  assert.deepEqual([a.start, a.durationMin, a.title, a.game, a.gameId, a.twitchId], [toLocal(Date.parse('2026-10-21T19:00:00Z')), 180, 'Isaac', 'The Binding of Isaac', '123', 'a']);
+  assert.equal(b.twitchId, ''); // ricorrente: non collegata, così non si tocca la serie su Twitch
+  // la seconda volta (o se le hai cancellate) non tornano
+  assert.equal(segmentsToEntries(existing, segments, { now, seen: r.seen }).added.length, 0);
+});

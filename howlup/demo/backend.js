@@ -7,12 +7,12 @@ import { cleanEntry, generateWeeks } from '../../src/core/schedule.js';
 import { Notifier, cleanSettings } from '../src/core/notifier.js';
 import { Announcements, cleanAnnounceSettings } from '../src/core/announce.js';
 
-const KEY = 'howlup-demo-2';
+const KEY = 'howlup-demo-3';
 const t = today();
 const nextWeekday = (n) => { let d = t; while (weekday(d) !== n) d = addDays(d, 1); return d; };
 const sample = () => ({
   events: [
-    { title: 'Turno al lavoro', category: 'work', date: addDays(t, -weekday(t) + 1), time: '09:00', endTime: '13:00', repeat: { freq: 'weekly', days: [1, 2, 3, 4, 5] } },
+    { title: 'Clienti della mia attività', category: 'work', date: addDays(t, -weekday(t) + 1), time: '10:00', endTime: '12:00', repeat: { freq: 'weekly', days: [2, 4] } },
     { title: 'Palestra', category: 'personal', date: t, time: '18:30', endTime: '19:30', repeat: { freq: 'weekly', days: [1, 3] } },
     { title: 'Cena con gli amici', category: 'personal', date: addDays(t, 2), time: '20:00' },
     { title: 'Compleanno di Marta', category: 'personal', date: addDays(t, 5), allDay: true, repeat: { freq: 'yearly' } },
@@ -34,6 +34,12 @@ const agenda = new Agenda({ store, onChange: () => { rev = Date.now(); } });
 if (!store.load()) {
   for (const e of sample().events) agenda.saveEvent(e);
   for (const x of sample().tasks) agenda.saveTask(x);
+  // turni di notte al Cube nelle prossime due settimane (dalla domenica al giovedì)
+  const from = addDays(t, -weekday(t) + 1);
+  const to = addDays(from, 13);
+  const days = [];
+  for (let d = from; d <= to; d = addDays(d, 1)) if (weekday(d) !== 5 && weekday(d) !== 6) days.push(d);
+  agenda.setShifts({ from, to, days });
 }
 
 // la Programmazione di TwitchGestor finta (nella versione vera le live stanno lì)
@@ -138,6 +144,7 @@ window.fetch = async (input, init = {}) => {
     }
     m = /^\/api\/lives\/([\w-]+)$/.exec(path);
     if (m && method === 'DELETE') { lives = lives.filter((x) => x.id !== m[1]); saveLives(); return json(200, { rev, lives: livesState() }); }
+    if (method === 'PUT' && path === '/api/shifts') { const r = agenda.setShifts(body); return json(200, { rev, ...r, shift: agenda.shift }); }
     if (method === 'PUT' && path === '/api/categories') return json(200, { rev, categories: agenda.saveCategories(body.categories) });
     return json(404, { error: 'Non disponibile nella demo' });
   } catch (err) {

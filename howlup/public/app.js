@@ -94,18 +94,20 @@ function untilText(o) {
   const t = today();
   if (o.day !== t || o.allDay) return '';
   const diff = toMin(o.time) - nowMin();
-  if (diff <= 0) return o.endTime && toMin(o.endTime) > nowMin() ? 'adesso' : '';
+  if (diff <= 0) return o.endTime && endMin(o) > nowMin() ? 'adesso' : '';
   return diff < 60 ? `tra ${diff} min` : `tra ${Math.floor(diff / 60)} h ${diff % 60 ? `${diff % 60} min` : ''}`.trim();
 }
+// fine in minuti dall'inizio del giorno: se è prima dell'inizio finisce il giorno dopo (turni di notte)
+const endMin = (o) => (o.endTime ? toMin(o.endTime) + (o.endTime < o.time ? 1440 : 0) : toMin(o.time));
 const greeting = () => { const h = new Date().getHours(); return h < 6 ? 'Buonanotte' : h < 13 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : 'Buonasera'; };
 
 // ---------- pezzi ----------
 function itemRow(o) {
   const c = cat(o.category);
-  const past = o.day === today() && !o.allDay && toMin(o.endTime || o.time) < nowMin();
+  const past = o.day === today() && !o.allDay && endMin(o) < nowMin();
   const fromTg = o.source === 'twitchgestor';
   return el('button', { type: 'button', className: `item${past ? ' past' : ''}`, style: { '--c': colorOf(o.category) }, onclick: () => (fromTg ? liveSheet(o) : eventSheet(o)) },
-    el('span', { className: 't' }, o.allDay ? 'tutto il giorno' : o.time, o.endTime ? el('small', {}, o.endTime) : null),
+    el('span', { className: 't' }, o.allDay ? 'tutto il giorno' : o.time, o.endTime ? el('small', {}, o.endTime < o.time ? `${o.endTime} +1` : o.endTime) : null),
     el('span', { className: 'bar' }),
     el('span', { className: 'what' }, el('b', {}, o.title),
       el('span', {}, (fromTg
@@ -161,7 +163,7 @@ function viewToday() {
   const t = today();
   const list = occurrences(allEvents(), t, addDays(t, 7));
   const todayList = list.filter((o) => o.day === t);
-  const next = todayList.find((o) => o.allDay ? false : toMin(o.endTime || o.time) >= nowMin()) ?? list.find((o) => o.day > t);
+  const next = todayList.find((o) => o.allDay ? false : endMin(o) >= nowMin()) ?? list.find((o) => o.day > t);
   const open = data.tasks.filter((x) => !x.done);
   const urgent = open.filter((x) => x.due && x.due <= t).sort((a, b) => a.due.localeCompare(b.due));
   const tomorrow = list.filter((o) => o.day === addDays(t, 1));
@@ -239,7 +241,8 @@ function viewCalendar() {
       dayTasks.length ? el('div', { className: 'tasks', style: { marginTop: '12px' } }, dayTasks.map(taskRow)) : null,
       el('div', { className: 'row', style: { marginTop: '12px' } },
         el('button', { type: 'button', className: 'btn small', onclick: () => eventSheet({ date: calDay }) }, '＋ Impegno'),
-        el('button', { type: 'button', className: 'btn small', onclick: () => taskSheet({ due: calDay }) }, '＋ Da fare'))),
+        el('button', { type: 'button', className: 'btn small', onclick: () => taskSheet({ due: calDay }) }, '＋ Da fare'),
+        el('button', { type: 'button', className: 'btn small', onclick: () => shiftSheet(calDay) }, '🌙 Turni'))),
   ];
 }
 
@@ -569,7 +572,7 @@ function eventSheet(o = {}) {
   const allDay = el('input', { type: 'checkbox', checked: e.allDay });
   const time = el('input', { type: 'time', value: e.time || '21:00' });
   const endTime = el('input', { type: 'time', value: e.endTime });
-  const times = el('div', { className: 'grid2' }, el('label', { className: 'field' }, el('span', {}, 'Inizio'), time), el('label', { className: 'field' }, el('span', {}, 'Fine (facoltativa)'), endTime));
+  const times = el('div', { className: 'grid2' }, el('label', { className: 'field' }, el('span', {}, 'Inizio'), time), el('label', { className: 'field' }, el('span', {}, 'Fine (facoltativa; prima dell\'inizio = il giorno dopo)'), endTime));
   const freq = el('select', {}, ...[['none', 'Mai'], ['daily', 'Ogni giorno'], ['weekly', 'Ogni settimana'], ['monthly', 'Ogni mese'], ['yearly', 'Ogni anno']].map(([v, l]) => el('option', { value: v }, l)));
   freq.value = FREQS.includes(e.repeat.freq) ? e.repeat.freq : 'none';
   const interval = el('input', { type: 'number', min: '1', max: '52', value: String(e.repeat.interval ?? 1) });
@@ -650,7 +653,7 @@ function eventSheet(o = {}) {
   if (!existing) setTimeout(() => title.focus(), 50);
 }
 
-const durOf = (e) => (e.allDay || !e.endTime ? 120 : Math.max(15, toMin(e.endTime) - toMin(e.time)));
+const durOf = (e) => (e.allDay || !e.endTime ? 120 : Math.max(15, endMin(e) - toMin(e.time)));
 function saveAsLive(e) {
   const time = e.allDay ? '21:00' : e.time;
   if (e.repeat.freq === 'weekly') {
@@ -749,6 +752,86 @@ function taskSheet(t = {}) {
   if (!existing) setTimeout(() => title.focus(), 50);
 }
 
+// ---------- turni da dipendente: si toccano i giorni di lavoro del mese, l'orario è sempre quello del turno ----------
+function shiftSheet(fromDay = today()) {
+  const shift = { ...(data.shift ?? { title: 'Turno al Cube', category: 'cube', time: '23:00', endTime: '07:00', remindMin: 60 }) };
+  let month = fromDay.slice(0, 7);
+  let picked = new Set();
+  let monthLoaded = '';
+  const monthRange = () => { const first = `${month}-01`; const [y, m] = month.split('-').map(Number); return [first, dateKey(new Date(y, m, 0, 12))]; };
+  const loadMonth = () => {
+    const [from, to] = monthRange();
+    picked = new Set(data.events.filter((e) => e.source === 'shift' && e.date >= from && e.date <= to).map((e) => e.date));
+    monthLoaded = month;
+  };
+  const head = el('div', { className: 'cal-head' });
+  const grid = el('div', { className: 'month' });
+  const count = el('b');
+  const saveBtn = el('button', { type: 'button', className: 'btn primary' });
+  const draw = () => {
+    if (monthLoaded !== month) loadMonth();
+    const [y, m] = month.split('-').map(Number);
+    const [from, to] = monthRange();
+    const go = (n) => { month = dateKey(new Date(y, m - 1 + n, 1, 12)).slice(0, 7); draw(); };
+    head.replaceChildren(
+      el('button', { type: 'button', className: 'btn small', onclick: () => go(-1), 'aria-label': 'Mese prima' }, '‹'),
+      el('b', {}, new Date(y, m - 1, 1).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })),
+      el('button', { type: 'button', className: 'btn small', onclick: () => go(1), 'aria-label': 'Mese dopo' }, '›'));
+    const start = addDays(from, -(weekday(from) - 1));
+    const cells = [];
+    const daysOfWeekday = (w) => { const out = []; for (let d = from; d <= to; d = addDays(d, 1)) if (weekday(d) === w) out.push(d); return out; };
+    // tocca una lettera (L, M, …) per segnare o togliere quel giorno in tutto il mese
+    const wd = ['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((w, i) => el('button', {
+      type: 'button', className: 'wd', style: { aspectRatio: 'auto', minHeight: '0', background: 'none', padding: '2px' },
+      title: `Tutti i ${WEEKDAYS[i]} del mese`,
+      onclick: () => { const ds = daysOfWeekday(i + 1); const all = ds.every((d) => picked.has(d)); for (const d of ds) { if (all) picked.delete(d); else picked.add(d); } draw(); },
+    }, w));
+    for (let i = 0; i < 42; i++) {
+      const d = addDays(start, i);
+      if (i >= 35 && d > to) break;
+      const inMonth = d >= from && d <= to;
+      cells.push(el('button', {
+        type: 'button', disabled: !inMonth,
+        className: [inMonth ? '' : 'other', d === today() ? 'today' : '', picked.has(d) ? 'sel' : ''].filter(Boolean).join(' '),
+        onclick: () => { if (picked.has(d)) picked.delete(d); else picked.add(d); draw(); },
+        'aria-pressed': picked.has(d) ? 'true' : 'false',
+      }, String(parseDate(d).getDate()), picked.has(d) ? el('span', { className: 'dots' }, el('i', { style: { '--c': colorOf(shift.category) } })) : null));
+    }
+    grid.replaceChildren(...wd, ...cells);
+    count.textContent = `${picked.size} turni in questo mese`;
+    saveBtn.textContent = 'Salva i turni';
+  };
+  const time = el('input', { type: 'time', value: shift.time, onchange: (e) => { if (e.target.value) shift.time = e.target.value; } });
+  const end = el('input', { type: 'time', value: shift.endTime, onchange: (e) => { if (e.target.value) shift.endTime = e.target.value; } });
+  const title = el('input', { type: 'text', value: shift.title, maxlength: '140', oninput: (e) => { shift.title = e.target.value; } });
+  const catSel = el('select', { onchange: (e) => { shift.category = e.target.value; draw(); } }, ...data.categories.map((c) => el('option', { value: c.id }, `${c.icon} ${c.name}`)));
+  catSel.value = shift.category;
+  const remind = el('select', { onchange: (e) => { shift.remindMin = e.target.value === '' ? null : Number(e.target.value); } },
+    ...[['', 'Nessuno'], ['30', '30 minuti prima'], ['60', '1 ora prima'], ['120', '2 ore prima']].map(([v, l]) => el('option', { value: v }, l)));
+  remind.value = shift.remindMin == null ? '' : String(shift.remindMin);
+  saveBtn.onclick = async () => {
+    const [from, to] = monthRange();
+    const r = await api('/api/shifts', { method: 'PUT', body: { from, to, days: [...picked], shift } });
+    if (r) { close(); toast(r.added || r.removed ? `Turni salvati (${r.added} nuovi, ${r.removed} tolti) 🌙` : 'Turni salvati 🌙'); load(true); }
+  };
+  draw();
+  const close = openSheet(el('h3', {}, `🌙 ${shift.title}`),
+    el('p', { className: 'muted small', style: { marginTop: '0' } }, `Tocca i giorni in cui lavori (orario ${shift.time}–${shift.endTime}). Tocca una lettera per segnare o togliere quel giorno in tutto il mese. Puoi farlo un mese o una settimana alla volta.`),
+    head, grid,
+    el('p', { className: 'small' }, count),
+    el('details', {}, el('summary', {}, '⚙️ Orario e dettagli del turno'),
+      el('label', { className: 'field' }, el('span', {}, 'Nome'), title),
+      el('div', { className: 'grid2' },
+        el('label', { className: 'field' }, el('span', {}, 'Inizio'), time),
+        el('label', { className: 'field' }, el('span', {}, 'Fine (il giorno dopo se è prima)'), end)),
+      el('div', { className: 'grid2' },
+        el('label', { className: 'field' }, el('span', {}, 'Tipo'), catSel),
+        el('label', { className: 'field' }, el('span', {}, 'Promemoria'), remind)),
+      el('p', { className: 'hint' }, 'Vale per i turni nuovi; quelli già segnati restano come sono.')),
+    el('p', { className: 'hint' }, '⏱️ Straordinario? Tocca quel turno nel calendario e cambia l\'ora di inizio o di fine: vale solo per quel giorno.'),
+    el('div', { className: 'sheet-actions' }, el('span', { className: 'grow' }), el('button', { type: 'button', className: 'btn', onclick: () => close() }, 'Annulla'), saveBtn));
+}
+
 // ---------- disegno ----------
 function render() {
   $('top-date').textContent = longDate(today());
@@ -778,7 +861,8 @@ $('fab').onclick = () => {
   const close = openSheet(el('h3', {}, 'Aggiungi'),
     el('div', { className: 'sheet-actions' },
       el('button', { type: 'button', className: 'btn primary grow', onclick: () => { close(); eventSheet({ date: view === 'calendar' ? calDay : today() }); } }, '📅 Impegno'),
-      el('button', { type: 'button', className: 'btn grow', onclick: () => { close(); taskSheet({ due: view === 'calendar' ? calDay : '' }); } }, '✅ Cosa da fare')));
+      el('button', { type: 'button', className: 'btn grow', onclick: () => { close(); taskSheet({ due: view === 'calendar' ? calDay : '' }); } }, '✅ Cosa da fare')),
+    el('button', { type: 'button', className: 'btn', style: { width: '100%', marginTop: '8px' }, onclick: () => { close(); shiftSheet(view === 'calendar' ? calDay : today()); } }, `🌙 Turni di lavoro (${data.shift?.title ?? 'Cube'})`));
 };
 
 // altri dispositivi possono cambiare i dati: si ricontrolla spesso e quando torni sulla pagina

@@ -27,7 +27,7 @@ import { liveSession } from './core/session.js';
 import { sendTelegram } from './telegram.js';
 import { TelegramNotifier, whenText, fillText } from './core/telegramNotify.js';
 import { Goals } from './core/goals.js';
-import { Schedule, fromLocal } from './core/schedule.js';
+import { Schedule, fromLocal, segmentsToEntries } from './core/schedule.js';
 import { MusicPlayer } from './core/music.js';
 import { scanLibrary } from './musiclib.js';
 import { sanitizeConfig } from './core/schema.js';
@@ -496,6 +496,34 @@ async function publishSchedule(e) {
   schedule.setTwitchId(e.id, seg.id);
   return seg.id;
 }
+// le live che erano già nel calendario di Twitch entrano nella Programmazione (e quindi anche in Howl-UP)
+const SCHEDULE_IMPORTED = path.join(DATA_DIR, 'schedule-imported.json');
+async function importTwitchSchedule() {
+  if (!auth.user) return;
+  const segments = [];
+  let after = '';
+  for (let page = 0; page < 4; page++) {
+    let r;
+    try {
+      r = await helix.request('GET', `/schedule?broadcaster_id=${auth.user.id}&first=25${after ? `&after=${encodeURIComponent(after)}` : ''}`);
+    } catch (err) {
+      if (err.status !== 404) log.warn(`Calendario di Twitch non letto: ${err.message}`); // 404 = calendario vuoto
+      break;
+    }
+    segments.push(...(r.data?.segments ?? []));
+    after = r.pagination?.cursor ?? '';
+    if (!after) break;
+  }
+  let seen = [];
+  try { seen = JSON.parse(fs.readFileSync(SCHEDULE_IMPORTED, 'utf8')).seen ?? []; } catch { /* prima volta */ }
+  const r = segmentsToEntries(schedule.entries, segments, { seen });
+  if (r.seen.length !== seen.length) fs.writeFileSync(SCHEDULE_IMPORTED, JSON.stringify({ seen: r.seen }));
+  if (r.added.length) {
+    schedule.replace([...schedule.entries, ...r.added]);
+    log.info(`Programmazione: aggiunte ${r.added.length} live dal calendario di Twitch`);
+  }
+}
+setInterval(() => importTwitchSchedule().catch(() => {}), 30 * 60000).unref();
 async function unpublishSchedule(twitchId) {
   if (!auth.user || !twitchId) return;
   await helix.request('DELETE', `/schedule/segment?broadcaster_id=${auth.user.id}&id=${encodeURIComponent(twitchId)}`).catch(() => {});
@@ -783,6 +811,7 @@ auth.on('authorized', (user) => {
   auth.startPeriodicValidation();
   creditsScheduler.refresh('accesso');
   loadBadges();
+  importTwitchSchedule().catch(() => {});
   app.broadcastState();
 });
 botAuth.on('authorized', (user) => {

@@ -319,6 +319,7 @@ const server = http.createServer(async (req, res) => {
         const ok = await twitch.deleteLive(m[1]);
         return send(res, ok ? 200 : 404, ok ? { rev, lives: lives() } : { error: 'Live non trovata' });
       }
+      if (route === 'PUT /api/shifts') { const r = agenda.setShifts(await readBody(req)); return send(res, 200, { rev, ...r, shift: agenda.shift }); }
       if (route === 'PUT /api/categories') return send(res, 200, { rev, categories: agenda.saveCategories((await readBody(req)).categories) });
       return send(res, 404, { error: 'Non trovato' });
     }
