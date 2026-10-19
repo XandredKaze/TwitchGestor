@@ -16,7 +16,7 @@ function setup(overrides = {}) {
 
 test('mostra gli alert uno alla volta rispettando durata e pausa tra alert', (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
-  const { m, alerts } = setup();
+  const { m, alerts } = setup({ overlay: { ...config.overlay, alertStyle: 'classic' } });
   m.ingest(fromEventSub('channel.follow', u, 'a'));
   m.ingest(fromEventSub('channel.follow', { ...u, user_name: 'Bea' }, 'b'));
   assert.equal(alerts.length, 1);
@@ -126,4 +126,35 @@ test('stile del riquadro: generale, per tipo e per variante (Brutalism)', () => 
   assert.equal(cheer(100, 's2').alertStyle, 'classic');
   assert.equal(cheer(1000, 's3').alertStyle, 'brutal');
   assert.equal(new NotificationManager({ config: { ...config, overlay: {} } }).buildAlert(fromEventSub('channel.follow', u, 's4')).alertStyle, 'classic');
+});
+
+test('ERRORE_DI_SISTEMA: testi del tipo, durata secondo la scena, Bits e Raid restano classici', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let mode = 'normal';
+  const m = new NotificationManager({ config, sceneMode: () => mode });
+  const alerts = [];
+  m.on('alert', (a) => alerts.push(a));
+  m.ingest(fromEventSub('channel.subscription.gift', { ...u, total: 5, tier: '1000' }, 'g'));
+  const a = alerts[0];
+  assert.equal(a.alertStyle, 'errore');
+  assert.deepEqual([a.errore.title, a.errore.igTitle, a.errore.msg, a.errore.amount, a.errore.user], ['GIFT SUB', 'GRAZIE PER IL REGALO!', 'ha regalato', '5 Sub', 'Anna']);
+  assert.equal(a.errore.icon, '/images/errore/icons/gift.png');
+  assert.equal(a.duration, 14 * 70 + 950 + 6000 + 450);
+  mode = 'ingame';
+  t.mock.timers.tick(a.duration + config.queue.gapMs);
+  m.ingest(fromEventSub('channel.follow', u, 'f'));
+  assert.equal(alerts[1].duration, 1450 + 3500 + 400);
+  assert.equal(m.buildAlert({ id: 'c', type: 'cheer', amount: 100, user: { name: 'A' } }).alertStyle, 'classic');
+});
+
+test('prova dalla tab Alert: ferma quello in corso e parte subito, nel layout scelto', () => {
+  const { m, alerts } = setup();
+  const skipped = [];
+  m.on('skip', (a) => skipped.push(a.id));
+  m.ingest(fromEventSub('channel.follow', u, 'a'));
+  m.test({ id: 't1', type: 'sub', user: { name: 'Prova' }, test: true }, null, { interrupt: true, mode: 'ingame' });
+  assert.deepEqual(skipped, ['a']);
+  assert.equal(alerts.length, 2);
+  assert.equal(alerts[1].errore.mode, 'ingame');
+  m.stop();
 });

@@ -308,7 +308,8 @@ export function createServer(app) {
           const type = url.pathname.slice('/api/test/'.length);
           if (!NOTIFICATION_TYPES.includes(type)) return send(res, 400, { error: `Tipo sconosciuto: ${type}` });
           const body = await readBody(req, 1_000_000);
-          app.manager.test(sampleNotification(type, body.sample), draft(body));
+          // interrupt: ferma l'alert in corso e parte subito; mode: layout di ERRORE_DI_SISTEMA (normale o in-game)
+          app.manager.test(sampleNotification(type, body.sample), draft(body), { interrupt: body.interrupt === true, mode: body.mode });
           return send(res, 200, { ok: true });
         }
         if (route === 'POST /api/preview') {
@@ -664,7 +665,7 @@ export function createServer(app) {
         app.broadcastState();
       });
       const hello = {
-        overlay: () => ({ type: 'hello', build: BUILD_ID, overlay: app.config.get().overlay }),
+        overlay: () => ({ type: 'hello', build: BUILD_ID, overlay: app.config.get().overlay, scene: app.scene?.() ?? null }),
         chat: () => ({ type: 'hello', build: BUILD_ID, settings: app.config.get().chatOverlay, badges: app.chatFeed?.badges ?? {}, messages: app.chatFeed?.messages ?? [] }),
         dashboard: () => ({ type: 'state', state: app.getState() }),
         music: () => ({ ...(app.music?.player.pageState() ?? {}), type: 'hello', build: BUILD_ID }),

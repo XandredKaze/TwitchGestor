@@ -3,6 +3,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { render, templateVars } from './templates.js';
 import { createLogger } from '../logger.js';
+import { ERRORE_TYPES, erroreDuration } from './errore.js';
 
 const log = createLogger('notifiche');
 
@@ -26,9 +27,11 @@ export class NotificationManager extends EventEmitter {
   #paused = false;
   #saveTimer = null;
 
-  constructor({ config, historyFile = null }) {
+  /** sceneMode(): 'ingame' se OBS è su una scena di gioco (lo stile ERRORE_DI_SISTEMA cambia layout e durata). */
+  constructor({ config, historyFile = null, sceneMode = () => 'normal' }) {
     super();
     this.#config = config;
+    this.sceneMode = sceneMode;
     this.#historyFile = historyFile;
     this.history = [];
     this.stats = emptyStats();
@@ -126,7 +129,17 @@ export class NotificationManager extends EventEmitter {
       // stile del riquadro: classico o Brutalism (come il tema di TwitchGestor)
       alertStyle: style.alertStyle || overlay.alertStyle || 'classic',
       label: style.label ?? this.typeConfig(n.type)?.label ?? n.type,
+      ...this.#errore(n, style, overlay, vars),
     };
+  }
+
+  /** Stile ERRORE_DI_SISTEMA: testi, icona e impostazioni grafiche; i tipi senza grafica restano classici. */
+  #errore(n, style, overlay, vars) {
+    if ((style.alertStyle || overlay.alertStyle) !== 'errore') return {};
+    if (!ERRORE_TYPES.includes(n.type) || !style.errore || !overlay.errore) return { alertStyle: 'classic' };
+    const e = style.errore;
+    const texts = Object.fromEntries(['tag', 'tag2', 'title', 'igTitle', 'msg', 'amount'].map((k) => [k, render(e[k] ?? '', vars)]));
+    return { alertStyle: 'errore', errore: { ...texts, icon: e.icon ?? '', color: e.color ?? '#ff2d95', user: vars.user, cfg: { ...overlay.errore } } };
   }
 
   #chatReply(n, cfg) {
@@ -151,6 +164,8 @@ export class NotificationManager extends EventEmitter {
   #next() {
     if (this.#current || this.#paused || this.#queue.length === 0) return;
     const alert = this.#queue.shift();
+    // ERRORE_DI_SISTEMA: la durata dipende dalla scena (normale o in-game) in cui parte
+    if (alert.alertStyle === 'errore' && alert.errore) alert.duration = erroreDuration(alert.errore.cfg, alert.errore.mode ?? this.sceneMode());
     this.#current = alert;
     this.emit('alert', alert);
     this.#emitQueue();
@@ -174,9 +189,19 @@ export class NotificationManager extends EventEmitter {
   }
 
   /** @param draftConfig facoltativo: impostazioni non ancora salvate, per provare un alert dalla dashboard. */
-  test(n, draftConfig) {
+  /**
+   * @param draftConfig facoltativo: impostazioni non ancora salvate, per provare un alert dalla dashboard.
+   * @param opts.interrupt ferma l'alert in corso e parte subito; opts.mode 'normal'|'ingame' forza il layout (ERRORE_DI_SISTEMA)
+   */
+  test(n, draftConfig, { interrupt = false, mode } = {}) {
     const builder = draftConfig ? new NotificationManager({ config: draftConfig }) : this;
-    this.#enqueue(builder.buildAlert(n));
+    const alert = builder.buildAlert(n);
+    if (alert.errore && (mode === 'normal' || mode === 'ingame')) alert.errore.mode = mode;
+    if (interrupt) {
+      this.#queue.unshift(alert);
+      if (this.#current) { this.emit('skip', this.#current); this.#finish(); } else this.#next();
+      this.#emitQueue();
+    } else this.#enqueue(alert);
     this.emit('notification', { ...n, alerted: true });
   }
 

@@ -8,7 +8,10 @@
     'slide-left': 'Entra da destra', 'slide-right': 'Entra da sinistra', zoom: 'Zoom', bounce: 'Rimbalzo',
     flip: 'Ribaltamento', shake: 'Scossa', window: 'Finestra (si apre dall\'alto)',
   };
-  const ALERT_STYLE_LABELS = { classic: 'Classico', brutal: 'Brutalism (come il tema)' };
+  const ALERT_STYLE_LABELS = { classic: 'Classico', brutal: 'Brutalism (come il tema)', errore: 'ERRORE_DI_SISTEMA' };
+  // tipi con la grafica di ERRORE_DI_SISTEMA (Bits e Raid restano classici finché non arrivano le loro)
+  const ERRORE_TYPES = ['sub', 'giftsub', 'follow', 'resub', 'donation', 'redemption'];
+  const ERRORE_HINT = 'ERRORE_DI_SISTEMA ha la sua grafica: testi, icona e colore si cambiano nella sezione "ERRORE_DI_SISTEMA" di ogni alert, colori e tempi in "Impostazioni generali". Font, dimensioni, animazione, immagine e posizione qui sotto non si applicano; suono e messaggio in chat sì. Bits e Raid restano con lo stile Classico finché non arrivano le loro grafiche.';
   const styleOptions = () => Object.entries(ALERT_STYLE_LABELS).map(([value, label]) => ({ value, label }));
   const BRUTAL_HINT = 'Brutalism usa i colori (nero, bianco, lilla) e i font del tema: colori e font qui sotto non si applicano. Dimensioni, animazione e posizione sì. Con l\'animazione "Pop" la finestra si apre dall\'alto.';
   const POSITION_LABELS = {
@@ -301,6 +304,8 @@
 
       t.enabled === false ? el('p', { className: 'notice' }, 'Questo tipo di notifica è ignorato del tutto: non compare né nell\'overlay né nello storico.') : null,
 
+      erroreTypeSection(type, t),
+
       section('Quando mostrarlo',
         checkbox(t, 'alert', 'Mostra l\'alert in OBS (se disattivato, la notifica finisce solo nello storico)'),
         MIN_AMOUNT_TYPES.includes(type) ? field(`Minimo per mostrare l'alert (${amountLabel})`, numberInput(t, 'minAmount', { min: 0 }), { onReset: reset('minAmount') }) : null,
@@ -320,6 +325,7 @@
       section('Aspetto',
         field('Stile del riquadro', select(t, 'alertStyle', styleOptions(), { inheritLabel: `Come generale (${ALERT_STYLE_LABELS[general.alertStyle ?? 'classic']})`, onchange: () => {} })),
         (t.alertStyle ?? general.alertStyle) === 'brutal' ? el('p', { className: 'hint' }, BRUTAL_HINT) : null,
+        (t.alertStyle ?? general.alertStyle) === 'errore' ? el('p', { className: 'hint' }, ERRORE_HINT) : null,
         el('div', { className: 'grid-2' },
           field('Font', fontSelect(t, 'font', `Come generale (${general.font})`)),
           field('Dimensione titolo', range(t, 'titleSize', { min: 14, max: 140, step: 1, fallback: general.titleSize ?? Math.round((t.fontSize ?? general.fontSize) * 1.4), format: (v) => `${v}px` }), { onReset: inheritedReset('titleSize') }),
@@ -402,6 +408,99 @@
       }, isReward ? '＋ Aggiungi ricompensa' : '＋ Aggiungi soglia'));
   }
 
+  // ---------- Stile ERRORE_DI_SISTEMA ----------
+
+  const usesErrore = (type) => ERRORE_TYPES.includes(type) && (draft.types[type]?.alertStyle ?? draft.overlay.alertStyle) === 'errore';
+
+  /** Prova in OBS: ferma l'alert in corso e parte subito, nel layout scelto (anche senza salvare). */
+  function erroreTestButtons(type) {
+    const go = (mode) => api(`/api/test/${type}`, { body: { config: draft, sample: sampleFor(type), interrupt: true, mode } });
+    const preview = (mode) => { previewType = type; $('preview-mode').value = mode; render(); previewNow({ play: true }); };
+    return el('div', { className: 'row', style: { flexWrap: 'wrap', gap: '6px' } },
+      el('button', { type: 'button', onclick: () => preview('normal') }, '▶ Anteprima normale'),
+      el('button', { type: 'button', onclick: () => preview('ingame') }, '▶ Anteprima in-game'),
+      el('button', { type: 'button', onclick: () => go('normal') }, '📺 Prova in OBS: normale'),
+      el('button', { type: 'button', onclick: () => go('ingame') }, '📺 Prova in OBS: in-game'));
+  }
+
+  function erroreTypeSection(type, t) {
+    if (!usesErrore(type) || !t.errore) return null;
+    const e = t.errore;
+    const d = defaults.types[type]?.errore ?? {};
+    const reset = (key) => () => { resetField(e, key, d); markChanged({ rerender: true }); };
+    return section('ERRORE_DI_SISTEMA',
+      el('p', { className: 'hint' }, 'Testi di questo alert nello stile ERRORE_DI_SISTEMA. Se un testo è troppo lungo, il carattere si rimpicciolisce da solo.'),
+      el('div', { className: 'grid-2' },
+        field('Flavour text (prima parte)', textInput(e, 'tag'), { onReset: reset('tag') }),
+        field('Flavour text (seconda parte)', textInput(e, 'tag2'), { onReset: reset('tag2') }),
+        field('Titolo (scena normale)', textInput(e, 'title'), { onReset: reset('title') }),
+        field('Titolo (scena in-game)', textInput(e, 'igTitle'), { onReset: reset('igTitle') }),
+        field('Messaggio (vuoto = niente riga)', textInput(e, 'msg'), { onReset: reset('msg') }),
+        field('Valore in grassetto', textInput(e, 'amount'), { onReset: reset('amount'), hint: 'Arriva dall\'evento, es. {amount} Sub' })),
+      placeholderChips(type),
+      el('div', { className: 'grid-2' },
+        field('Icona', imagePicker(e, 'icon'), { onReset: reset('icon'), hint: 'PNG con fondo trasparente' }),
+        field('Colore dell\'icona (glow e flavour text)', colorInput(e, 'color', d.color ?? '#ff2d95'), { onReset: reset('color') })),
+      erroreTestButtons(type));
+  }
+
+  function erroreGeneralSection() {
+    if (draft.overlay.alertStyle !== 'errore' && !ERRORE_TYPES.some(usesErrore)) return null;
+    const c = draft.overlay.errore;
+    if (!c) return null;
+    const d = defaults.overlay.errore ?? {};
+    const reset = (key) => () => { resetField(c, key, d); markChanged({ rerender: true }); };
+    const px = (v) => `${v}px`;
+    const sec = (v) => `${(v / 1000).toFixed(1)} s`;
+    const scenes = window.TG.obsScenes?.() ?? [];
+    const words = () => String(c.igScenes ?? '').split(',').map((w) => w.trim()).filter(Boolean);
+    const isIg = (name) => words().some((w) => name.toLowerCase().includes(w.toLowerCase()));
+    return section('ERRORE_DI_SISTEMA',
+      el('h3', {}, 'Colori'),
+      el('div', { className: 'grid-2' },
+        field('Bordo, titolo finestra e X', colorInput(c, 'red', d.red), { onReset: reset('red') }),
+        field('Testi pixel di errore', colorInput(c, 'accent', d.accent), { onReset: reset('accent') }),
+        field('Nome dello spettatore', colorInput(c, 'name', d.name), { onReset: reset('name') }),
+        field('Titolo (NUOVO SUB)', colorInput(c, 'title', d.title), { onReset: reset('title') }),
+        field('Sfondo sotto i bit', colorInput(c, 'bg', d.bg), { onReset: reset('bg') }),
+        field('Testo in grassetto', colorInput(c, 'text', d.text), { onReset: reset('text') }),
+        field('Testo del messaggio', colorInput(c, 'muted', d.muted), { onReset: reset('muted') })),
+      el('h3', {}, 'Sfondo ed effetti'),
+      field('Immagine di sfondo (bit)', imagePicker(c, 'bitsImage'), { onReset: reset('bitsImage'), hint: 'Meglio con il fondo trasparente (WEBP o PNG): fuori dal bordo si vedono solo i bit' }),
+      el('div', { className: 'grid-2' },
+        field('Opacità dei bit', range(c, 'bitsOpacity', { min: 0, max: 100, step: 5, scale: 0.01, fallback: 0.6, format: (v) => `${Math.round(v * 100)}%` }), { onReset: reset('bitsOpacity') }),
+        field('Quanto escono i bit ai lati', range(c, 'bitsBleed', { min: 0, max: 80, step: 1, fallback: 24, format: px }), { onReset: reset('bitsBleed') }),
+        field('Chromatic aberration (titolo e icona)', range(c, 'ca', { min: 0, max: 10, step: 0.5, fallback: 3, format: px }), { onReset: reset('ca') }),
+        field('Spostamento rosso/blu del glitch', range(c, 'glitchDx', { min: 0, max: 20, step: 1, fallback: 6, format: px }), { onReset: reset('glitchDx') })),
+      el('h3', {}, 'Tempi'),
+      el('div', { className: 'grid-2' },
+        field('Durata alert normale', range(c, 'holdMs', { min: 1, max: 20, step: 0.5, scale: 1000, fallback: 6000, format: sec }), { onReset: reset('holdMs') }),
+        field('Durata alert in-game', range(c, 'igHoldMs', { min: 1, max: 20, step: 0.5, scale: 1000, fallback: 3500, format: sec }), { onReset: reset('igHoldMs') }),
+        field('Finestre di errore a cascata', range(c, 'windows', { min: 0, max: 30, step: 1, fallback: 14 }), { onReset: reset('windows') }),
+        field('Ritardo tra le finestre', range(c, 'spawnMs', { min: 20, max: 300, step: 10, fallback: 70, format: (v) => `${v} ms` }), { onReset: reset('spawnMs') }),
+        field('Sfalsamento della cascata', range(c, 'offset', { min: 0, max: 60, step: 1, fallback: 20, format: px }), { onReset: reset('offset') })),
+      el('h3', {}, 'Alert in-game (scene di gioco)'),
+      field('Scene in-game: il nome contiene…', textInput(c, 'igScenes'), {
+        onReset: reset('igScenes'), hint: 'Parole separate da virgola (es. game, gioco). Nelle altre scene l\'alert è quello normale.',
+      }),
+      scenes.length ? el('div', { className: 'chips' }, el('span', { className: 'hint' }, 'Le tue scene (tocca per aggiungere o togliere):'),
+        scenes.map((name) => el('button', {
+          type: 'button', className: `chip${isIg(name) ? ' active' : ''}`, title: isIg(name) ? 'In-game' : 'Normale',
+          onclick: () => {
+            const list = words();
+            const next = isIg(name) ? list.filter((w) => !name.toLowerCase().includes(w.toLowerCase())) : [...list, name];
+            c.igScenes = next.join(', ');
+            markChanged({ rerender: true });
+          },
+        }, `${isIg(name) ? '🎮' : '🖥️'} ${name}`))) : el('p', { className: 'hint' }, 'Collega OBS (scheda Live) per scegliere le scene con un tocco.'),
+      el('div', { className: 'grid-2' },
+        field('Larghezza', range(c, 'igW', { min: 400, max: 1920, step: 2, fallback: 966, format: px }), { onReset: reset('igW') }),
+        field('Altezza', range(c, 'igH', { min: 100, max: 400, step: 1, fallback: 163, format: px }), { onReset: reset('igH') }),
+        field('Distanza dal bordo alto', range(c, 'igTop', { min: 0, max: 600, step: 2, fallback: 40, format: px }), { onReset: reset('igTop') })),
+      el('p', { className: 'hint' }, 'In OBS usa un\'unica Sorgente browser dell\'overlay condivisa tra le scene (nelle altre scene: Aggiungi → Sorgente browser → "Aggiungi esistente"): se cambi scena durante un alert, continua nell\'altro layout.'),
+      erroreTestButtons(ERRORE_TYPES.includes(previewType) ? previewType : 'sub'));
+  }
+
   // ---------- Account che scrive in chat ----------
 
   function chatWho() {
@@ -459,6 +558,7 @@
       section('Overlay',
         field('Stile del riquadro', select(o, 'alertStyle', styleOptions(), { onchange: () => {} }), { hint: 'Si sceglie anche dalla scheda Tema.' }),
         (o.alertStyle ?? 'classic') === 'brutal' ? el('p', { className: 'hint' }, BRUTAL_HINT) : null,
+        (o.alertStyle ?? 'classic') === 'errore' ? el('p', { className: 'hint' }, ERRORE_HINT) : null,
         el('div', { className: 'grid-2' },
           field('Posizione sullo schermo', select(o, 'position', Object.entries(POSITION_LABELS).map(([value, label]) => ({ value, label })))),
           field('Animazione', select(o, 'animation', Object.entries(ANIMATION_LABELS).map(([value, label]) => ({ value, label })))),
@@ -469,6 +569,7 @@
           field('Colore del testo', colorInput(o, 'textColor', '#ffffff'), { onReset: reset('textColor') }),
           field('Colore dello sfondo', colorInput(o, 'background', '#121218'), { onReset: reset('background') }),
           field('Opacità dello sfondo', range(o, 'backgroundOpacity', { min: 0, max: 100, step: 5, scale: 0.01, fallback: 0.88, format: (v) => `${Math.round(v * 100)}%` }), { onReset: reset('backgroundOpacity') }))),
+      erroreGeneralSection(),
       section('Coda',
         field('Pausa tra un alert e l\'altro', range(draft.queue, 'gapMs', { min: 0, max: 5, step: 0.1, scale: 1000, fallback: 800, format: (v) => `${(v / 1000).toFixed(1)} s` }))),
       el('div', { id: 'chat-section' }, section('Chat',
@@ -572,6 +673,8 @@
     const data = await api('/api/preview', { body: { type: previewType, config: draft, sample: sampleFor(previewType) }, quiet: true });
     if (!data) return;
     const alert = data.alert;
+    $('preview-mode').hidden = !alert.errore;
+    if (alert.errore) alert.errore.mode = $('preview-mode').value; // ERRORE_DI_SISTEMA: layout normale o in-game
     if (!play) alert.duration = 24 * 3600 * 1000; // resta visibile mentre modifichi
     $('preview').contentWindow?.postMessage({
       type: 'alert', alert, overlay: draft.overlay, silent: !(play && $('preview-sound').checked),
@@ -597,6 +700,7 @@
   });
   $('nav-general').onclick = () => { selected = '__general'; render(); };
   $('btn-replay').onclick = () => previewNow({ play: true });
+  $('preview-mode').onchange = () => previewNow({ play: true });
   $('btn-test-obs').onclick = () => api(`/api/test/${previewType}`, { body: { config: draft, sample: sampleFor(previewType) } });
   $('btn-discard').onclick = () => {
     if (!confirm('Annullare tutte le modifiche non salvate?')) return;

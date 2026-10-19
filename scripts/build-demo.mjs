@@ -65,6 +65,18 @@ for (const file of fs.readdirSync(PUBLIC)) {
   fs.writeFileSync(path.join(OUT, file), text);
 }
 
-const files = fs.readdirSync(OUT);
+// 3. Font e immagini (stile ERRORE_DI_SISTEMA degli alert), con percorsi relativi anche nel codice.
+for (const dir of ['fonts', 'images']) fs.cpSync(path.join(PUBLIC, dir), path.join(OUT, dir), { recursive: true });
+const fixPaths = (file, pairs) => {
+  const f = path.join(OUT, file);
+  let text = fs.readFileSync(f, 'utf8');
+  for (const [a, b] of pairs) text = text.replaceAll(a, b);
+  fs.writeFileSync(f, text);
+};
+fixPaths('demo.js', [['"/images/', '"images/']]);
+fixPaths('alert-errore.js', [['`/${src}`', 'src']]);
+for (const css of fs.readdirSync(OUT).filter((f) => f.endsWith('.css'))) fixPaths(css, [['url(/fonts/', 'url(fonts/'], ['url(/images/', 'url(images/']]);
+
+const files = fs.readdirSync(OUT, { recursive: true }).filter((f) => fs.statSync(path.join(OUT, f)).isFile());
 const size = files.reduce((s, f) => s + fs.statSync(path.join(OUT, f)).size, 0);
 console.log(`Demo pronta in dist-demo/ (${files.length} file, ${Math.round(size / 1024)} KB)`);

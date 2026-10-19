@@ -86,6 +86,15 @@
   function show(alert, { silent = false } = {}) {
     clearTimeout(hideTimer);
     hide(current);
+    window.ErroreAlert?.stop();
+
+    // stile ERRORE_DI_SISTEMA: grafica e animazioni sue (alert-errore.js), stessa coda e stessi suoni
+    if (alert.alertStyle === 'errore' && alert.errore && window.ErroreAlert) {
+      current = null;
+      window.ErroreAlert.play(alert);
+      if (!silent) window.playSound(alert.sound, alert.volume);
+      return;
+    }
 
     const brutal = alert.alertStyle === 'brutal';
     if (!brutal) window.loadFont(alert.font);
@@ -124,7 +133,22 @@
 
   function applySettings(o = {}) {
     stage.className = `pos-${o.position || 'top-center'}`;
+    igWords = o.errore?.igScenes ?? igWords;
   }
+
+  // scena di OBS (ERRORE_DI_SISTEMA: layout normale o in-game). La dà TwitchGestor se è collegato a OBS;
+  // altrimenti la pagina la chiede a OBS stesso (Browser Source condivisa tra le scene).
+  let igWords = 'game';
+  let sceneFromApp = false;
+  const sceneMode = (name) => (String(igWords).split(',').map((w) => w.trim().toLowerCase()).filter(Boolean)
+    .some((w) => String(name ?? '').toLowerCase().includes(w)) ? 'ingame' : 'normal');
+  function applyScene(scene) {
+    if (!scene?.name) return;
+    sceneFromApp = true;
+    window.ErroreAlert?.setMode(scene.mode);
+  }
+  window.addEventListener('obsSceneChanged', (e) => { if (!sceneFromApp) window.ErroreAlert?.setMode(sceneMode(e.detail?.name)); });
+  window.obsstudio?.getCurrentScene?.((s) => { if (s && !sceneFromApp) window.ErroreAlert?.setMode(sceneMode(s.name)); });
 
   if (preview) {
     // Messaggi dalla dashboard: { type: 'alert', alert, overlay, silent }
@@ -146,8 +170,11 @@
         if (build && msg.build && msg.build !== build) { location.reload(); return; }
         build = msg.build;
         applySettings(msg.overlay);
+        applyScene(msg.scene);
       }
+      if (msg.type === 'scene') applyScene(msg.scene);
       if (msg.type === 'alert') show(msg.alert);
+      if (msg.type === 'skip') window.ErroreAlert?.stop(msg.id);
       if (msg.type === 'skip' && current?.dataset.id === msg.id) {
         clearTimeout(hideTimer);
             hide(current);

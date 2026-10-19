@@ -28,6 +28,7 @@ import { sendTelegram } from './telegram.js';
 import { TelegramNotifier, whenText, fillText } from './core/telegramNotify.js';
 import { Goals } from './core/goals.js';
 import { Schedule, fromLocal, segmentsToEntries } from './core/schedule.js';
+import { isIngameScene } from './core/errore.js';
 import { MusicPlayer } from './core/music.js';
 import { scanLibrary } from './musiclib.js';
 import { sanitizeConfig } from './core/schema.js';
@@ -48,9 +49,29 @@ let tailscaleInfo = null; // accesso da fuori casa collegato: { ip, dnsName }
 const publicUrl = (env.PUBLIC_URL || `http://localhost:${port}`).replace(/\/$/, '');
 
 const config = new ConfigStore();
+// Una volta sola (versione 1.34): gli alert passano allo stile ERRORE_DI_SISTEMA, anche se prima ne avevi scelto un altro.
+// Dopo puoi tornare a Classico o Brutalism dalla tab Alert o dalla scheda Tema.
+{
+  const marker = path.join(DATA_DIR, 'alert-style-errore');
+  if (!fs.existsSync(marker)) {
+    try {
+      const c = structuredClone(config.get());
+      c.overlay = { ...c.overlay, alertStyle: 'errore' };
+      for (const t of Object.values(c.types ?? {})) if (t?.errore) delete t.alertStyle;
+      config.save(c);
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(marker, new Date().toISOString());
+    } catch (err) {
+      log.warn(`Stile degli alert non cambiato: ${err.message}`);
+    }
+  }
+}
 config.watch();
 
-const manager = new NotificationManager({ config: config.get(), historyFile: path.join(DATA_DIR, 'history.json') });
+// scena di OBS: nelle scene "di gioco" lo stile ERRORE_DI_SISTEMA usa la barra in alto (più corta)
+const currentScene = () => { try { return obs.current ?? ''; } catch { return ''; } }; // obs si crea più sotto
+const sceneMode = () => (isIngameScene(currentScene(), config.get().overlay?.errore?.igScenes) ? 'ingame' : 'normal');
+const manager = new NotificationManager({ config: config.get(), historyFile: path.join(DATA_DIR, 'history.json'), sceneMode });
 config.on('change', (c) => manager.setConfig(c));
 
 // La voce (text-to-speech) è stata tolta: cancella i file rimasti dalle versioni precedenti.
@@ -608,6 +629,7 @@ const app = {
     library: () => musicLibrary,
     rescan: rescanMusic,
   },
+  scene: () => ({ name: obs.current ?? '', mode: sceneMode() }),
   schedule: {
     state: () => ({ entries: schedule.entries, next: schedule.next(), timezone: TIMEZONE, canPublish: Boolean(auth.user && auth.hasScope('channel:manage:schedule')) }),
     replace(list) {
@@ -727,13 +749,18 @@ manager.on('chat', (text) => {
   sendChat(text).catch((err) => log.warn(`Invio messaggio in chat fallito: ${err.message}`));
 });
 config.on('change', (c) => {
-  web.toOverlays({ type: 'hello', overlay: c.overlay });
+  web.toOverlays({ type: 'hello', overlay: c.overlay, scene: { name: obs.current ?? '', mode: sceneMode() } });
   web.toChat({ type: 'settings', settings: c.chatOverlay });
   app.broadcastState();
 });
 
 obs.on('status', () => app.broadcastState());
-obs.on('scenes', (state) => web.toDashboards({ type: 'obs', obs: state }));
+let lastScene = null;
+obs.on('scenes', (state) => {
+  web.toDashboards({ type: 'obs', obs: state });
+  // l'overlay degli alert segue la scena attiva (ERRORE_DI_SISTEMA: un alert in corso continua nell'altro layout)
+  if (state.current !== lastScene) { lastScene = state.current; web.toOverlays({ type: 'scene', scene: { name: state.current ?? '', mode: sceneMode() } }); }
+});
 // Inizio della diretta: quello di Twitch (come il contatore di Twitch), non quello di OBS.
 // OBS inizia a contare quando parte l'invio del video, che può essere prima che Twitch ti mostri in live.
 const twitchLive = { checkedAt: 0, startedAt: null };

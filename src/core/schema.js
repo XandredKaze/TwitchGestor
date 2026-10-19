@@ -14,7 +14,7 @@ export const POSITIONS = ['top-left', 'top-center', 'top-right', 'center', 'bott
 /** Temi della dashboard (scheda Tema). */
 export const UI_THEMES = ['default', 'brutal'];
 /** Stili degli alert in OBS. */
-export const ALERT_STYLES = ['classic', 'brutal'];
+export const ALERT_STYLES = ['classic', 'brutal', 'errore'];
 export const SOUND_PRESETS = ['chime', 'coin', 'pop', 'fanfare', 'bell', 'levelup', 'laser'];
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -93,6 +93,18 @@ const OVERLAY_FIELDS = {
   backgroundOpacity: num(0, 1),
   animation: oneOf(ANIMATIONS),
   alertStyle: oneOf(ALERT_STYLES),
+};
+
+/** Stile ERRORE_DI_SISTEMA: colori, sfondo a bit, effetti, tempi e misure dell'alert in-game. */
+const ERRORE_FIELDS = {
+  red: color, accent: color, name: color, title: color, bg: color, text: color, muted: color,
+  bitsImage: media, bitsOpacity: num(0, 1), bitsBleed: num(0, 200), ca: num(0, 20), glitchDx: num(0, 40),
+  windows: num(0, 40), spawnMs: num(10, 1000), offset: num(0, 100), holdMs: num(1000, 60000), igHoldMs: num(1000, 60000),
+  igW: num(300, 1920), igH: num(80, 600), igTop: num(0, 1000), igScenes: text(200),
+};
+/** Per ogni tipo: icona, colore dell'icona e testi (con i segnaposto come {amount}). */
+const ERRORE_TYPE_FIELDS = {
+  icon: media, color, tag: text(80), tag2: text(120), title: text(80), igTitle: text(80), msg: text(120), amount: text(80),
 };
 
 function pick(input, fields, base = {}) {
@@ -273,6 +285,7 @@ export function sanitizeConfig(input, defaults) {
   if (!isObject(input)) return out;
 
   out.overlay = pick(input.overlay, OVERLAY_FIELDS, out.overlay);
+  if (out.overlay.errore) out.overlay.errore = pick(input.overlay?.errore, ERRORE_FIELDS, out.overlay.errore);
   if (isObject(input.queue)) out.queue.gapMs = num(0, 10000)(input.queue.gapMs) ?? out.queue.gapMs;
   if (isObject(input.chat)) out.chat.enabled = bool(input.chat.enabled) ?? out.chat.enabled;
   if (out.ui && isObject(input.ui)) out.ui.theme = oneOf(UI_THEMES)(input.ui.theme) ?? out.ui.theme;
@@ -288,6 +301,7 @@ export function sanitizeConfig(input, defaults) {
     const src = input.types?.[type];
     if (!isObject(src)) continue;
     const t = pick(src, TYPE_FIELDS, out.types[type]);
+    if (t.errore) t.errore = pick(src.errore, ERRORE_TYPE_FIELDS, t.errore);
     if (Array.isArray(src.variants)) {
       t.variants = src.variants.slice(0, 20).filter(isObject).map((v) => pick(v, VARIANT_FIELDS));
     }

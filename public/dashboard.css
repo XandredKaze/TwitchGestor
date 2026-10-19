@@ -832,7 +832,7 @@ input, select, textarea { transition: border-color 0.15s, box-shadow 0.15s; }
 .roll-brutal .m-name { width: 30%; height: 6px; background: #e6e6e6; }
 .roll-brutal .m-name:nth-child(3) { width: 24%; }
 /* anteprime dello stile degli alert */
-.alert-classic, .alert-brutal { display: flex !important; align-items: center; justify-content: center; background: linear-gradient(135deg, #3b4a5c, #1d2430); }
+.alert-classic, .alert-brutal, .alert-errore { display: flex !important; align-items: center; justify-content: center; background: linear-gradient(135deg, #3b4a5c, #1d2430); }
 .alert-classic .m-box { display: flex; flex-direction: column; align-items: center; gap: 7px; width: 58%; padding: 12px 0; border-radius: 10px; background: #121218e0; border: 2px solid #9147ff; box-shadow: 0 0 14px #9147ff88; }
 .alert-classic .m-bar { display: none; }
 .alert-classic .m-title { width: 60%; height: 9px; border-radius: 4px; background: #9147ff; }
@@ -841,6 +841,10 @@ input, select, textarea { transition: border-color 0.15s, box-shadow 0.15s; }
 .alert-brutal .m-bar { height: 14px; border-bottom: 2px solid #e6e6e6; background: linear-gradient(#e6e6e6, #e6e6e6) 6px 50% / 22% 3px no-repeat, linear-gradient(#b39bd3, #b39bd3) calc(6px + 26%) 50% / 18% 3px no-repeat, linear-gradient(#e6e6e6, #e6e6e6) calc(100% - 6px) 50% / 6px 6px no-repeat; }
 .alert-brutal .m-title { height: 10px; margin: 9px 10px 7px; background: linear-gradient(#b39bd3, #b39bd3) 0 0 / 30% 100% no-repeat, linear-gradient(#e6e6e6, #e6e6e6) 36% 0 / 45% 100% no-repeat; }
 .alert-brutal .m-name { height: 5px; margin: 0 10px; width: 70%; background: #8a8a8a; }
+.alert-errore .m-box { position: relative; width: 58%; padding: 10px 10px 12px; border: 2px solid #ff2a2a; border-radius: 4px; background: #0b0a0d; box-shadow: 0 0 10px #ff2a2a88, -9px -7px 0 -2px #0b0a0d, -9px -7px 0 0 #ff2a2a, -18px -14px 0 -2px #0b0a0d, -18px -14px 0 0 #ff2a2a; }
+.alert-errore .m-bar { height: 5px; width: 55%; background: #ff2a2a; margin-bottom: 8px; }
+.alert-errore .m-title { height: 10px; width: 80%; background: #eafcff; box-shadow: -2px 0 #ff005ad9, 2px 0 #00e5ffd9; margin-bottom: 6px; }
+.alert-errore .m-name { height: 7px; width: 50%; background: #ff5a4f; }
 
 /* =====================================================================
    TEMA "BRUTALISM" (stile retro-computer): nero carbone con grana,

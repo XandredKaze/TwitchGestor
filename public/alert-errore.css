@@ -1,0 +1,150 @@
+/* Alert "ERRORE_DI_SISTEMA" (grafica di un amico di Xandred): identico alla demo alert.html.
+   Colori, misure ed effetti arrivano dalle impostazioni (tab Alert) come variabili su #errore. */
+@font-face { font-family: 'ES Silkscreen'; src: url(/fonts/silkscreen-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212; }
+@font-face { font-family: 'ES Silkscreen'; src: url(/fonts/silkscreen-latin-ext.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C4, U+A720-A7FF; }
+@font-face { font-family: 'ES Rubik Mono One'; src: url(/fonts/rubikmonoone-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2212; }
+@font-face { font-family: 'ES Rubik Mono One'; src: url(/fonts/rubikmonoone-latin-ext.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1E00-1E9F, U+20A0-20AB, U+20AD-20C4, U+A720-A7FF; }
+@font-face { font-family: 'ES Nunito'; font-weight: 400; src: url(/fonts/nunito-400.woff2) format('woff2'); }
+@font-face { font-family: 'ES Nunito'; font-weight: 800; src: url(/fonts/nunito-800.woff2) format('woff2'); }
+@font-face { font-family: 'ES Nunito'; font-weight: 900; src: url(/fonts/nunito-900.woff2) format('woff2'); }
+
+#errore {
+  --red:    #ff2a2a;
+  --accent: #ec74b4;
+  --icon:   #ff2d95;
+  --name:   #ff5a4f;
+  --title:  #eafcff;
+  --bg:     #0b0a0d;
+  --text:   #ffffff;
+  --muted:  #9a96a3;
+  --bits: url(/images/errore/bits.webp);
+  --bits-opacity: .6;
+  --bits-bleed: 24px;
+  --ca: 3px;
+  --w: 600px;
+  --h: 305px;
+  --ig-w: 966px;
+  --ig-h: 163px;
+  --ig-top: 40px;
+  font-family: 'ES Nunito', 'Nunito', sans-serif;
+  pointer-events: none;
+}
+#errore *, #errore *::before, #errore *::after { box-sizing: border-box; margin: 0; }
+
+#errore #e-stage { position: fixed; left: 50%; top: 50%; width: var(--w); height: var(--h); margin: calc(var(--h) / -2) 0 0 calc(var(--w) / -2); }
+#errore #e-stage[hidden] { display: none; }
+
+/* ===== Finestra (normale e in-game) ===== */
+#errore .win, #errore #e-ig { background: var(--bg); border-radius: 6px; isolation: isolate; }
+#errore .win { position: absolute; inset: 0; }
+/* bordo rosso sopra ai bit */
+#errore .win::after, #errore #e-ig::after {
+  content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  border: 3px solid var(--red); border-radius: inherit;
+  box-shadow: 0 0 10px rgb(255 42 42 / .45), inset 0 0 10px rgb(255 42 42 / .25);
+}
+/* bit di sfondo: escono un po' a destra e sinistra e sfumano */
+#errore .bits {
+  position: absolute; z-index: -1; top: 0; bottom: 0;
+  left: calc(var(--bits-bleed) * -1); right: calc(var(--bits-bleed) * -1);
+  background: var(--bits) center / cover;
+  opacity: var(--bits-opacity);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--bits-bleed), #000 calc(100% - var(--bits-bleed)), transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 var(--bits-bleed), #000 calc(100% - var(--bits-bleed)), transparent);
+}
+#errore .bar {
+  position: absolute; top: 34px; left: 26px; right: 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'ES Silkscreen', monospace; font-size: 22px; letter-spacing: 4px;
+  color: var(--red); text-shadow: 0 0 8px rgb(255 42 42 / .6);
+}
+#errore .x { flex: none; color: var(--red); filter: drop-shadow(0 0 6px rgb(255 42 42 / .6)); }
+#errore .bar .x { width: 30px; height: 30px; }
+#errore .body { position: absolute; inset: 0; }
+
+/* --- contenuto ERRORE (finestre a cascata) --- */
+#errore .err { position: absolute; inset: 70px 0 0; display: flex; align-items: center; gap: 28px; padding: 0 40px; }
+#errore .err-icon {
+  flex: none; width: 120px; height: 120px; border-radius: 50%;
+  background: var(--bg); color: var(--red); border: 4px solid var(--red);
+  display: grid; place-items: center;
+  box-shadow: 0 0 24px rgb(255 42 42 / .6), inset 0 0 14px rgb(255 42 42 / .35);
+}
+#errore .err-icon svg { width: 55%; height: 55%; }
+#errore .err-text { font-family: 'ES Silkscreen', monospace; color: var(--accent); font-size: 26px; line-height: 1.25; letter-spacing: 2px; }
+#errore .err-text small { display: block; color: var(--muted); font-size: 13px; margin-top: 10px; }
+
+/* --- contenuto INFO (finestra finale) --- */
+#errore .info { position: absolute; inset: 0; display: none; }
+#errore .star { position: absolute; left: 24px; top: 150px; width: 84px; }
+/* icone: chromatic aberration fissa + glow del colore dell'icona */
+#errore .icon { filter: drop-shadow(calc(var(--ca) * -1) 0 rgb(255 0 90 / .8)) drop-shadow(var(--ca) 0 rgb(0 229 255 / .8)) drop-shadow(0 0 10px var(--icon)); }
+#errore .info-main { position: absolute; left: 134px; top: 112px; right: 20px; }
+#errore .tag { white-space: nowrap; font-family: 'ES Silkscreen', monospace; font-size: 12px; letter-spacing: 1.5px; color: var(--icon); }
+#errore .tag span + span { margin-left: 12px; }
+#errore .title {
+  margin-top: 14px; white-space: nowrap;
+  font: 400 44px/1 'ES Rubik Mono One', sans-serif; color: var(--title);
+  text-shadow: calc(var(--ca) * -1) 0 rgb(255 0 90 / .85), var(--ca) 0 rgb(0 229 255 / .85), 0 0 14px rgb(255 45 149 / .5);
+}
+#errore .user { margin-top: 8px; font: 900 36px/1.1 'ES Nunito', 'Nunito', sans-serif; color: var(--name); word-break: break-all; }
+#errore .msg { margin-top: 10px; font-size: 15px; color: var(--muted); }
+#errore .msg[hidden] { display: none; }
+#errore .msg b { color: var(--text); font-weight: 800; }
+
+#errore .win.show-info .err  { display: none; }
+#errore .win.show-info .info { display: block; }
+
+/* ===== Animazioni ===== */
+#errore .pop { animation: es-pop .14s steps(3) both; }
+@keyframes es-pop { from { transform: scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
+
+#errore .glitch { animation: es-glitch .55s steps(1) both; }
+/* chromatic aberration: canali rosso e blu sfalsati (filtro SVG #es-ca) */
+#errore .glitch, #errore .out { filter: url(#es-ca); }
+@keyframes es-glitch {
+  0%   { transform: translate(0);          clip-path: inset(0 -40px); }
+  10%  { transform: translate(-10px, 2px); clip-path: inset(10% -40px 60% -40px); }
+  20%  { transform: translate(8px, -3px);  clip-path: inset(50% -40px 20% -40px); }
+  30%  { transform: translate(-5px);       clip-path: inset(0 -40px 80% -40px); }
+  40%  { transform: translate(12px, 3px);  clip-path: inset(70% -40px 5% -40px); }
+  50%  { transform: translate(-7px);       clip-path: inset(30% -40px 40% -40px); }
+  60%  { transform: translate(5px, -2px);  clip-path: inset(0 -40px); }
+  70%  { transform: translate(-12px);      clip-path: inset(85% -40px 0 -40px); }
+  80%  { transform: translate(3px);        clip-path: inset(20% -40px 55% -40px); }
+  90%  { transform: translate(-2px);       clip-path: inset(0 -40px); }
+  100% { transform: translate(0);          clip-path: inset(0 -40px); filter: none; }
+}
+
+#errore .show-info .reveal { animation: es-reveal .35s steps(4) both; }
+#errore .show-info .reveal:nth-child(2) { animation-delay: .1s; }
+#errore .show-info .reveal:nth-child(3) { animation-delay: .2s; }
+#errore .show-info .reveal:nth-child(4) { animation-delay: .3s; }
+@keyframes es-reveal { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+
+#errore .out { animation: es-glitch .45s steps(1) both, es-fade .45s steps(3) both; }
+@keyframes es-fade { to { opacity: 0; } }
+
+/* ===== Alert IN-GAME (barra in alto) ===== */
+#errore #e-ig {
+  position: fixed; top: var(--ig-top); left: 50%;
+  width: var(--ig-w); height: var(--ig-h); margin-left: calc(var(--ig-w) / -2);
+}
+#errore #e-ig[hidden] { display: none; }
+#errore #e-ig::after { border-width: 2px; }
+#errore .ig-c { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 48px 0 34px; }
+#errore .ig-err, #errore .ig-info { display: flex; align-items: center; gap: 30px; flex: 1; }
+#errore .ig-info, #errore #e-ig.show-info .ig-err { display: none; }
+#errore #e-ig.show-info .ig-info { display: flex; }
+#errore .ig-err .err-icon { width: 92px; height: 92px; }
+#errore .ig-err .err-text { font-size: 30px; }
+#errore .ig-star { flex: none; width: 92px; }
+#errore .ig-main { flex: 1; min-width: 0; }
+#errore .ig-main .tag { font-size: 14px; }
+#errore .ig-main .title { margin-top: 10px; font-size: 34px; }
+#errore .ig-main .user { margin-top: 8px; font-size: 34px; }
+#errore .ig-x { width: 56px; height: 56px; }
+#errore .ig-in  { animation: es-ig-in .4s ease-out both; }
+#errore .ig-out { animation: es-ig-out .4s ease-in both; }
+@keyframes es-ig-in  { from { opacity: 0; transform: translateY(-30px); } }
+@keyframes es-ig-out { to   { opacity: 0; transform: translateY(-30px); } }

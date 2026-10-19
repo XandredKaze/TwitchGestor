@@ -14,7 +14,30 @@
     "background": "#121218",
     "backgroundOpacity": 0.88,
     "animation": "pop",
-    "alertStyle": "classic"
+    "alertStyle": "errore",
+    "errore": {
+      "red": "#ff2a2a",
+      "accent": "#ec74b4",
+      "name": "#ff5a4f",
+      "title": "#eafcff",
+      "bg": "#0b0a0d",
+      "text": "#ffffff",
+      "muted": "#9a96a3",
+      "bitsImage": "/images/errore/bits.webp",
+      "bitsOpacity": 0.6,
+      "bitsBleed": 24,
+      "ca": 3,
+      "glitchDx": 6,
+      "windows": 14,
+      "spawnMs": 70,
+      "offset": 20,
+      "holdMs": 6000,
+      "igHoldMs": 3500,
+      "igW": 966,
+      "igH": 163,
+      "igTop": 40,
+      "igScenes": "game"
+    }
   },
   "chat": {
     "enabled": false
@@ -149,7 +172,17 @@
       "color": "#9146ff",
       "title": "Nuovo follower!",
       "text": "{user} ora ti segue ❤️",
-      "chatReply": ""
+      "chatReply": "",
+      "errore": {
+        "icon": "/images/errore/icons/follow.png",
+        "color": "#8ff0b4",
+        "tag": "03XFOLLOW_INIT++",
+        "tag2": "· NUOVO PROCESSO IN ASCOLTO",
+        "title": "NUOVO FOLLOW",
+        "igTitle": "GRAZIE DEL FOLLOW!",
+        "msg": "",
+        "amount": ""
+      }
     },
     "sub": {
       "label": "Abbonamento",
@@ -163,7 +196,17 @@
       "color": "#f5a623",
       "title": "Nuovo abbonato!",
       "text": "{user} si è abbonato (Tier {tier})",
-      "chatReply": "Grazie mille per l'abbonamento {user}! 💜"
+      "chatReply": "Grazie mille per l'abbonamento {user}! 💜",
+      "errore": {
+        "icon": "/images/errore/icons/sub.png",
+        "color": "#ff2d95",
+        "tag": "01XSUB_ADDUSER++",
+        "tag2": "· TROPPO SUPPORTO RILEVATO",
+        "title": "NUOVO SUB",
+        "igTitle": "GRAZIE PER LA SUB!",
+        "msg": "",
+        "amount": ""
+      }
     },
     "resub": {
       "label": "Rinnovo abbonamento",
@@ -183,7 +226,17 @@
           "minAmount": 12,
           "title": "Un anno (o più) insieme! 🎉"
         }
-      ]
+      ],
+      "errore": {
+        "icon": "/images/errore/icons/resub.png",
+        "color": "#5b3be6",
+        "tag": "04XRESUB_LOOP++",
+        "tag2": "· FEDELTÀ OLTRE IL LIMITE",
+        "title": "RESUB",
+        "igTitle": "GRAZIE PER IL RESUB!",
+        "msg": "è abbonato da",
+        "amount": "{months} Mesi"
+      }
     },
     "giftsub": {
       "label": "Abbonamenti regalati",
@@ -203,7 +256,17 @@
           "title": "PIOGGIA DI ABBONAMENTI! 🎁",
           "duration": 10000
         }
-      ]
+      ],
+      "errore": {
+        "icon": "/images/errore/icons/gift.png",
+        "color": "#c95ce8",
+        "tag": "02XGIFT_SPAWN++",
+        "tag2": "· REGALO OTTENUTO NON A NATALE - ERRORE",
+        "title": "GIFT SUB",
+        "igTitle": "GRAZIE PER IL REGALO!",
+        "msg": "ha regalato",
+        "amount": "{amount} Sub"
+      }
     },
     "cheer": {
       "label": "Bits",
@@ -261,7 +324,17 @@
           "title": "💧 Idratati!",
           "text": "{user} ti ricorda di bere un sorso d'acqua"
         }
-      ]
+      ],
+      "errore": {
+        "icon": "/images/errore/icons/points.png",
+        "color": "#2fe84b",
+        "tag": "06XEXP_REDEEM++",
+        "tag2": "· LIVELLO IN OTTENIMENTO...",
+        "title": "RISCATTO",
+        "igTitle": "PREMIO RISCATTATO!",
+        "msg": "ha riscattato",
+        "amount": "{reward}"
+      }
     },
     "donation": {
       "label": "Donazione",
@@ -283,7 +356,17 @@
           "title": "SUPER DONAZIONE! 💸",
           "duration": 12000
         }
-      ]
+      ],
+      "errore": {
+        "icon": "/images/errore/icons/donation.png",
+        "color": "#e8c33a",
+        "tag": "05XDONATE_TX++",
+        "tag2": "· FUNZIONE PAY TO WIN NON TROVATA",
+        "title": "DONAZIONE",
+        "igTitle": "GRAZIE PER LA DONAZIONE!",
+        "msg": "ha donato",
+        "amount": "{amountFormatted}"
+      }
     }
   },
   "moderation": {

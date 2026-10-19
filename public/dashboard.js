@@ -75,6 +75,7 @@
     ? `http://${location.hostname}:${new URL(state.overlayUrl).port || 80}/${page}`
     : state.overlayUrl.replace(/overlay$/, page));
   window.TG.obsUrl = (page) => (state ? obsUrl(page) : '');
+  window.TG.obsScenes = () => (state?.obs?.status === 'connesso' ? state.obs.scenes ?? [] : []); // per la tab Alert (scene in-game)
 
   // TwitchGestor aggiornato (es. sul Raspberry): ricarica la pagina, se non ci sono modifiche non salvate
   let knownBuild = null;
@@ -644,6 +645,7 @@
   const ALERT_THEMES = [
     { id: 'classic', name: 'Classico', desc: 'Riquadro arrotondato con bordo luminoso, nei colori e nel font scelti per ogni alert.' },
     { id: 'brutal', name: 'Brutalism', desc: 'Finestra "// FOLLOW _ ▢ ✕" nero carbone con grana, linee bianche e lilla, titolo a blocchi.' },
+    { id: 'errore', name: 'ERRORE_DI_SISTEMA', desc: 'Finestre di errore rosse a cascata con glitch; nelle scene di gioco una barra in alto. Bits e Raid restano classici.' },
   ];
   let rollTheme = null;
   let alertTheme = null;
