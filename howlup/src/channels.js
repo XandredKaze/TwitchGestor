@@ -17,7 +17,7 @@ export async function sendNtfy({ server, topic }, msg, { ackUrl, openUrl, fetchF
       priority: msg.repeat ? 4 : 3, click: openUrl || undefined, actions,
     }),
     signal: AbortSignal.timeout(15000),
-  });
+  }).catch((err) => { throw new Error(`il Raspberry non raggiunge ${server} (${err.cause?.code ?? err.message})`); });
   if (!res.ok) throw new Error(`ntfy ha risposto ${res.status}`);
 }
 

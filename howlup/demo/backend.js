@@ -71,8 +71,10 @@ const notifier = new Notifier({
   getSettings: notifyView,
   getData: () => ({ ...agenda.state(), events: [...agenda.events, ...livesToEvents(lives)] }),
   store: { load: () => notifyState, save: (d) => { notifyState = d; rev = Date.now(); } },
-  send: () => {},
+  // nella demo non parte niente: si finge che i canali accesi abbiano ricevuto
+  send: (msg) => { const c = notifyView().channels; lastSend = { at: Date.now(), title: msg.title, results: { ...(c.ntfy.enabled ? { ntfy: 'ok' } : {}), ...(c.telegram.enabled ? { telegram: 'Telegram non collegato in TwitchGestor' } : {}) } }; },
 });
+let lastSend = null;
 
 const json = (status, data) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 const realFetch = window.fetch.bind(window);
@@ -108,13 +110,13 @@ window.fetch = async (input, init = {}) => {
       if (typeof body.text === 'string') announcements.update(am[1], { text: body.text });
       return json(200, { rev, draft: await announcements.sendNow(am[1], {}) });
     }
-    if (method === 'GET' && path === '/api/notify') return json(200, { settings: notifyView(), pending: notifier.pending(), linkBase: 'http://twitchgestor.local:3100', telegram: null });
+    if (method === 'GET' && path === '/api/notify') return json(200, { settings: notifyView(), pending: notifier.pending(), linkBase: 'http://twitchgestor.local:3100', last: lastSend, telegram: null });
     if (method === 'PUT' && path === '/api/notify') {
       notifySettings = cleanSettings(body.settings);
       try { localStorage.setItem('howlup-demo-notify', JSON.stringify(notifySettings)); } catch { /* niente */ }
       return json(200, { settings: notifyView() });
     }
-    if (method === 'POST' && path === '/api/notify/test') { await notifier.test(); return json(200, { rev, pending: notifier.pending() }); }
+    if (method === 'POST' && path === '/api/notify/test') { lastSend = null; await notifier.test(); return json(200, { rev, pending: notifier.pending(), last: lastSend }); }
     if (method === 'POST' && path === '/api/notify/ack') { notifier.ack(body.id ? String(body.id) : ''); return json(200, { rev, pending: notifier.pending() }); }
     if (method === 'PUT' && path === '/api/lives') {
       const e = cleanEntry(body.live);

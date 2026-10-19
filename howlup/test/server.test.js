@@ -45,3 +45,15 @@ test('impegni, cose da fare e calendario', async () => {
   const del = await fetch(`${base}/api/events/${r.event.id}`, { method: 'DELETE', headers: h });
   assert.equal(del.status, 200);
 });
+
+test('la prova delle notifiche dice com\'è andata su ogni canale', async () => {
+  const none = await (await fetch(`${base}/api/notify/test`, { method: 'POST', headers: h })).json();
+  assert.deepEqual(none.last.results, {});
+  const { settings } = await (await fetch(`${base}/api/notify`, { headers: h })).json();
+  settings.channels.ntfy = { ...settings.channels.ntfy, enabled: true, server: 'http://127.0.0.1:1' };
+  await fetch(`${base}/api/notify`, { method: 'PUT', headers: h, body: JSON.stringify({ settings }) });
+  const bad = await (await fetch(`${base}/api/notify/test`, { method: 'POST', headers: h })).json();
+  assert.match(bad.last.results.ntfy, /non raggiunge http:\/\/127\.0\.0\.1:1/);
+  const view = await (await fetch(`${base}/api/notify`, { headers: h })).json();
+  assert.equal(view.last.results.ntfy, bad.last.results.ntfy);
+});

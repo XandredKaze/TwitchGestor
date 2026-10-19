@@ -308,6 +308,17 @@ async function loadNotify() {
   notify = await api('/api/notify');
   if (view === 'more') render();
 }
+const CHANNEL_NAMES = { ntfy: '📱 ntfy', telegram: '✈️ Telegram' };
+function lastSendBox(last) {
+  if (!last) return null;
+  const entries = Object.entries(last.results ?? {});
+  const at = new Date(last.at).toLocaleString('it-IT', { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return el('div', { className: `card${entries.some(([, v]) => v !== 'ok') || !entries.length ? ' warn' : ''}`, style: { margin: '10px 0 0' } },
+    el('p', { className: 'small', style: { margin: '0 0 4px' } }, el('b', {}, 'Ultimo invio: '), `${at} – ${last.title}`),
+    entries.length
+      ? el('ul', { className: 'steps small', style: { margin: '0' } }, ...entries.map(([k, v]) => el('li', {}, `${CHANNEL_NAMES[k] ?? k}: ${v === 'ok' ? '✅ partita' : `❌ ${v}`}`)))
+      : el('p', { className: 'small', style: { margin: '0' } }, '❌ Nessun canale acceso: accendi ntfy o Telegram qui sopra.'));
+}
 function notifySection() {
   if (!notify) { loadNotify(); return el('section', { className: 'card' }, el('h2', {}, 'Notifiche'), el('p', { className: 'muted small' }, 'Carico…')); }
   const s = structuredClone(notify.settings);
@@ -356,7 +367,16 @@ function notifySection() {
       sw('✈️ Telegram (chat privata)', () => s.channels.telegram.enabled, (v) => { s.channels.telegram.enabled = v; }),
       el('p', { className: 'hint' }, notify.telegram ? `Usa il bot di TwitchGestor: arriva nella chat "${notify.telegram.name || 'privata'}".` : 'Usa il bot di TwitchGestor: prima collegalo in TwitchGestor → Riepiloghi → Telegram (chat privata).')),
     el('div', { className: 'row', style: { marginTop: '8px' } },
-      el('button', { type: 'button', className: 'btn primary', onclick: async () => { if (await api('/api/notify/test', { method: 'POST' })) { toast('Prova inviata'); load(true); } } }, '🧪 Manda una prova')),
+      el('button', { type: 'button', className: 'btn primary', onclick: async () => {
+        const r = await api('/api/notify/test', { method: 'POST' });
+        if (!r) return;
+        notify.last = r.last;
+        const res = Object.values(r.last?.results ?? {});
+        toast(!res.length ? 'Nessun canale acceso: la prova non è partita' : res.every((x) => x === 'ok') ? 'Prova inviata' : 'Qualcosa non è partito: guarda sotto');
+        load(true);
+        render();
+      } }, '🧪 Manda una prova')),
+    lastSendBox(notify.last),
     el('p', { className: 'hint' }, `I pulsanti delle notifiche aprono: ${notify.linkBase}`));
 }
 

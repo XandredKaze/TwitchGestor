@@ -94,6 +94,7 @@ async function telegramTarget() {
   return tgCache.value;
 }
 let recapCache = { at: 0, value: null };
+let lastSend = null;
 const notifier = new Notifier({
   getSettings: notifyView,
   getData: () => ({ ...agenda.state(), events: [...agenda.events, ...livesToEvents(twitch.state.entries)] }),
@@ -104,11 +105,18 @@ const notifier = new Notifier({
     const s = notifyView();
     const ackUrl = `${linkBase()}/ack/${msg.id}?k=${secrets.ackKey}`;
     const openUrl = `${linkBase()}/#today`;
-    const jobs = [];
-    if (s.channels.ntfy.enabled) jobs.push(sendNtfy(s.channels.ntfy, msg, { ackUrl, openUrl }));
-    if (s.channels.telegram.enabled) jobs.push(telegramTarget().then((t) => sendTelegramMsg(t ?? {}, msg, { ackUrl, openUrl })));
-    const results = await Promise.allSettled(jobs);
-    for (const r of results) if (r.status === 'rejected') log(`Notifica: ${r.reason.message}`);
+    const jobs = {};
+    if (s.channels.ntfy.enabled) jobs.ntfy = sendNtfy(s.channels.ntfy, msg, { ackUrl, openUrl });
+    if (s.channels.telegram.enabled) jobs.telegram = telegramTarget().then((t) => sendTelegramMsg(t ?? {}, msg, { ackUrl, openUrl }));
+    const names = Object.keys(jobs);
+    const settled = await Promise.allSettled(Object.values(jobs));
+    const results = {};
+    settled.forEach((r, i) => {
+      results[names[i]] = r.status === 'fulfilled' ? 'ok' : r.reason.message;
+      if (r.status === 'rejected') log(`Notifica (${names[i]}): ${r.reason.message}`);
+    });
+    // l'esito dell'ultimo invio si vede in Altro → Notifiche (così capisci perché non arriva)
+    lastSend = { at: Date.now(), title: msg.title, results };
   },
 });
 async function notifyTick() {
@@ -249,14 +257,14 @@ const server = http.createServer(async (req, res) => {
       }
       // --- notifiche ---
       if (route === 'GET /api/notify') {
-        return send(res, 200, { settings: notifyView(), pending: notifier.pending(), linkBase: linkBase(), telegram: await telegramTarget().then((t) => (t?.chatId ? { name: t.name } : null)) });
+        return send(res, 200, { settings: notifyView(), pending: notifier.pending(), linkBase: linkBase(), last: lastSend, telegram: await telegramTarget().then((t) => (t?.chatId ? { name: t.name } : null)) });
       }
       if (route === 'PUT /api/notify') {
         notifySettings = cleanSettings((await readBody(req)).settings);
         writeJson(NOTIFY_FILE, notifySettings);
         return send(res, 200, { settings: notifyView() });
       }
-      if (route === 'POST /api/notify/test') { await notifier.test(); return send(res, 200, { rev, pending: notifier.pending() }); }
+      if (route === 'POST /api/notify/test') { lastSend = null; await notifier.test(); return send(res, 200, { rev, pending: notifier.pending(), last: lastSend }); }
       if (route === 'POST /api/notify/ack') {
         const body = await readBody(req);
         notifier.ack(body.id ? String(body.id) : '');
