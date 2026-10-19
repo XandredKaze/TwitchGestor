@@ -14,6 +14,7 @@ import { createTwitchLink } from './twitchgestor.js';
 import { Notifier, cleanSettings } from './core/notifier.js';
 import { sendNtfy, sendTelegramMsg, announceTelegram, announceDiscord } from './channels.js';
 import { Announcements, cleanAnnounceSettings } from './core/announce.js';
+import { createSecureLink } from './secure.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..'); // cartella di TwitchGestor
@@ -29,6 +30,7 @@ if (!process.env.HOWLUP_TEST && fs.existsSync(path.join(ROOT, '.env'))) process.
 const env = process.env;
 const PORT = env.HOWLUP_PORT !== undefined ? Number(env.HOWLUP_PORT) : 3100;
 const HOST = env.HOST || '127.0.0.1';
+const HTTPS_PORT = Number(env.HOWLUP_HTTPS_PORT) || 8443; // https con Tailscale (per installarlo come app)
 const log = (...a) => console.log(new Date().toLocaleTimeString('it-IT'), '[howl-up]', ...a);
 
 fs.mkdirSync(DATA, { recursive: true });
@@ -60,6 +62,10 @@ if (!env.HOWLUP_NO_TWITCH) {
     setInterval(() => twitch.refresh(), 15000).unref();
   })();
 }
+// https con Tailscale: per installare Howl-UP come app (si ricontrolla ogni 5 minuti, se Tailscale si collega dopo)
+const secure = createSecureLink({ port: PORT || 3100, httpsPort: HTTPS_PORT, log });
+if (!env.HOWLUP_TEST) { secure.refresh(); setInterval(() => secure.refresh(), 5 * 60000).unref(); }
+
 const lives = () => ({ ok: twitch.state.ok, error: twitch.state.error, canPublish: twitch.state.canPublish, entries: twitch.state.entries });
 
 // chiave del link del calendario (diversa dalla password: il link finisce nelle app del calendario)
@@ -77,12 +83,13 @@ writeJson(path.join(DATA, 'secrets.json'), secrets);
 // indirizzo per i pulsanti delle notifiche: quello con cui hai aperto Howl-UP l'ultima volta (meglio quello di Tailscale)
 let linkHost = readJson(path.join(DATA, 'link.json'), {}).host ?? '';
 function rememberHost(req) {
-  const host = String(req.headers.host ?? '');
+  const host = hostOf(req);
   if (!/^[\w.-]+(:\d+)?$/.test(host) || /^(localhost|127\.)/.test(host)) return;
   const remote = /^100\.|\.ts\.net/.test(host);
   if (host !== linkHost && (remote || !/^100\.|\.ts\.net/.test(linkHost))) { linkHost = host; writeJson(path.join(DATA, 'link.json'), { host }); }
 }
-const linkBase = () => (linkHost ? `http://${linkHost}` : `http://${env.HOWLUP_LINK_HOST || 'twitchgestor.local'}:${PORT}`);
+// l'indirizzo https di Tailscale (….ts.net:8443) va aperto in https, gli altri in http
+const linkBase = () => (linkHost ? `${/\.ts\.net:\d+$/.test(linkHost) && linkHost.endsWith(`:${HTTPS_PORT}`) ? 'https' : 'http'}://${linkHost}` : `http://${env.HOWLUP_LINK_HOST || 'twitchgestor.local'}:${PORT}`);
 const notifyView = () => {
   const s = cleanSettings(notifySettings);
   if (!s.channels.ntfy.topic) s.channels.ntfy.topic = secrets.ntfyTopic;
@@ -177,7 +184,9 @@ const safeEqual = (a, b) => {
   return x.length === y.length && crypto.timingSafeEqual(x, y);
 };
 const authorized = (req, url) => !env.DASHBOARD_TOKEN || safeEqual(req.headers['x-dashboard-token'] ?? url.searchParams.get('token'), env.DASHBOARD_TOKEN);
-const sameOrigin = (req) => !req.headers.origin || new URL(req.headers.origin).host === req.headers.host;
+// dietro "tailscale serve" (https) la richiesta arriva da 127.0.0.1: il nome vero può stare in X-Forwarded-Host
+const hostOf = (req) => String((/^(::ffff:)?127\.|^::1$/.test(req.socket.remoteAddress ?? '') && req.headers['x-forwarded-host']) || req.headers.host || '');
+const sameOrigin = (req) => !req.headers.origin || [hostOf(req), req.headers.host].includes(new URL(req.headers.origin).host);
 
 function send(res, status, body, headers = {}) {
   const isText = typeof body === 'string';
@@ -256,6 +265,8 @@ const server = http.createServer(async (req, res) => {
         return send(res, ok ? 200 : 404, ok ? { rev } : { error: 'Non trovata' });
       }
       // --- notifiche ---
+      if (route === 'GET /api/install') return send(res, 200, secure.state);
+      if (route === 'POST /api/install/check') return send(res, 200, await secure.refresh());
       if (route === 'GET /api/notify') {
         return send(res, 200, { settings: notifyView(), pending: notifier.pending(), linkBase: linkBase(), last: lastSend, telegram: await telegramTarget().then((t) => (t?.chatId ? { name: t.name } : null)) });
       }

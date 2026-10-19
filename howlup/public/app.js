@@ -291,15 +291,55 @@ function viewMore() {
         el('li', {}, el('b', {}, 'Android: '), 'installa l\'app ', el('b', {}, 'ICSx⁵'), ' (gratis da F-Droid, a pagamento su Google Play), premi ＋ e incolla il link. Gli impegni compaiono in Google Calendar.'),
         el('li', {}, el('b', {}, 'iPhone: '), 'Impostazioni → Calendario → Account → Aggiungi account → Altro → ', el('b', {}, 'Aggiungi calendario sottoscritto'), ' e incolla il link.')),
       el('p', { className: 'muted small' }, 'È facoltativo: Howl-UP funziona anche senza. Fuori casa il calendario si aggiorna quando Tailscale è attivo. Chi ha il link vede i tuoi impegni: non condividerlo.')),
-    el('section', { className: 'card' }, el('h2', {}, 'Come un\'app sul telefono'),
-      el('ol', { className: 'steps small' },
-        el('li', {}, el('b', {}, 'Android (Chrome): '), 'menu ⋮ → ', el('b', {}, 'Aggiungi a schermata Home'), '.'),
-        el('li', {}, el('b', {}, 'iPhone (Safari): '), 'tasto Condividi → ', el('b', {}, 'Aggiungi alla schermata Home'), '.')),
-      el('p', { className: 'muted small' }, 'Compare l\'icona del lupo: un tocco e sei in Howl-UP.')),
-    el('section', { className: 'card' }, el('h2', {}, 'In arrivo'),
-      el('ul', { className: 'steps small' },
-        el('li', {}, '📣 Messaggi pronti per Telegram, Discord e storie Instagram quando cambi una live.'))),
+    installSection(),
     el('div', { className: 'row' }, el('button', { type: 'button', className: 'btn small', onclick: () => { try { localStorage.removeItem('howlupToken'); } catch { /* niente */ } location.reload(); } }, 'Esci da questo dispositivo')))];
+}
+
+// ---------- installare Howl-UP come app (in Altro): serve l'indirizzo https di Tailscale ----------
+let install = null;
+async function loadInstall(check = false) {
+  install = await api(check ? '/api/install/check' : '/api/install', check ? { method: 'POST' } : {});
+  if (view === 'more') render();
+}
+function installSection() {
+  if (!install) { loadInstall(); return el('section', { className: 'card' }, el('h2', {}, 'Come un\'app'), el('p', { className: 'muted small' }, 'Carico…')); }
+  const here = location.protocol === 'https:';
+  const recheck = el('button', { type: 'button', className: 'btn small', onclick: () => { install = null; render(); loadInstall(true); } }, '↻ Ricontrolla');
+  const steps = el('ol', { className: 'steps small' },
+    el('li', {}, el('b', {}, 'Android (Chrome): '), 'menu ⋮ → ', el('b', {}, 'Installa app'), ' (o "Aggiungi a schermata Home" → Installa).'),
+    el('li', {}, el('b', {}, 'Android (Firefox): '), 'menu ⋮ → ', el('b', {}, 'Aggiungi alla schermata Home'), '.'),
+    el('li', {}, el('b', {}, 'iPhone (Safari): '), 'tasto Condividi → ', el('b', {}, 'Aggiungi alla schermata Home'), '.'),
+    el('li', {}, el('b', {}, 'PC (Chrome o Edge): '), 'l\'icona di installazione a destra nella barra dell\'indirizzo.'));
+  let body;
+  if (install.status === 'ok') {
+    body = [
+      here ? el('p', { className: 'small', style: { marginTop: '0' } }, '✅ Sei già sull\'indirizzo giusto: installala da qui.')
+        : el('p', { className: 'small', style: { marginTop: '0' } }, 'Si installa da questo indirizzo (con Tailscale attivo sul dispositivo):'),
+      here ? null : el('div', { className: 'copy' }, el('code', {}, install.url), el('a', { className: 'btn small primary', href: install.url, style: { textDecoration: 'none' } }, 'Apri')),
+      steps,
+      el('p', { className: 'muted small' }, 'Compare l\'icona del lupo: un tocco e sei in Howl-UP. Funziona a casa e fuori, purché Tailscale sia acceso.'),
+    ];
+  } else if (install.status === 'enable') {
+    body = [
+      el('p', { className: 'small', style: { marginTop: '0' } }, 'Per installarla serve l\'indirizzo https (i browser lo chiedono). Tailscale lo dà gratis, ma va attivato una volta per la tua rete:'),
+      el('ol', { className: 'steps small' },
+        el('li', {}, el('a', { href: install.enableUrl, target: '_blank', rel: 'noopener' }, 'Apri questo link di Tailscale'), ' ed entra con il tuo account.'),
+        el('li', {}, 'Premi ', el('b', {}, 'Enable HTTPS'), ' (attiva i certificati https).'),
+        el('li', {}, 'Torna qui e premi "Ricontrolla".')),
+      el('div', { className: 'row' }, recheck),
+    ];
+  } else if (install.status === 'no-tailscale') {
+    body = [
+      el('p', { className: 'small', style: { marginTop: '0' } }, 'I browser permettono di installarla solo da un indirizzo https, e Howl-UP lo prende da Tailscale (gratis). Prima collega Tailscale: TwitchGestor → ⚙ Sistema → ', el('b', {}, 'Accesso da fuori casa'), '.'),
+      el('div', { className: 'row' }, recheck),
+    ];
+  } else if (install.status === 'error') {
+    body = [
+      el('p', { className: 'small', style: { marginTop: '0' } }, `⚠️ Tailscale non ha dato l'indirizzo https: ${install.error}`),
+      el('div', { className: 'row' }, recheck),
+    ];
+  } else body = [el('p', { className: 'muted small' }, 'Controllo Tailscale…'), el('div', { className: 'row' }, recheck)];
+  return el('section', { className: 'card' }, el('h2', {}, 'Come un\'app (telefono e PC)'), ...body);
 }
 
 // ---------- notifiche (in Altro) ----------

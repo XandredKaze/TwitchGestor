@@ -110,6 +110,7 @@ window.fetch = async (input, init = {}) => {
       if (typeof body.text === 'string') announcements.update(am[1], { text: body.text });
       return json(200, { rev, draft: await announcements.sendNow(am[1], {}) });
     }
+    if (path === '/api/install' || path === '/api/install/check') return json(200, { status: 'ok', url: 'https://twitchgestor.tail1234.ts.net:8443', enableUrl: '', error: '' });
     if (method === 'GET' && path === '/api/notify') return json(200, { settings: notifyView(), pending: notifier.pending(), linkBase: 'http://twitchgestor.local:3100', last: lastSend, telegram: null });
     if (method === 'PUT' && path === '/api/notify') {
       notifySettings = cleanSettings(body.settings);

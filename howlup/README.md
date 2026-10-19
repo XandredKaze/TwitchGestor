@@ -4,7 +4,9 @@ L'agenda di Xandred Kaze: impegni di live, lavoro e vita personale, cose da fare
 Gira sullo stesso Raspberry di TwitchGestor, si aggiorna insieme a lui e usa la stessa password.
 
 - **Pagina:** `http://twitchgestor.local:3100` (fuori casa: l'indirizzo `100.x` di Tailscale, porta 3100).
-  Sul telefono: "Aggiungi a schermata Home" e si apre come un'app.
+- **Come app (telefono e PC):** i browser la installano solo da un indirizzo https. Howl-UP lo chiede a Tailscale
+  (`tailscale serve`, gratis, certificato vero): `https://<raspberry>.<rete>.ts.net:8443`, dai dispositivi con
+  Tailscale attivo. La prima volta Tailscale chiede di attivare i certificati https della rete (link in Altro).
 - **Oggi:** prossimo impegno, impegni di oggi e domani, cose da fare in scadenza, prossimi giorni.
 - **Calendario:** mese con i pallini colorati per tipo; tocca un giorno per vedere e aggiungere.
 - **Da fare:** in ritardo, oggi, prossimi giorni, senza scadenza; le cose fatte si tolgono da sole dopo 30 giorni.
