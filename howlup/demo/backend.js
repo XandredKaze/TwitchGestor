@@ -4,6 +4,7 @@
  */
 import { Agenda, toICS, today, addDays, weekday, livesToEvents } from '../src/core/agenda.js';
 import { cleanEntry, generateWeeks } from '../../src/core/schedule.js';
+import { Notifier, cleanSettings } from '../src/core/notifier.js';
 
 const KEY = 'howlup-demo-2';
 const t = today();
@@ -49,6 +50,18 @@ const saveLives = () => { try { localStorage.setItem(LIVE_KEY, JSON.stringify(li
 const livesState = () => ({ ok: true, error: '', canPublish: false, entries: lives });
 const GAMES = ['Just Chatting', 'Elden Ring', 'Minecraft', 'Fortnite', 'Valorant', 'Art', 'Music', 'League of Legends'];
 
+// notifiche: nella demo non partono davvero, ma "Manda una prova" crea quella da confermare
+let notifySettings = {};
+try { notifySettings = JSON.parse(localStorage.getItem('howlup-demo-notify')) ?? {}; } catch { /* niente */ }
+const notifyView = () => { const x = cleanSettings(notifySettings); if (!x.channels.ntfy.topic) x.channels.ntfy.topic = 'howlup-demo00000'; return x; };
+let notifyState = null;
+const notifier = new Notifier({
+  getSettings: notifyView,
+  getData: () => ({ ...agenda.state(), events: [...agenda.events, ...livesToEvents(lives)] }),
+  store: { load: () => notifyState, save: (d) => { notifyState = d; rev = Date.now(); } },
+  send: () => {},
+});
+
 const json = (status, data) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input, init = {}) => {
@@ -63,7 +76,7 @@ window.fetch = async (input, init = {}) => {
   try {
     if (method === 'GET' && path === '/api/state') {
       if (url.searchParams.get('rev') === String(rev)) return json(200, { rev, unchanged: true });
-      return json(200, { rev, ...agenda.state(), lives: livesState(), calendarPath: '/calendar/demo.ics' });
+      return json(200, { rev, ...agenda.state(), lives: livesState(), pending: notifier.pending(), calendarPath: '/calendar/demo.ics' });
     }
     if (method === 'PUT' && path === '/api/events') return json(200, { rev, event: agenda.saveEvent(body.event) });
     let m = /^\/api\/events\/([\w-]+)(\/occurrence)?$/.exec(path);
@@ -72,6 +85,14 @@ window.fetch = async (input, init = {}) => {
     if (method === 'PUT' && path === '/api/tasks') return json(200, { rev, task: agenda.saveTask(body.task) });
     m = /^\/api\/tasks\/([\w-]+)$/.exec(path);
     if (m && method === 'DELETE') return json(200, { rev, ok: agenda.deleteTask(m[1]) });
+    if (method === 'GET' && path === '/api/notify') return json(200, { settings: notifyView(), pending: notifier.pending(), linkBase: 'http://twitchgestor.local:3100', telegram: null });
+    if (method === 'PUT' && path === '/api/notify') {
+      notifySettings = cleanSettings(body.settings);
+      try { localStorage.setItem('howlup-demo-notify', JSON.stringify(notifySettings)); } catch { /* niente */ }
+      return json(200, { settings: notifyView() });
+    }
+    if (method === 'POST' && path === '/api/notify/test') { await notifier.test(); return json(200, { rev, pending: notifier.pending() }); }
+    if (method === 'POST' && path === '/api/notify/ack') { notifier.ack(body.id ? String(body.id) : ''); return json(200, { rev, pending: notifier.pending() }); }
     if (method === 'PUT' && path === '/api/lives') {
       const e = cleanEntry(body.live);
       if (!e) return json(400, { error: 'Servono giorno e ora della live' });

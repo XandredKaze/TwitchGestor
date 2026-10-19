@@ -82,6 +82,19 @@ export function createTwitchLink({ port = 3000, token = '', onChange, log = () =
       return added;
     },
 
+    /** Bot e chat di Telegram impostati in TwitchGestor (per mandare le notifiche di Howl-UP). */
+    async telegram() {
+      const r = await call('/api/config');
+      const t = r.config?.telegram ?? {};
+      return t.token && t.chatId ? { token: t.token, chatId: t.chatId, name: t.chatName || '' } : null;
+    },
+
+    /** L'ultima live finita (riepilogo di TwitchGestor), per il buongiorno. */
+    async lastRecap() {
+      const r = await call('/api/recaps');
+      return r.recaps?.[0] ?? null;
+    },
+
     /** Categorie di Twitch (giochi) per il campo di ricerca. */
     categories: (q) => call(`/api/actions/categories?q=${encodeURIComponent(q)}`),
   };

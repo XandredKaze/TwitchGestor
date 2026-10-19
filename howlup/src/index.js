@@ -11,6 +11,8 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Agenda, toICS, livesToEvents } from './core/agenda.js';
 import { createTwitchLink } from './twitchgestor.js';
+import { Notifier, cleanSettings } from './core/notifier.js';
+import { sendNtfy, sendTelegramMsg } from './channels.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..'); // cartella di TwitchGestor
@@ -19,6 +21,8 @@ const CORE = path.join(HERE, 'core');
 const DATA = process.env.HOWLUP_DATA || path.join(ROOT, 'data', 'howlup');
 const AGENDA_FILE = path.join(DATA, 'agenda.json');
 const KEY_FILE = path.join(DATA, 'calendar-key');
+const NOTIFY_FILE = path.join(DATA, 'notify.json'); // impostazioni delle notifiche
+const NOTIFY_STATE = path.join(DATA, 'notify-state.json'); // cosa è stato mandato e confermato
 
 if (!process.env.HOWLUP_TEST && fs.existsSync(path.join(ROOT, '.env'))) process.loadEnvFile(path.join(ROOT, '.env'));
 const env = process.env;
@@ -61,6 +65,56 @@ const lives = () => ({ ok: twitch.state.ok, error: twitch.state.error, canPublis
 let calendarKey = '';
 try { calendarKey = fs.readFileSync(KEY_FILE, 'utf8').trim(); } catch { /* prima volta */ }
 if (!/^[a-f0-9]{24}$/.test(calendarKey)) { calendarKey = crypto.randomBytes(12).toString('hex'); fs.writeFileSync(KEY_FILE, calendarKey); }
+
+// --- notifiche: buongiorno, riepilogo della settimana, promemoria; si ripetono finché non le confermi ---
+const readJson = (file, def) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return def; } };
+let notifySettings = readJson(NOTIFY_FILE, {});
+const secrets = readJson(path.join(DATA, 'secrets.json'), {});
+if (!/^[a-f0-9]{24}$/.test(secrets.ackKey ?? '')) secrets.ackKey = crypto.randomBytes(12).toString('hex');
+if (!/^howlup-[a-f0-9]{12}$/.test(secrets.ntfyTopic ?? '')) secrets.ntfyTopic = `howlup-${crypto.randomBytes(6).toString('hex')}`;
+writeJson(path.join(DATA, 'secrets.json'), secrets);
+// indirizzo per i pulsanti delle notifiche: quello con cui hai aperto Howl-UP l'ultima volta (meglio quello di Tailscale)
+let linkHost = readJson(path.join(DATA, 'link.json'), {}).host ?? '';
+function rememberHost(req) {
+  const host = String(req.headers.host ?? '');
+  if (!/^[\w.-]+(:\d+)?$/.test(host) || /^(localhost|127\.)/.test(host)) return;
+  const remote = /^100\.|\.ts\.net/.test(host);
+  if (host !== linkHost && (remote || !/^100\.|\.ts\.net/.test(linkHost))) { linkHost = host; writeJson(path.join(DATA, 'link.json'), { host }); }
+}
+const linkBase = () => (linkHost ? `http://${linkHost}` : `http://${env.HOWLUP_LINK_HOST || 'twitchgestor.local'}:${PORT}`);
+const notifyView = () => {
+  const s = cleanSettings(notifySettings);
+  if (!s.channels.ntfy.topic) s.channels.ntfy.topic = secrets.ntfyTopic;
+  return s;
+};
+let tgCache = { at: 0, value: null };
+async function telegramTarget() {
+  if (Date.now() - tgCache.at > 5 * 60000) tgCache = { at: Date.now(), value: await twitch.telegram().catch(() => null) };
+  return tgCache.value;
+}
+let recapCache = { at: 0, value: null };
+const notifier = new Notifier({
+  getSettings: notifyView,
+  getData: () => ({ ...agenda.state(), events: [...agenda.events, ...livesToEvents(twitch.state.entries)] }),
+  getExtra: () => ({ recap: recapCache.value }),
+  store: { load: () => readJson(NOTIFY_STATE, null), save: (d) => { writeJson(NOTIFY_STATE, d); rev = Date.now(); } },
+  log,
+  async send(msg) {
+    const s = notifyView();
+    const ackUrl = `${linkBase()}/ack/${msg.id}?k=${secrets.ackKey}`;
+    const openUrl = `${linkBase()}/#today`;
+    const jobs = [];
+    if (s.channels.ntfy.enabled) jobs.push(sendNtfy(s.channels.ntfy, msg, { ackUrl, openUrl }));
+    if (s.channels.telegram.enabled) jobs.push(telegramTarget().then((t) => sendTelegramMsg(t ?? {}, msg, { ackUrl, openUrl })));
+    const results = await Promise.allSettled(jobs);
+    for (const r of results) if (r.status === 'rejected') log(`Notifica: ${r.reason.message}`);
+  },
+});
+async function notifyTick() {
+  if (Date.now() - recapCache.at > 10 * 60000 && twitch.state.ok) recapCache = { at: Date.now(), value: await twitch.lastRecap().catch(() => recapCache.value) };
+  await notifier.tick().catch((err) => log(`Notifiche: ${err.message}`));
+}
+if (!env.HOWLUP_TEST) setInterval(notifyTick, 30000).unref();
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -110,13 +164,24 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, toICS([...agenda.events, ...livesToEvents(twitch.state.entries)], { categories: agenda.categories }), { 'Content-Type': 'text/calendar; charset=utf-8' });
     }
 
+    // "✅ Ho visto" dalla notifica (ntfy o Telegram): con la chiave delle notifiche, senza password
+    let a = /^\/ack\/([\w-]+)$/.exec(url.pathname);
+    if (a && (req.method === 'GET' || req.method === 'POST')) {
+      if (!safeEqual(url.searchParams.get('k'), secrets.ackKey)) return send(res, 403, 'Link non valido');
+      notifier.ack(a[1]);
+      if (req.method === 'POST') return send(res, 200, { ok: true });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Howl-UP</title><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#121016;color:#ece8f2;font:600 20px system-ui,sans-serif;text-align:center"><div><div style="font-size:56px">✅</div><p>Visto! La notifica non si ripete più.</p><p><a href="/#today" style="color:#e36dc9">Apri Howl-UP</a></p></div></body>');
+    }
+
     if (url.pathname.startsWith('/api/')) {
       if (!authorized(req, url)) return send(res, 401, { error: 'Password mancante o sbagliata' });
+      rememberHost(req);
       if (req.method !== 'GET' && (req.headers['x-howlup'] !== '1' || !sameOrigin(req))) return send(res, 403, { error: 'Richiesta non consentita' });
 
       if (route === 'GET /api/state') {
         if (url.searchParams.get('rev') === String(rev)) return send(res, 200, { rev, unchanged: true });
-        return send(res, 200, { rev, ...agenda.state(), lives: lives(), calendarPath: `/calendar/${calendarKey}.ics` });
+        return send(res, 200, { rev, ...agenda.state(), lives: lives(), pending: notifier.pending(), calendarPath: `/calendar/${calendarKey}.ics` });
       }
       if (route === 'PUT /api/events') return send(res, 200, { rev, event: agenda.saveEvent((await readBody(req)).event) });
       let m = /^\/api\/events\/([\w-]+)(\/occurrence)?$/.exec(url.pathname);
@@ -133,6 +198,21 @@ const server = http.createServer(async (req, res) => {
       if (m && req.method === 'DELETE') {
         const ok = agenda.deleteTask(m[1]);
         return send(res, ok ? 200 : 404, ok ? { rev } : { error: 'Non trovata' });
+      }
+      // --- notifiche ---
+      if (route === 'GET /api/notify') {
+        return send(res, 200, { settings: notifyView(), pending: notifier.pending(), linkBase: linkBase(), telegram: await telegramTarget().then((t) => (t ? { name: t.name } : null)) });
+      }
+      if (route === 'PUT /api/notify') {
+        notifySettings = cleanSettings((await readBody(req)).settings);
+        writeJson(NOTIFY_FILE, notifySettings);
+        return send(res, 200, { settings: notifyView() });
+      }
+      if (route === 'POST /api/notify/test') { await notifier.test(); return send(res, 200, { rev, pending: notifier.pending() }); }
+      if (route === 'POST /api/notify/ack') {
+        const body = await readBody(req);
+        notifier.ack(body.id ? String(body.id) : '');
+        return send(res, 200, { rev, pending: notifier.pending() });
       }
       // --- live (Programmazione di TwitchGestor) ---
       if (route === 'PUT /api/lives') return send(res, 200, { rev, live: await twitch.saveLive((await readBody(req)).live), lives: lives() });

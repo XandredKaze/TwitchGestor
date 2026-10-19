@@ -138,6 +138,20 @@ function quickTask(due = '') {
   }, input, el('button', { type: 'submit' }, 'Aggiungi'));
 }
 
+// notifiche ancora da confermare: si ripetono finché non tocchi "Ho visto"
+function pendingCard() {
+  const list = data.pending ?? [];
+  if (!list.length) return null;
+  const ack = async (id) => { if (await api('/api/notify/ack', { method: 'POST', body: { id } })) { toast('Visto 🐺'); load(true); } };
+  return el('section', { className: 'card pending' },
+    el('h2', {}, `📬 Da confermare (${list.length})`),
+    el('p', { className: 'hint', style: { marginTop: '-4px' } }, 'Queste notifiche si ripetono finché non le segni come viste.'),
+    el('div', { className: 'items' }, list.map((p) => el('details', { className: 'pend' },
+      el('summary', {}, el('span', {}, p.title), el('button', { type: 'button', className: 'btn small primary', onclick: (e) => { e.preventDefault(); ack(p.id); } }, '✅ Ho visto')),
+      el('pre', {}, p.text)))),
+    list.length > 1 ? el('button', { type: 'button', className: 'btn small', style: { marginTop: '10px' }, onclick: () => ack('') }, 'Ho visto tutto') : null);
+}
+
 // TwitchGestor non risponde: le live potrebbero non essere aggiornate
 const tgWarning = () => (data.lives && !data.lives.ok && data.lives.error ? el('div', { className: 'card warn' }, '⚠️ ', data.lives.error) : null);
 
@@ -154,6 +168,7 @@ function viewToday() {
 
   const left = el('div', { className: 'col' },
     tgWarning(),
+    pendingCard(),
     el('div', {}, el('h1', {}, `${greeting()} 🐺`), el('div', { className: 'muted' }, `${todayList.length ? `${todayList.length} ${todayList.length === 1 ? 'impegno' : 'impegni'} oggi` : 'Nessun impegno oggi'}${urgent.length ? ` · ${urgent.length} da fare` : ''}`)),
     next
       ? el('button', { type: 'button', className: 'card next', style: { '--c': colorOf(next.category), textAlign: 'left' }, onclick: () => (next.source === 'twitchgestor' ? liveSheet(next) : eventSheet(next)) },
@@ -263,6 +278,7 @@ function viewMore() {
       el('div', { className: 'row', style: { marginTop: '12px' } },
         el('button', { type: 'button', className: 'btn small', onclick: () => { cats.push({ id: `c${Date.now().toString(36)}`, name: 'Nuova', color: '#9a8fb0', icon: '⭐' }); drawCats(); } }, '＋ Categoria'),
         el('button', { type: 'button', className: 'btn primary small', onclick: async () => { if (await api('/api/categories', { method: 'PUT', body: { categories: cats } })) { toast('Salvate'); load(true); } } }, 'Salva'))),
+    notifySection(),
     el('section', { className: 'card' }, el('h2', {}, 'TwitchGestor'),
       el('p', { className: 'small', style: { margin: '0' } }, data.lives?.ok
         ? `✓ Collegato: le ${data.lives.entries.length} live in programma sono anche qui. Se le cambi qui cambiano anche in TwitchGestor, e viceversa.`
@@ -281,9 +297,66 @@ function viewMore() {
       el('p', { className: 'muted small' }, 'Compare l\'icona del lupo: un tocco e sei in Howl-UP.')),
     el('section', { className: 'card' }, el('h2', {}, 'In arrivo'),
       el('ul', { className: 'steps small' },
-        el('li', {}, '🌅 Buongiorno ogni mattina con impegni, cose da fare e com\'è andata la live.'),
         el('li', {}, '📣 Messaggi pronti per Telegram, Discord e storie Instagram quando cambi una live.'))),
     el('div', { className: 'row' }, el('button', { type: 'button', className: 'btn small', onclick: () => { try { localStorage.removeItem('howlupToken'); } catch { /* niente */ } location.reload(); } }, 'Esci da questo dispositivo')))];
+}
+
+// ---------- notifiche (in Altro) ----------
+let notify = null;
+async function loadNotify() {
+  notify = await api('/api/notify');
+  if (view === 'more') render();
+}
+function notifySection() {
+  if (!notify) { loadNotify(); return el('section', { className: 'card' }, el('h2', {}, 'Notifiche'), el('p', { className: 'muted small' }, 'Carico…')); }
+  const s = structuredClone(notify.settings);
+  const save = async () => { const r = await api('/api/notify', { method: 'PUT', body: { settings: s } }); if (r) { notify.settings = r.settings; toast('Salvato'); render(); } };
+  const sw = (label, get, set) => el('label', { className: 'switch' }, label, el('input', { type: 'checkbox', checked: get(), onchange: (e) => { set(e.target.checked); save(); } }));
+  const timeIn = (get, set) => el('input', { type: 'time', value: get(), onchange: (e) => { if (e.target.value) { set(e.target.value); save(); } } });
+  const sel = (opts, get, set) => { const x = el('select', { onchange: (e) => { set(Number(e.target.value)); save(); } }, ...opts.map(([v, l]) => el('option', { value: String(v) }, l))); x.value = String(get()); return x; };
+  const dayChips = el('div', { className: 'chips' }, ...WEEKDAYS.map((w, i) => el('button', {
+    type: 'button', className: `chip${s.briefing.days.includes(i + 1) ? ' on' : ''}`,
+    onclick: () => { s.briefing.days = s.briefing.days.includes(i + 1) ? s.briefing.days.filter((d) => d !== i + 1) : [...s.briefing.days, i + 1]; save(); },
+  }, w.slice(0, 3))));
+  const topic = s.channels.ntfy.topic;
+  const copy = async (text) => { try { await navigator.clipboard.writeText(text); toast('Copiato'); } catch { toast('Selezionalo e copialo'); } };
+  const noChannel = !s.channels.ntfy.enabled && !s.channels.telegram.enabled;
+  return el('section', { className: 'card notify' }, el('h2', {}, 'Notifiche'),
+    noChannel ? el('p', { className: 'card warn', style: { margin: '0 0 12px' } }, '⚠️ Scegli almeno un canale qui sotto, altrimenti le notifiche non arrivano.') : null,
+    el('div', { className: 'nsec' },
+      sw('🌅 Buongiorno con gli impegni del giorno', () => s.briefing.enabled, (v) => { s.briefing.enabled = v; }),
+      el('div', { className: 'grid2' }, el('label', { className: 'field' }, el('span', {}, 'Alle'), timeIn(() => s.briefing.time, (v) => { s.briefing.time = v; })), el('span')),
+      el('div', { className: 'field' }, el('span', {}, 'Nei giorni'), dayChips)),
+    el('div', { className: 'nsec' },
+      sw('🗓️ Riepilogo della settimana', () => s.weekly.enabled, (v) => { s.weekly.enabled = v; }),
+      el('div', { className: 'grid2' },
+        el('label', { className: 'field' }, el('span', {}, 'Ogni'), sel(WEEKDAYS.map((w, i) => [i + 1, w]), () => s.weekly.day, (v) => { s.weekly.day = v; })),
+        el('label', { className: 'field' }, el('span', {}, 'Alle'), timeIn(() => s.weekly.time, (v) => { s.weekly.time = v; })))),
+    el('div', { className: 'nsec' },
+      sw('⏰ Promemoria prima degli impegni', () => s.reminders.enabled, (v) => { s.reminders.enabled = v; }),
+      el('p', { className: 'hint' }, 'Quanto prima lo scegli in ogni impegno (campo "Promemoria"). Le live hanno 30 minuti.')),
+    el('div', { className: 'nsec' },
+      sw('🔁 Ripeti finché non tocco "Ho visto"', () => s.repeat.enabled, (v) => { s.repeat.enabled = v; }),
+      el('div', { className: 'grid2' },
+        el('label', { className: 'field' }, el('span', {}, 'Ogni'), sel([[5, '5 minuti'], [10, '10 minuti'], [15, '15 minuti'], [30, '30 minuti'], [60, '1 ora'], [120, '2 ore']], () => s.repeat.everyMin, (v) => { s.repeat.everyMin = v; })),
+        el('label', { className: 'field' }, el('span', {}, 'Al massimo'), sel([[2, '2 volte'], [3, '3 volte'], [6, '6 volte'], [10, '10 volte'], [20, '20 volte']], () => s.repeat.maxTimes, (v) => { s.repeat.maxTimes = v; }))),
+      el('div', { className: 'grid2' },
+        el('label', { className: 'field' }, el('span', {}, 'Non di notte: dalle'), timeIn(() => s.repeat.quietFrom, (v) => { s.repeat.quietFrom = v; })),
+        el('label', { className: 'field' }, el('span', {}, 'alle'), timeIn(() => s.repeat.quietTo, (v) => { s.repeat.quietTo = v; })))),
+    el('h2', { style: { marginTop: '18px' } }, 'Dove arrivano'),
+    el('div', { className: 'nsec' },
+      sw('📱 ntfy (notifiche sul telefono)', () => s.channels.ntfy.enabled, (v) => { s.channels.ntfy.enabled = v; }),
+      el('ol', { className: 'steps small' },
+        el('li', {}, 'Installa l\'app gratuita ', el('b', {}, 'ntfy'), ' (Google Play o App Store).'),
+        el('li', {}, 'Nell\'app premi ＋ e scrivi questo nome (è segreto, non condividerlo):', el('div', { className: 'copy', style: { marginTop: '6px' } }, el('code', {}, topic), el('button', { type: 'button', className: 'btn small', onclick: () => copy(topic) }, 'Copia'))),
+        el('li', {}, 'Accendi l\'interruttore qui sopra e premi "Manda una prova".')),
+      el('p', { className: 'hint' }, 'Le notifiche passano dal servizio gratuito ntfy.sh. Il pulsante "✅ Ho visto" funziona quando il telefono raggiunge il Raspberry (a casa o con Tailscale attivo).')),
+    el('div', { className: 'nsec' },
+      sw('✈️ Telegram (chat privata)', () => s.channels.telegram.enabled, (v) => { s.channels.telegram.enabled = v; }),
+      el('p', { className: 'hint' }, notify.telegram ? `Usa il bot di TwitchGestor: arriva nella chat "${notify.telegram.name || 'privata'}".` : 'Usa il bot di TwitchGestor: prima collegalo in TwitchGestor → Riepiloghi → Telegram (chat privata).')),
+    el('div', { className: 'row', style: { marginTop: '8px' } },
+      el('button', { type: 'button', className: 'btn primary', onclick: async () => { if (await api('/api/notify/test', { method: 'POST' })) { toast('Prova inviata'); load(true); } } }, '🧪 Manda una prova')),
+    el('p', { className: 'hint' }, `I pulsanti delle notifiche aprono: ${notify.linkBase}`));
 }
 
 // ---------- fogli: impegno e cosa da fare ----------
@@ -521,6 +594,7 @@ $('nav').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-view]');
   if (!b) return;
   view = b.dataset.view;
+  if (view === 'more') notify = null;
   history.replaceState(null, '', `#${view}`);
   render();
   window.scrollTo({ top: 0 });
