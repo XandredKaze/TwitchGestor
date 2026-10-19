@@ -45,7 +45,7 @@ function showLogin(wrong) {
       const res = await fetch('/api/state', { headers: { 'x-dashboard-token': input.value.trim() } }).catch(() => null);
       if (res?.ok) { try { localStorage.setItem('howlupToken', input.value.trim()); } catch { /* niente */ } location.reload(); } else msg.textContent = res ? 'Password sbagliata.' : 'Howl-UP non raggiungibile.';
     },
-  }, el('div', { className: 'brand' }, el('img', { src: 'icon.svg', alt: '', width: '40', height: '40' }), el('b', {}, 'Howl', el('span', {}, '-UP'))),
+  }, el('div', { className: 'brand' }, el('b', {}, 'Howl', el('span', {}, '-UP'))),
   el('span', {}, 'Scrivi la password (la stessa della dashboard di TwitchGestor). Su questo dispositivo serve una volta sola.'),
   el('div', { className: 'field' }, input), msg,
   el('button', { type: 'submit', className: 'btn primary' }, 'Entra'))));
