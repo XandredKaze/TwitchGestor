@@ -11,7 +11,7 @@ Gira sullo stesso Raspberry di TwitchGestor, si aggiorna insieme a lui e usa la 
 - **Impegni:** tipo (Live, Lavoro, Personale o categorie tue), tutto il giorno o con orario, si ripete
   (ogni giorno, settimana con i giorni scelti, mese, anno, ogni N, fino al), promemoria, note.
   Per gli impegni che si ripetono puoi modificare o eliminare solo un giorno o tutta la serie.
-- **Calendario del telefono:** in Altro c'è un link `.ics` da aggiungere a Google Calendar (con l'app ICSx⁵)
+- **Calendario del telefono:** in Altro c'è un link `.ics` da aggiungere a Google Calendar (con l'app ICSx⁵: gratis da F-Droid, a pagamento su Google Play)
   o al calendario dell'iPhone: impegni e promemoria compaiono lì e si aggiornano da soli.
 
 Dati: `data/howlup/agenda.json` (nelle copie di sicurezza di TwitchGestor). Avvio a mano: `npm run howlup`.
