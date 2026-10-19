@@ -133,7 +133,7 @@ export class NotificationManager extends EventEmitter {
     };
   }
 
-  /** Stile ERRORE_DI_SISTEMA: testi, icona e impostazioni grafiche; i tipi senza grafica restano classici. */
+  /** Stile ERRORE_DI_SISTEMA: testi, icona e impostazioni grafiche; un tipo senza la sua grafica resta classico. */
   #errore(n, style, overlay, vars) {
     if ((style.alertStyle || overlay.alertStyle) !== 'errore') return {};
     if (!ERRORE_TYPES.includes(n.type) || !style.errore || !overlay.errore) return { alertStyle: 'classic' };

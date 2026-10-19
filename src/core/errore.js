@@ -4,8 +4,8 @@
  * (tipi che lo usano, scena in-game, durata); la grafica sta in public/alert-errore.js e .css.
  */
 
-/** Tipi di alert che hanno la grafica di questo stile (Bits e Raid restano classici finché non arrivano le loro). */
-export const ERRORE_TYPES = ['sub', 'giftsub', 'follow', 'resub', 'donation', 'redemption'];
+/** Tipi di alert che hanno la grafica di questo stile (tutti). */
+export const ERRORE_TYPES = ['sub', 'giftsub', 'follow', 'resub', 'donation', 'redemption', 'cheer', 'raid'];
 
 /** "game, gioco" → ['game', 'gioco'] */
 export const sceneWords = (s) => String(s ?? '').split(',').map((w) => w.trim().toLowerCase()).filter(Boolean);

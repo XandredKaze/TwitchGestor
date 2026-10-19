@@ -645,7 +645,7 @@
   const ALERT_THEMES = [
     { id: 'classic', name: 'Classico', desc: 'Riquadro arrotondato con bordo luminoso, nei colori e nel font scelti per ogni alert.' },
     { id: 'brutal', name: 'Brutalism', desc: 'Finestra "// FOLLOW _ ▢ ✕" nero carbone con grana, linee bianche e lilla, titolo a blocchi.' },
-    { id: 'errore', name: 'ERRORE_DI_SISTEMA', desc: 'Finestre di errore rosse a cascata con glitch; nelle scene di gioco una barra in alto. Bits e Raid restano classici.' },
+    { id: 'errore', name: 'ERRORE_DI_SISTEMA', desc: 'Finestre di errore rosse a cascata con glitch; nelle scene di gioco una barra in alto.' },
   ];
   let rollTheme = null;
   let alertTheme = null;

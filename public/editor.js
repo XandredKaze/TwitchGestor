@@ -9,9 +9,9 @@
     flip: 'Ribaltamento', shake: 'Scossa', window: 'Finestra (si apre dall\'alto)',
   };
   const ALERT_STYLE_LABELS = { classic: 'Classico', brutal: 'Brutalism (come il tema)', errore: 'ERRORE_DI_SISTEMA' };
-  // tipi con la grafica di ERRORE_DI_SISTEMA (Bits e Raid restano classici finché non arrivano le loro)
-  const ERRORE_TYPES = ['sub', 'giftsub', 'follow', 'resub', 'donation', 'redemption'];
-  const ERRORE_HINT = 'ERRORE_DI_SISTEMA ha la sua grafica: testi, icona e colore si cambiano nella sezione "ERRORE_DI_SISTEMA" di ogni alert, colori e tempi in "Impostazioni generali". Font, dimensioni, animazione, immagine e posizione qui sotto non si applicano; suono e messaggio in chat sì. Bits e Raid restano con lo stile Classico finché non arrivano le loro grafiche.';
+  // tipi con la grafica di ERRORE_DI_SISTEMA
+  const ERRORE_TYPES = ['sub', 'giftsub', 'follow', 'resub', 'donation', 'redemption', 'cheer', 'raid'];
+  const ERRORE_HINT = 'ERRORE_DI_SISTEMA ha la sua grafica: testi, icona e colore si cambiano nella sezione "ERRORE_DI_SISTEMA" di ogni alert, colori e tempi in "Impostazioni generali". Font, dimensioni, animazione, immagine e posizione qui sotto non si applicano; suono e messaggio in chat sì.';
   const styleOptions = () => Object.entries(ALERT_STYLE_LABELS).map(([value, label]) => ({ value, label }));
   const BRUTAL_HINT = 'Brutalism usa i colori (nero, bianco, lilla) e i font del tema: colori e font qui sotto non si applicano. Dimensioni, animazione e posizione sì. Con l\'animazione "Pop" la finestra si apre dall\'alto.';
   const POSITION_LABELS = {

@@ -128,7 +128,7 @@ test('stile del riquadro: generale, per tipo e per variante (Brutalism)', () => 
   assert.equal(new NotificationManager({ config: { ...config, overlay: {} } }).buildAlert(fromEventSub('channel.follow', u, 's4')).alertStyle, 'classic');
 });
 
-test('ERRORE_DI_SISTEMA: testi del tipo, durata secondo la scena, Bits e Raid restano classici', (t) => {
+test('ERRORE_DI_SISTEMA: testi del tipo, durata secondo la scena, anche Bits e Raid', (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   let mode = 'normal';
   const m = new NotificationManager({ config, sceneMode: () => mode });
@@ -144,7 +144,10 @@ test('ERRORE_DI_SISTEMA: testi del tipo, durata secondo la scena, Bits e Raid re
   t.mock.timers.tick(a.duration + config.queue.gapMs);
   m.ingest(fromEventSub('channel.follow', u, 'f'));
   assert.equal(alerts[1].duration, 1450 + 3500 + 400);
-  assert.equal(m.buildAlert({ id: 'c', type: 'cheer', amount: 100, user: { name: 'A' } }).alertStyle, 'classic');
+  const bits = m.buildAlert({ id: 'c', type: 'cheer', amount: 100, user: { name: 'A' } });
+  assert.deepEqual([bits.alertStyle, bits.errore.tag, bits.errore.amount, bits.errore.icon], ['errore', '200xPARTICLES_GENERATOR();', '100 Bits', '/images/errore/icons/bits.png']);
+  const raid = m.buildAlert({ id: 'r', type: 'raid', amount: 1, user: { name: 'B' } });
+  assert.deepEqual([raid.errore.title, raid.errore.amount], ['RAID', '1 spettatore']);
 });
 
 test('prova dalla tab Alert: ferma quello in corso e parte subito, nel layout scelto', () => {

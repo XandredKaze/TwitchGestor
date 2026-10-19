@@ -288,7 +288,17 @@
           "title": "PIOGGIA DI BITS! 💎",
           "duration": 9000
         }
-      ]
+      ],
+      "errore": {
+        "icon": "/images/errore/icons/bits.png",
+        "color": "#f78ad8",
+        "tag": "200xPARTICLES_GENERATOR();",
+        "tag2": "- PERDITA DI PACCHETTI IN CORSO....",
+        "title": "BITS",
+        "igTitle": "GRAZIE PER I BITS!",
+        "msg": "ha inviato",
+        "amount": "{amount} Bits"
+      }
     },
     "raid": {
       "label": "Raid",
@@ -302,7 +312,17 @@
       "color": "#e91916",
       "title": "RAID!",
       "text": "{user} arriva con {amount} spettator{amount|e|i}!",
-      "chatReply": "Benvenuti raiders di {user}! Andate a seguirlo su twitch.tv/{login} 🚀"
+      "chatReply": "Benvenuti raiders di {user}! Andate a seguirlo su twitch.tv/{login} 🚀",
+      "errore": {
+        "icon": "/images/errore/icons/raid.png",
+        "color": "#fbab2c",
+        "tag": "032xRAID_APROACHING",
+        "tag2": "- Accesso Trojan Consentito",
+        "title": "RAID",
+        "igTitle": "BENVENUTI RAIDERS!",
+        "msg": "arriva con",
+        "amount": "{amount} spettator{amount|e|i}"
+      }
     },
     "redemption": {
       "label": "Punti canale",
