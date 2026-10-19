@@ -14,7 +14,12 @@ Gira sullo stesso Raspberry di TwitchGestor, si aggiorna insieme a lui e usa la 
 - **Calendario del telefono:** in Altro c'è un link `.ics` da aggiungere a Google Calendar (con l'app ICSx⁵: gratis da F-Droid, a pagamento su Google Play)
   o al calendario dell'iPhone: impegni e promemoria compaiono lì e si aggiornano da soli.
 
+- **Live di TwitchGestor:** le live della Programmazione compaiono nell'agenda (🔴 Live · 🎮 gioco · da TwitchGestor).
+  Toccandone una la modifichi (giorno, ora, durata, titolo, categoria di Twitch, titolo automatico) e cambia anche
+  in TwitchGestor e, se era pubblicata, sul calendario di Twitch. Una live nuova creata in Howl-UP (tipo "Live",
+  una volta o ogni settimana) va direttamente nella Programmazione. Le modifiche fatte in TwitchGestor arrivano
+  in Howl-UP entro 15 secondi. Le live restano salvate solo in TwitchGestor: le due app non vanno mai in disaccordo.
+
 Dati: `data/howlup/agenda.json` (nelle copie di sicurezza di TwitchGestor). Avvio a mano: `npm run howlup`.
 
-In arrivo: le live di TwitchGestor dentro Howl-UP (modificabili dalle due parti), buongiorno e riepiloghi
-automatici, messaggi pronti per Telegram, Discord e storie Instagram.
+In arrivo: buongiorno e riepiloghi automatici, messaggi pronti per Telegram, Discord e storie Instagram.

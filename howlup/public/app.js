@@ -1,5 +1,5 @@
 // Howl-UP: la pagina (telefono e PC). I dati stanno sul Raspberry; qui si mostrano e si modificano.
-import { occurrences, repeatText, today, addDays, parseDate, dateKey, weekday, WEEKDAYS, FREQS } from './core/agenda.js';
+import { occurrences, repeatText, today, addDays, parseDate, dateKey, weekday, WEEKDAYS, FREQS, livesToEvents } from './core/agenda.js';
 
 const $ = (id) => document.getElementById(id);
 function el(tag, attrs = {}, ...children) {
@@ -61,7 +61,9 @@ function toast(text) {
 }
 
 // ---------- dati ----------
-let data = { rev: 0, categories: [], events: [], tasks: [], calendarPath: '' };
+let data = { rev: 0, categories: [], events: [], tasks: [], lives: { ok: false, entries: [] }, calendarPath: '' };
+// gli impegni di Howl-UP più le live in programma in TwitchGestor
+const allEvents = () => [...data.events, ...livesToEvents(data.lives?.entries)];
 let view = location.hash.slice(1) || 'today';
 let calMonth = today().slice(0, 7);
 let calDay = today();
@@ -73,7 +75,7 @@ async function load(force = false) {
   render();
 }
 const cat = (id) => data.categories.find((c) => c.id === id);
-const colorOf = (id) => cat(id)?.color ?? 'var(--accent)';
+const colorOf = (id) => cat(id)?.color ?? (id === 'live' ? '#e36dc9' : 'var(--accent)');
 
 // ---------- formati ----------
 const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
@@ -100,11 +102,14 @@ const greeting = () => { const h = new Date().getHours(); return h < 6 ? 'Buonan
 function itemRow(o) {
   const c = cat(o.category);
   const past = o.day === today() && !o.allDay && toMin(o.endTime || o.time) < nowMin();
-  return el('button', { type: 'button', className: `item${past ? ' past' : ''}`, style: { '--c': colorOf(o.category) }, onclick: () => eventSheet(o) },
+  const fromTg = o.source === 'twitchgestor';
+  return el('button', { type: 'button', className: `item${past ? ' past' : ''}`, style: { '--c': colorOf(o.category) }, onclick: () => (fromTg ? liveSheet(o) : eventSheet(o)) },
     el('span', { className: 't' }, o.allDay ? 'tutto il giorno' : o.time, o.endTime ? el('small', {}, o.endTime) : null),
     el('span', { className: 'bar' }),
     el('span', { className: 'what' }, el('b', {}, o.title),
-      el('span', {}, [c ? `${c.icon} ${c.name}` : '', o.repeat?.freq !== 'none' ? `↻ ${repeatText(o)}` : ''].filter(Boolean).join(' · '))));
+      el('span', {}, (fromTg
+        ? [`${c?.icon ?? '🔴'} Live`, o.game ? `🎮 ${o.game}` : '', 'da TwitchGestor']
+        : [c ? `${c.icon} ${c.name}` : '', o.repeat?.freq !== 'none' ? `↻ ${repeatText(o)}` : '']).filter(Boolean).join(' · '))));
 }
 
 function taskRow(t) {
@@ -133,10 +138,13 @@ function quickTask(due = '') {
   }, input, el('button', { type: 'submit' }, 'Aggiungi'));
 }
 
+// TwitchGestor non risponde: le live potrebbero non essere aggiornate
+const tgWarning = () => (data.lives && !data.lives.ok && data.lives.error ? el('div', { className: 'card warn' }, '⚠️ ', data.lives.error) : null);
+
 // ---------- viste ----------
 function viewToday() {
   const t = today();
-  const list = occurrences(data.events, t, addDays(t, 7));
+  const list = occurrences(allEvents(), t, addDays(t, 7));
   const todayList = list.filter((o) => o.day === t);
   const next = todayList.find((o) => o.allDay ? false : toMin(o.endTime || o.time) >= nowMin()) ?? list.find((o) => o.day > t);
   const open = data.tasks.filter((x) => !x.done);
@@ -145,9 +153,10 @@ function viewToday() {
   const later = list.filter((o) => o.day > addDays(t, 1));
 
   const left = el('div', { className: 'col' },
+    tgWarning(),
     el('div', {}, el('h1', {}, `${greeting()} 🐺`), el('div', { className: 'muted' }, `${todayList.length ? `${todayList.length} ${todayList.length === 1 ? 'impegno' : 'impegni'} oggi` : 'Nessun impegno oggi'}${urgent.length ? ` · ${urgent.length} da fare` : ''}`)),
     next
-      ? el('button', { type: 'button', className: 'card next', style: { '--c': colorOf(next.category), textAlign: 'left' }, onclick: () => eventSheet(next) },
+      ? el('button', { type: 'button', className: 'card next', style: { '--c': colorOf(next.category), textAlign: 'left' }, onclick: () => (next.source === 'twitchgestor' ? liveSheet(next) : eventSheet(next)) },
         el('div', { className: 'label' }, next.day === t ? 'Prossimo' : 'Prossimo impegno'),
         el('div', { className: 'title' }, `${cat(next.category)?.icon ?? ''} ${next.title}`),
         el('div', { className: 'when' }, `${relDay(next.day)}${next.allDay ? ', tutto il giorno' : ` alle ${next.time}`}`),
@@ -181,7 +190,7 @@ function viewCalendar() {
   const first = `${calMonth}-01`;
   const start = addDays(first, -(weekday(first) - 1));
   const end = addDays(start, 41);
-  const occ = occurrences(data.events, start, end);
+  const occ = occurrences(allEvents(), start, end);
   const byDay = new Map();
   for (const o of occ) byDay.set(o.day, [...(byDay.get(o.day) ?? []), o]);
   const shift = (n) => { const d = new Date(y, m - 1 + n, 1, 12); calMonth = dateKey(d).slice(0, 7); render(); };
@@ -197,9 +206,10 @@ function viewCalendar() {
     }, String(parseDate(d).getDate()),
     el('span', { className: 'dots' }, items.slice(0, 4).map((o) => el('i', { style: { '--c': colorOf(o.category) } })))));
   }
-  const dayList = byDay.get(calDay) ?? occurrences(data.events, calDay, calDay);
+  const dayList = byDay.get(calDay) ?? occurrences(allEvents(), calDay, calDay);
   const dayTasks = data.tasks.filter((x) => x.due === calDay);
   return [
+    tgWarning(),
     el('section', { className: 'card' },
       el('div', { className: 'cal-head' },
         el('button', { type: 'button', className: 'btn small', onclick: () => shift(-1), 'aria-label': 'Mese prima' }, '‹'),
@@ -253,6 +263,10 @@ function viewMore() {
       el('div', { className: 'row', style: { marginTop: '12px' } },
         el('button', { type: 'button', className: 'btn small', onclick: () => { cats.push({ id: `c${Date.now().toString(36)}`, name: 'Nuova', color: '#9a8fb0', icon: '⭐' }); drawCats(); } }, '＋ Categoria'),
         el('button', { type: 'button', className: 'btn primary small', onclick: async () => { if (await api('/api/categories', { method: 'PUT', body: { categories: cats } })) { toast('Salvate'); load(true); } } }, 'Salva'))),
+    el('section', { className: 'card' }, el('h2', {}, 'TwitchGestor'),
+      el('p', { className: 'small', style: { margin: '0' } }, data.lives?.ok
+        ? `✓ Collegato: le ${data.lives.entries.length} live in programma sono anche qui. Se le cambi qui cambiano anche in TwitchGestor, e viceversa.`
+        : `⚠️ ${data.lives?.error || 'Non collegato'}`)),
     el('section', { className: 'card' }, el('h2', {}, 'Sull\'app Calendario del telefono'),
       el('p', { className: 'small', style: { marginTop: '0' } }, 'Con questo link gli impegni compaiono anche nel calendario del telefono, con i promemoria, e si aggiornano da soli.'),
       el('div', { className: 'copy' }, el('code', {}, calUrl), copyBtn),
@@ -267,7 +281,6 @@ function viewMore() {
       el('p', { className: 'muted small' }, 'Compare l\'icona del lupo: un tocco e sei in Howl-UP.')),
     el('section', { className: 'card' }, el('h2', {}, 'In arrivo'),
       el('ul', { className: 'steps small' },
-        el('li', {}, '🔗 Le live di TwitchGestor qui dentro, modificabili da tutte e due le parti.'),
         el('li', {}, '🌅 Buongiorno ogni mattina con impegni, cose da fare e com\'è andata la live.'),
         el('li', {}, '📣 Messaggi pronti per Telegram, Discord e storie Instagram quando cambi una live.'))),
     el('div', { className: 'row' }, el('button', { type: 'button', className: 'btn small', onclick: () => { try { localStorage.removeItem('howlupToken'); } catch { /* niente */ } location.reload(); } }, 'Esci da questo dispositivo')))];
@@ -302,9 +315,13 @@ function eventSheet(o = {}) {
   const title = el('input', { type: 'text', className: 'title-input', placeholder: 'Cosa devi fare?', value: e.title, maxlength: '140' });
   let category = e.category;
   const catChips = el('div', { className: 'chips' });
-  const drawCats = () => catChips.replaceChildren(...data.categories.map((c) => el('button', {
-    type: 'button', className: `chip${c.id === category ? ' on' : ''}`, style: { '--c': c.color }, onclick: () => { category = c.id; drawCats(); },
-  }, `${c.icon} ${c.name}`)));
+  const liveHint = el('p', { className: 'hint' }, '🔴 Le live nuove si salvano nella Programmazione di TwitchGestor: lì titolo e categoria si impostano da soli prima della live.');
+  const drawCats = () => {
+    catChips.replaceChildren(...data.categories.map((c) => el('button', {
+      type: 'button', className: `chip${c.id === category ? ' on' : ''}`, style: { '--c': c.color }, onclick: () => { category = c.id; drawCats(); },
+    }, `${c.icon} ${c.name}`)));
+    liveHint.hidden = Boolean(existing) || category !== 'live' || !data.lives?.ok;
+  };
   drawCats();
   const date = el('input', { type: 'date', value: existing && e.repeat.freq !== 'none' ? day : e.date });
   const allDay = el('input', { type: 'checkbox', checked: e.allDay });
@@ -346,7 +363,7 @@ function eventSheet(o = {}) {
   const close = openSheet(
     el('h3', {}, existing ? 'Modifica impegno' : 'Nuovo impegno'),
     title,
-    el('div', { className: 'field' }, el('span', {}, 'Tipo'), catChips),
+    el('div', { className: 'field' }, el('span', {}, 'Tipo'), catChips, liveHint),
     el('label', { className: 'field' }, el('span', {}, 'Giorno'), date),
     el('label', { className: 'switch' }, 'Tutto il giorno', allDay),
     times,
@@ -373,6 +390,12 @@ function eventSheet(o = {}) {
           const next = collect();
           if (!next.title.trim()) { title.focus(); toast('Scrivi cosa devi fare'); return; }
           let r;
+          // una live nuova va nella Programmazione di TwitchGestor (una sola o più settimane)
+          if (!existing && category === 'live' && data.lives?.ok && ['none', 'weekly'].includes(next.repeat.freq)) {
+            r = await saveAsLive(next);
+            if (r) { close(); toast(next.repeat.freq === 'weekly' ? `Live create: ${r.added}` : 'Live salvata in TwitchGestor'); load(true); }
+            return;
+          }
           if (existing && existing.repeat.freq !== 'none') {
             const scope = await chooseScope('Salvare le modifiche per…');
             if (!scope) return;
@@ -383,6 +406,70 @@ function eventSheet(o = {}) {
         },
       }, 'Salva')));
   if (!existing) setTimeout(() => title.focus(), 50);
+}
+
+const durOf = (e) => (e.allDay || !e.endTime ? 120 : Math.max(15, toMin(e.endTime) - toMin(e.time)));
+function saveAsLive(e) {
+  const time = e.allDay ? '21:00' : e.time;
+  if (e.repeat.freq === 'weekly') {
+    const weeks = e.repeat.until ? Math.min(12, Math.ceil((parseDate(e.repeat.until) - parseDate(e.date)) / (7 * 86400000)) + 1) : 8;
+    return api('/api/lives/weeks', { method: 'POST', body: { from: e.date, weeks, days: e.repeat.days, time, durationMin: durOf(e), title: e.title } });
+  }
+  return api('/api/lives', { method: 'PUT', body: { live: { start: `${e.date}T${time}`, durationMin: durOf(e), title: e.title, notes: e.notes } } });
+}
+
+/** Una live della Programmazione di TwitchGestor: si modifica qui e cambia anche lì. */
+function liveSheet(o) {
+  const entry = data.lives.entries.find((x) => x.id === o.liveId) ?? {};
+  const title = el('input', { type: 'text', className: 'title-input', placeholder: 'Titolo della live', value: entry.title ?? '', maxlength: '140' });
+  const date = el('input', { type: 'date', value: o.date });
+  const time = el('input', { type: 'time', value: o.time });
+  const DUR = [60, 90, 120, 150, 180, 240, 300, 360];
+  const dur = el('select', {}, ...DUR.map((m) => el('option', { value: String(m) }, m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`)));
+  dur.value = String(DUR.includes(o.durationMin) ? o.durationMin : 120);
+  let game = { id: entry.gameId ?? '', name: entry.game ?? '' };
+  const gameInput = el('input', { type: 'text', value: game.name, placeholder: 'Cerca un gioco o una categoria…', autocomplete: 'off' });
+  const results = el('div', { className: 'chips' });
+  let t = 0;
+  gameInput.oninput = () => {
+    clearTimeout(t);
+    game = { id: '', name: gameInput.value };
+    t = setTimeout(async () => {
+      const q = gameInput.value.trim();
+      if (!q) { results.replaceChildren(); return; }
+      const r = await api(`/api/lives/categories?q=${encodeURIComponent(q)}`);
+      results.replaceChildren(...(r?.categories ?? []).slice(0, 8).map((c) => el('button', {
+        type: 'button', className: 'chip', onclick: () => { game = { id: c.id, name: c.name }; gameInput.value = c.name; results.replaceChildren(); },
+      }, c.name)));
+    }, 350);
+  };
+  const auto = el('input', { type: 'checkbox', checked: entry.autoTitle !== false });
+  const notes = el('textarea', { placeholder: 'Note (solo per te)', maxlength: '300' });
+  notes.value = entry.notes ?? '';
+  const close = openSheet(
+    el('h3', {}, '🔴 Live in programma'),
+    el('p', { className: 'hint', style: { margin: '0' } }, `Salvata nella Programmazione di TwitchGestor${entry.twitchId ? ' e sul calendario di Twitch' : ''}: se la cambi qui, cambia anche lì.`),
+    title,
+    el('div', { className: 'grid2' }, el('label', { className: 'field' }, el('span', {}, 'Giorno'), date), el('label', { className: 'field' }, el('span', {}, 'Ora'), time)),
+    el('label', { className: 'field' }, el('span', {}, 'Durata'), dur),
+    el('label', { className: 'field' }, el('span', {}, 'Categoria su Twitch'), gameInput), results,
+    el('label', { className: 'switch' }, 'Imposta da solo titolo e categoria 10 minuti prima', auto),
+    notes,
+    el('div', { className: 'sheet-actions' },
+      el('button', {
+        type: 'button', className: 'btn danger',
+        onclick: async () => { if (!confirm(`Eliminare la live "${entry.title || 'Live'}" anche da TwitchGestor?`)) return; if (await api(`/api/lives/${entry.id}`, { method: 'DELETE' })) { close(); toast('Live eliminata'); load(true); } },
+      }, 'Elimina'),
+      el('span', { className: 'grow' }),
+      el('button', { type: 'button', className: 'btn', onclick: () => close() }, 'Annulla'),
+      el('button', {
+        type: 'button', className: 'btn primary',
+        onclick: async () => {
+          if (!date.value || !time.value) { toast('Scegli giorno e ora'); return; }
+          const live = { ...entry, start: `${date.value}T${time.value}`, durationMin: Number(dur.value), title: title.value, game: game.name, gameId: game.id, notes: notes.value, autoTitle: auto.checked };
+          if (await api('/api/lives', { method: 'PUT', body: { live } })) { close(); toast('Live aggiornata anche in TwitchGestor'); load(true); }
+        },
+      }, 'Salva')));
 }
 
 function taskSheet(t = {}) {

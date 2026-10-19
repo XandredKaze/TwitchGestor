@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'howlup-'));
-Object.assign(process.env, { HOWLUP_TEST: '1', HOWLUP_DATA: dir, HOWLUP_PORT: '0', DASHBOARD_TOKEN: 'pw', HOST: '127.0.0.1' });
+Object.assign(process.env, { HOWLUP_NO_TWITCH: '1', HOWLUP_TEST: '1', HOWLUP_DATA: dir, HOWLUP_PORT: '0', DASHBOARD_TOKEN: 'pw', HOST: '127.0.0.1' });
 let base;
 let srv;
 before(async () => {

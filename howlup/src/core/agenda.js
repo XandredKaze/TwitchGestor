@@ -263,3 +263,21 @@ export class Agenda {
     this.onChange?.();
   }
 }
+
+/**
+ * Le live della Programmazione di TwitchGestor come impegni di Howl-UP (si modificano da qui ma restano
+ * salvate in TwitchGestor). entry: { id, start: "2026-10-20T21:00", durationMin, title, game, notes, autoTitle, twitchId }
+ */
+export function livesToEvents(entries = []) {
+  return entries.filter((e) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(e?.start ?? ''))).map((e) => {
+    const [h, m] = e.start.slice(11).split(':').map(Number);
+    const end = h * 60 + m + (Number(e.durationMin) || 120);
+    return {
+      id: `tg-${e.id}`, liveId: e.id, source: 'twitchgestor',
+      title: e.title || 'Live', category: 'live', date: e.start.slice(0, 10), time: e.start.slice(11),
+      endTime: end < 24 * 60 ? `${pad(Math.floor(end / 60))}:${pad(end % 60)}` : '', durationMin: Number(e.durationMin) || 120,
+      allDay: false, notes: e.notes ?? '', remindMin: 30, repeat: { freq: 'none' }, skip: [],
+      game: e.game ?? '', gameId: e.gameId ?? '', autoTitle: e.autoTitle !== false, published: Boolean(e.twitchId),
+    };
+  });
+}

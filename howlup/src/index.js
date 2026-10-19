@@ -9,7 +9,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { Agenda, toICS } from './core/agenda.js';
+import { Agenda, toICS, livesToEvents } from './core/agenda.js';
+import { createTwitchLink } from './twitchgestor.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..'); // cartella di TwitchGestor
@@ -39,6 +40,22 @@ const agenda = new Agenda({
   onChange: () => { rev = Date.now(); },
 });
 agenda.cleanupDone();
+
+// live in programma: stanno nella Programmazione di TwitchGestor (stesso Raspberry)
+const twitch = createTwitchLink({
+  port: Number(env.PORT) || 3000,
+  token: env.DASHBOARD_TOKEN ?? '',
+  onChange: () => { rev = Date.now(); },
+  log,
+});
+if (!env.HOWLUP_NO_TWITCH) {
+  // all'avvio TwitchGestor potrebbe non essere ancora pronto (partono insieme): si riprova ogni 3 secondi
+  (async () => {
+    for (let i = 0; i < 40 && !(await twitch.refresh()).ok; i++) await new Promise((r) => setTimeout(r, 3000));
+    setInterval(() => twitch.refresh(), 15000).unref();
+  })();
+}
+const lives = () => ({ ok: twitch.state.ok, error: twitch.state.error, canPublish: twitch.state.canPublish, entries: twitch.state.entries });
 
 // chiave del link del calendario (diversa dalla password: il link finisce nelle app del calendario)
 let calendarKey = '';
@@ -90,7 +107,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname.startsWith('/core/')) return serveFile(res, CORE, url.pathname.slice(6));
     // calendario per le app (Google Calendar, iPhone, ICSx⁵): link con una chiave sua
     if (req.method === 'GET' && url.pathname === `/calendar/${calendarKey}.ics`) {
-      return send(res, 200, toICS(agenda.events, { categories: agenda.categories }), { 'Content-Type': 'text/calendar; charset=utf-8' });
+      return send(res, 200, toICS([...agenda.events, ...livesToEvents(twitch.state.entries)], { categories: agenda.categories }), { 'Content-Type': 'text/calendar; charset=utf-8' });
     }
 
     if (url.pathname.startsWith('/api/')) {
@@ -99,7 +116,7 @@ const server = http.createServer(async (req, res) => {
 
       if (route === 'GET /api/state') {
         if (url.searchParams.get('rev') === String(rev)) return send(res, 200, { rev, unchanged: true });
-        return send(res, 200, { rev, ...agenda.state(), calendarPath: `/calendar/${calendarKey}.ics` });
+        return send(res, 200, { rev, ...agenda.state(), lives: lives(), calendarPath: `/calendar/${calendarKey}.ics` });
       }
       if (route === 'PUT /api/events') return send(res, 200, { rev, event: agenda.saveEvent((await readBody(req)).event) });
       let m = /^\/api\/events\/([\w-]+)(\/occurrence)?$/.exec(url.pathname);
@@ -116,6 +133,15 @@ const server = http.createServer(async (req, res) => {
       if (m && req.method === 'DELETE') {
         const ok = agenda.deleteTask(m[1]);
         return send(res, ok ? 200 : 404, ok ? { rev } : { error: 'Non trovata' });
+      }
+      // --- live (Programmazione di TwitchGestor) ---
+      if (route === 'PUT /api/lives') return send(res, 200, { rev, live: await twitch.saveLive((await readBody(req)).live), lives: lives() });
+      if (route === 'POST /api/lives/weeks') return send(res, 200, { rev, added: (await twitch.addWeeks(await readBody(req))).length, lives: lives() });
+      if (route === 'GET /api/lives/categories') return send(res, 200, await twitch.categories(url.searchParams.get('q') ?? ''));
+      m = /^\/api\/lives\/([\w-]+)$/.exec(url.pathname);
+      if (m && req.method === 'DELETE') {
+        const ok = await twitch.deleteLive(m[1]);
+        return send(res, ok ? 200 : 404, ok ? { rev, lives: lives() } : { error: 'Live non trovata' });
       }
       if (route === 'PUT /api/categories') return send(res, 200, { rev, categories: agenda.saveCategories((await readBody(req)).categories) });
       return send(res, 404, { error: 'Non trovato' });
