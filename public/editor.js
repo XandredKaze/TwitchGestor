@@ -453,8 +453,8 @@
     const px = (v) => `${v}px`;
     const sec = (v) => `${(v / 1000).toFixed(1)} s`;
     const scenes = window.TG.obsScenes?.() ?? [];
-    const words = () => String(c.igScenes ?? '').split(',').map((w) => w.trim()).filter(Boolean);
-    const isIg = (name) => words().some((w) => name.toLowerCase().includes(w.toLowerCase()));
+    const words = () => String(c.normalScenes ?? '').split(',').map((w) => w.trim()).filter(Boolean);
+    const isNormal = (name) => words().some((w) => name.toLowerCase().includes(w.toLowerCase()));
     return section('ERRORE_DI_SISTEMA',
       el('h3', {}, 'Colori'),
       el('div', { className: 'grid-2' },
@@ -479,20 +479,25 @@
         field('Finestre di errore a cascata', range(c, 'windows', { min: 0, max: 30, step: 1, fallback: 14 }), { onReset: reset('windows') }),
         field('Ritardo tra le finestre', range(c, 'spawnMs', { min: 20, max: 300, step: 10, fallback: 70, format: (v) => `${v} ms` }), { onReset: reset('spawnMs') }),
         field('Sfalsamento della cascata', range(c, 'offset', { min: 0, max: 60, step: 1, fallback: 20, format: px }), { onReset: reset('offset') })),
-      el('h3', {}, 'Alert in-game (scene di gioco)'),
-      field('Scene in-game: il nome contiene…', textInput(c, 'igScenes'), {
-        onReset: reset('igScenes'), hint: 'Parole separate da virgola (es. game, gioco). Nelle altre scene l\'alert è quello normale.',
+      el('h3', {}, 'Scene: alert normale o in-game'),
+      field('Scene con l\'alert normale (il nome contiene…)', textInput(c, 'normalScenes'), {
+        onReset: reset('normalScenes'),
+        hint: 'Nomi delle scene separati da virgola (basta una parte del nome, es. chatting, pausa). In tutte le altre scene l\'alert è quello in-game. Se non ne scegli nessuna, è sempre quello normale.',
       }),
-      scenes.length ? el('div', { className: 'chips' }, el('span', { className: 'hint' }, 'Le tue scene (tocca per aggiungere o togliere):'),
-        scenes.map((name) => el('button', {
-          type: 'button', className: `chip${isIg(name) ? ' active' : ''}`, title: isIg(name) ? 'In-game' : 'Normale',
-          onclick: () => {
-            const list = words();
-            const next = isIg(name) ? list.filter((w) => !name.toLowerCase().includes(w.toLowerCase())) : [...list, name];
-            c.igScenes = next.join(', ');
-            markChanged({ rerender: true });
-          },
-        }, `${isIg(name) ? '🎮' : '🖥️'} ${name}`))) : el('p', { className: 'hint' }, 'Collega OBS (scheda Live) per scegliere le scene con un tocco.'),
+      scenes.length ? el('div', { className: 'chips' }, el('span', { className: 'hint' }, 'Le tue scene: tocca quelle in cui vuoi l\'alert normale.'),
+        scenes.map((name) => {
+          const normal = isNormal(name);
+          const ingame = !normal && words().length > 0;
+          return el('button', {
+            type: 'button', className: `chip${normal ? ' active' : ''}`, title: normal ? 'Alert normale' : ingame ? 'Alert in-game' : 'Alert normale (nessuna scena scelta)',
+            onclick: () => {
+              const list = words();
+              c.normalScenes = (normal ? list.filter((w) => !name.toLowerCase().includes(w.toLowerCase())) : [...list, name]).join(', ');
+              markChanged({ rerender: true });
+            },
+          }, `${ingame ? '🎮' : '🖥️'} ${name}`);
+        })) : el('p', { className: 'hint' }, 'Collega OBS (scheda Live) per scegliere le scene con un tocco.'),
+      el('h3', {}, 'Barra in-game'),
       el('div', { className: 'grid-2' },
         field('Larghezza', range(c, 'igW', { min: 400, max: 1920, step: 2, fallback: 966, format: px }), { onReset: reset('igW') }),
         field('Altezza', range(c, 'igH', { min: 100, max: 400, step: 1, fallback: 163, format: px }), { onReset: reset('igH') }),

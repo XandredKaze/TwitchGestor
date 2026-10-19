@@ -68,9 +68,9 @@ const config = new ConfigStore();
 }
 config.watch();
 
-// scena di OBS: nelle scene "di gioco" lo stile ERRORE_DI_SISTEMA usa la barra in alto (più corta)
+// scena di OBS: fuori dalle scene scelte per l'alert normale, ERRORE_DI_SISTEMA usa la barra in alto (più corta)
 const currentScene = () => { try { return obs.current ?? ''; } catch { return ''; } }; // obs si crea più sotto
-const sceneMode = () => (isIngameScene(currentScene(), config.get().overlay?.errore?.igScenes) ? 'ingame' : 'normal');
+const sceneMode = () => (isIngameScene(currentScene(), config.get().overlay?.errore?.normalScenes) ? 'ingame' : 'normal');
 const manager = new NotificationManager({ config: config.get(), historyFile: path.join(DATA_DIR, 'history.json'), sceneMode });
 config.on('change', (c) => manager.setConfig(c));
 

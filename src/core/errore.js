@@ -10,10 +10,14 @@ export const ERRORE_TYPES = ['sub', 'giftsub', 'follow', 'resub', 'donation', 'r
 /** "game, gioco" → ['game', 'gioco'] */
 export const sceneWords = (s) => String(s ?? '').split(',').map((w) => w.trim().toLowerCase()).filter(Boolean);
 
-/** Una scena è "in-game" se il nome contiene una delle parole scelte. */
-export function isIngameScene(name, words) {
+/**
+ * Scene scelte per l'alert normale (nome o parte del nome): tutte le altre sono "in-game".
+ * Finché non ne scegli nessuna (o OBS non dice la scena) l'alert è sempre quello normale.
+ */
+export function isIngameScene(name, normalScenes) {
   const n = String(name ?? '').toLowerCase();
-  return Boolean(n) && sceneWords(words).some((w) => n.includes(w));
+  const words = sceneWords(normalScenes);
+  return Boolean(n) && words.length > 0 && !words.some((w) => n.includes(w));
 }
 
 /** Quanto dura tutto l'alert (entrata + attesa + uscita), come nell'animazione della pagina. */

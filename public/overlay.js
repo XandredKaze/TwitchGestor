@@ -133,15 +133,19 @@
 
   function applySettings(o = {}) {
     stage.className = `pos-${o.position || 'top-center'}`;
-    igWords = o.errore?.igScenes ?? igWords;
+    normalWords = o.errore?.normalScenes ?? normalWords;
   }
 
   // scena di OBS (ERRORE_DI_SISTEMA: layout normale o in-game). La dà TwitchGestor se è collegato a OBS;
   // altrimenti la pagina la chiede a OBS stesso (Browser Source condivisa tra le scene).
-  let igWords = 'game';
+  // come in src/core/errore.js: alert normale nelle scene scelte, in-game in tutte le altre
+  let normalWords = '';
   let sceneFromApp = false;
-  const sceneMode = (name) => (String(igWords).split(',').map((w) => w.trim().toLowerCase()).filter(Boolean)
-    .some((w) => String(name ?? '').toLowerCase().includes(w)) ? 'ingame' : 'normal');
+  const sceneMode = (name) => {
+    const words = String(normalWords).split(',').map((w) => w.trim().toLowerCase()).filter(Boolean);
+    const n = String(name ?? '').toLowerCase();
+    return n && words.length && !words.some((w) => n.includes(w)) ? 'ingame' : 'normal';
+  };
   function applyScene(scene) {
     if (!scene?.name) return;
     sceneFromApp = true;

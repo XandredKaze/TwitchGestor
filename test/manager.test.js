@@ -161,3 +161,12 @@ test('prova dalla tab Alert: ferma quello in corso e parte subito, nel layout sc
   assert.equal(alerts[1].errore.mode, 'ingame');
   m.stop();
 });
+
+test('scene: alert normale solo in quelle scelte, in-game in tutte le altre', async () => {
+  const { isIngameScene } = await import('../src/core/errore.js');
+  assert.equal(isIngameScene('Elden Ring', ''), false); // nessuna scelta: sempre normale
+  assert.equal(isIngameScene('Just Chatting', 'chatting, pausa'), false);
+  assert.equal(isIngameScene('Pausa 2', 'chatting, pausa'), false);
+  assert.equal(isIngameScene('Elden Ring', 'chatting, pausa'), true);
+  assert.equal(isIngameScene('', 'chatting'), false); // OBS non collegato
+});

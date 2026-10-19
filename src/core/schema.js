@@ -100,7 +100,7 @@ const ERRORE_FIELDS = {
   red: color, accent: color, name: color, title: color, bg: color, text: color, muted: color,
   bitsImage: media, bitsOpacity: num(0, 1), bitsBleed: num(0, 200), ca: num(0, 20), glitchDx: num(0, 40),
   windows: num(0, 40), spawnMs: num(10, 1000), offset: num(0, 100), holdMs: num(1000, 60000), igHoldMs: num(1000, 60000),
-  igW: num(300, 1920), igH: num(80, 600), igTop: num(0, 1000), igScenes: text(200),
+  igW: num(300, 1920), igH: num(80, 600), igTop: num(0, 1000), normalScenes: text(600),
 };
 /** Per ogni tipo: icona, colore dell'icona e testi (con i segnaposto come {amount}). */
 const ERRORE_TYPE_FIELDS = {
