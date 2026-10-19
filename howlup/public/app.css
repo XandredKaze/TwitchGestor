@@ -15,6 +15,11 @@
     color-scheme: light;
   }
 }
+:root[data-theme="light"] {
+    --bg: #f5f2f9; --panel: #ffffff; --inset: #f0ebf6; --border: #e0d8ea;
+    --text: #1d1a24; --muted: #6c6479; --accent: #7c5cc4; --pink: #c94ba9; --danger: #d6334a; --ok: #23915f;
+    color-scheme: light;
+}
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); }
 body { font: 16px/1.45 'Nunito Local', 'Nunito', system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
