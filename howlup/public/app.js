@@ -720,7 +720,7 @@ function render() {
   badge.textContent = data.announce || '';
   const v = $('view');
   v.className = `view${view === 'today' || view === 'calendar' ? ' two' : ''}`;
-  v.replaceChildren(...parts);
+  v.replaceChildren(...parts.filter(Boolean)); // senza i pezzi vuoti (altrimenti compare "null")
 }
 
 $('nav').addEventListener('click', (e) => {
