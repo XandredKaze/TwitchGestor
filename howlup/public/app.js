@@ -1,4 +1,5 @@
 // Howl-UP: la pagina (telefono e PC). I dati stanno sul Raspberry; qui si mostrano e si modificano.
+import { drawStory } from './story.js';
 import { occurrences, repeatText, today, addDays, parseDate, dateKey, weekday, WEEKDAYS, FREQS, livesToEvents } from './core/agenda.js';
 
 const $ = (id) => document.getElementById(id);
@@ -359,6 +360,95 @@ function notifySection() {
     el('p', { className: 'hint' }, `I pulsanti delle notifiche aprono: ${notify.linkBase}`));
 }
 
+// ---------- annunci per la community ----------
+let ann = null;
+let iconImg = null;
+const loadIcon = () => new Promise((resolve) => {
+  if (iconImg) return resolve(iconImg);
+  const img = new Image();
+  img.onload = () => { iconImg = img; resolve(img); };
+  img.onerror = () => resolve(null);
+  img.src = document.querySelector('.brand img')?.src ?? 'icon.svg';
+});
+async function loadAnnounce() {
+  ann = await api('/api/announce');
+  if (view === 'announce') render();
+}
+const STATUS = { draft: 'Da inviare', sent: 'Inviato', dismissed: 'Ignorato' };
+function draftCard(d) {
+  const canvas = el('canvas', { className: 'story', 'aria-label': 'Storia Instagram' });
+  loadIcon().then((icon) => drawStory(canvas, d, { login: ann?.login, icon }));
+  const text = el('textarea', { rows: '7', maxlength: '3500', disabled: d.status !== 'draft' });
+  text.value = d.text;
+  text.onchange = () => api(`/api/announce/${d.id}/text`, { method: 'POST', body: { text: text.value } });
+  const mins = d.sendAt ? Math.max(0, Math.ceil((d.sendAt - Date.now()) / 60000)) : null;
+  const res = Object.entries(d.results ?? {}).map(([k, v]) => `${k === 'telegram' ? 'Telegram' : 'Discord'}: ${v === 'ok' ? '✓ inviato' : `✕ ${v}`}`).join(' · ');
+  const download = () => canvas.toBlob((b) => {
+    const a = el('a', { href: URL.createObjectURL(b), download: `storia-${d.kind}-${(d.lives?.[0]?.start ?? '').slice(0, 10)}.png` });
+    document.body.append(a); a.click(); a.remove();
+  }, 'image/png');
+  return el('section', { className: `card draft ${d.status}` },
+    el('div', { className: 'draft-head' },
+      el('b', {}, d.title),
+      el('span', { className: `badge-s ${d.status}` }, STATUS[d.status] ?? d.status),
+      el('span', { className: 'muted small' }, new Date(d.createdAt).toLocaleString('it-IT', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))),
+    mins !== null && d.status === 'draft' ? el('div', { className: 'card warn auto' }, `⏳ Si invia da solo tra ${mins} min (solo testo).`,
+      el('button', { type: 'button', className: 'btn small', onclick: async () => { if (await api(`/api/announce/${d.id}/hold`, { method: 'POST' })) loadAnnounce(); } }, 'Ferma')) : null,
+    el('div', { className: 'draft-body' },
+      el('div', { className: 'story-box' }, canvas),
+      el('div', { className: 'col' },
+        el('label', { className: 'field' }, el('span', {}, 'Messaggio per Telegram e Discord'), text),
+        res ? el('p', { className: 'hint' }, res) : null,
+        el('div', { className: 'row' },
+          d.status === 'draft' ? el('button', {
+            type: 'button', className: 'btn primary',
+            onclick: async (e) => {
+              e.target.disabled = true;
+              const image = canvas.toDataURL('image/png');
+              const r = await api(`/api/announce/${d.id}/send`, { method: 'POST', body: { text: text.value, image } });
+              e.target.disabled = false;
+              if (r) { toast(r.draft.status === 'sent' ? 'Inviato 📣' : 'Non inviato: guarda il messaggio sotto'); loadAnnounce(); }
+            },
+          }, '📤 Invia con la storia') : null,
+          el('button', { type: 'button', className: 'btn', onclick: download }, '⬇ Storia Instagram'),
+          el('button', { type: 'button', className: 'btn', onclick: async () => { try { await navigator.clipboard.writeText(text.value); toast('Testo copiato'); } catch { toast('Selezionalo e copialo'); } } }, 'Copia testo'),
+          d.status === 'draft' ? el('button', { type: 'button', className: 'btn danger', onclick: async () => { if (await api(`/api/announce/${d.id}/dismiss`, { method: 'POST' })) loadAnnounce(); } }, 'Ignora') : null))));
+}
+function viewAnnounce() {
+  if (!ann) { loadAnnounce(); return [el('div', { className: 'col' }, el('h1', {}, 'Annunci'), el('p', { className: 'muted' }, 'Carico…'))]; }
+  const s = structuredClone(ann.settings);
+  const save = async () => { const r = await api('/api/announce', { method: 'PUT', body: { settings: s } }); if (r) { ann.settings = r.settings; toast('Salvato'); render(); } };
+  const sw = (label, get, set) => el('label', { className: 'switch' }, label, el('input', { type: 'checkbox', checked: get(), onchange: (e) => { set(e.target.checked); save(); } }));
+  const hook = el('input', { type: 'url', placeholder: 'https://discord.com/api/webhooks/…', value: s.discordWebhook, onchange: (e) => { s.discordWebhook = e.target.value.trim(); save(); } });
+  const delay = el('select', { onchange: (e) => { s.auto.delayMin = Number(e.target.value); save(); } }, ...[[5, '5 minuti'], [10, '10 minuti'], [30, '30 minuti'], [60, '1 ora']].map(([v, l]) => el('option', { value: String(v) }, l)));
+  delay.value = String(s.auto.delayMin);
+  const open = ann.drafts.filter((d) => d.status === 'draft');
+  const done = ann.drafts.filter((d) => d.status !== 'draft');
+  return [el('div', { className: 'col' },
+    el('h1', {}, 'Annunci'),
+    el('p', { className: 'muted', style: { margin: '-8px 0 0' } }, 'Quando una live viene aggiunta, spostata, annullata o cambiata (da qui o da TwitchGestor), qui trovi l\'annuncio pronto per la community.'),
+    open.length ? open.map(draftCard) : el('div', { className: 'empty' }, 'Nessun annuncio da inviare. Prova a spostare una live: l\'annuncio compare qui.'),
+    el('details', { className: 'card' }, el('summary', { className: 'sum' }, '⚙️ Dove inviare e invio automatico'),
+      el('div', { className: 'notify' },
+        el('div', { className: 'nsec' },
+          sw('✈️ Canale Telegram', () => s.telegram, (v) => { s.telegram = v; }),
+          el('p', { className: 'hint' }, ann.telegramChannel ? `Il canale "${ann.telegramChannel}" collegato in TwitchGestor.` : 'Prima collega il canale in TwitchGestor → Riepiloghi → Telegram → Canale pubblico.')),
+        el('div', { className: 'nsec' },
+          sw('💬 Discord', () => s.discord, (v) => { s.discord = v; }),
+          el('label', { className: 'field' }, el('span', {}, 'Webhook del canale degli annunci'), hook),
+          el('ol', { className: 'steps small' },
+            el('li', {}, 'Su Discord: impostazioni del canale (⚙️) → ', el('b', {}, 'Integrazioni → Webhook → Nuovo webhook'), '.'),
+            el('li', {}, el('b', {}, 'Copia URL del webhook'), ' e incollalo qui sopra.'))),
+        el('div', { className: 'nsec' },
+          sw('⏳ Invia da solo se non lo faccio io', () => s.auto.enabled, (v) => { s.auto.enabled = v; }),
+          el('label', { className: 'field' }, el('span', {}, 'Dopo'), delay),
+          el('p', { className: 'hint' }, 'Parte solo il testo; la storia la invii tu dal pulsante. Fino ad allora puoi modificarlo o fermarlo.')),
+        el('div', { className: 'nsec' },
+          el('b', {}, '📸 Instagram'),
+          el('p', { className: 'hint' }, 'Scarica la storia e pubblicala dall\'app di Instagram. La pubblicazione automatica con l\'account Business richiede un\'app di Meta: la possiamo aggiungere più avanti.')))),
+    done.length ? el('details', { className: 'card' }, el('summary', { className: 'sum' }, `Già inviati o ignorati (${done.length})`), el('div', { className: 'col', style: { marginTop: '12px' } }, done.slice(0, 10).map(draftCard))) : null)];
+}
+
 // ---------- fogli: impegno e cosa da fare ----------
 function openSheet(...content) {
   const root = $('sheet-root');
@@ -584,7 +674,11 @@ function taskSheet(t = {}) {
 function render() {
   $('top-date').textContent = longDate(today());
   for (const b of $('nav').querySelectorAll('button')) b.classList.toggle('active', b.dataset.view === view);
-  const parts = { today: viewToday, calendar: viewCalendar, tasks: viewTasks, more: viewMore }[view]?.() ?? viewToday();
+  const parts = { today: viewToday, calendar: viewCalendar, tasks: viewTasks, announce: viewAnnounce, more: viewMore }[view]?.() ?? viewToday();
+  $('fab').hidden = view === 'announce' || view === 'more';
+  const badge = $('announce-badge');
+  badge.hidden = !data.announce;
+  badge.textContent = data.announce || '';
   const v = $('view');
   v.className = `view${view === 'today' || view === 'calendar' ? ' two' : ''}`;
   v.replaceChildren(...parts);
@@ -595,6 +689,7 @@ $('nav').addEventListener('click', (e) => {
   if (!b) return;
   view = b.dataset.view;
   if (view === 'more') notify = null;
+  if (view === 'announce') ann = null;
   history.replaceState(null, '', `#${view}`);
   render();
   window.scrollTo({ top: 0 });

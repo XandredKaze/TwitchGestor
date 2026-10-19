@@ -86,7 +86,13 @@ export function createTwitchLink({ port = 3000, token = '', onChange, log = () =
     async telegram() {
       const r = await call('/api/config');
       const t = r.config?.telegram ?? {};
-      return t.token && t.chatId ? { token: t.token, chatId: t.chatId, name: t.chatName || '' } : null;
+      return t.token && t.chatId ? { token: t.token, chatId: t.chatId, name: t.chatName || '', channelId: t.channelId || '', channelName: t.channelName || '' } : (t.token && t.channelId ? { token: t.token, chatId: '', name: '', channelId: t.channelId, channelName: t.channelName || '' } : null);
+    },
+
+    /** Il nome del tuo canale Twitch (per il link negli annunci). */
+    async login() {
+      const r = await call('/api/state');
+      return r.twitch?.user?.login ?? '';
     },
 
     /** L'ultima live finita (riepilogo di TwitchGestor), per il buongiorno. */

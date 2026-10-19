@@ -5,6 +5,7 @@
 import { Agenda, toICS, today, addDays, weekday, livesToEvents } from '../src/core/agenda.js';
 import { cleanEntry, generateWeeks } from '../../src/core/schedule.js';
 import { Notifier, cleanSettings } from '../src/core/notifier.js';
+import { Announcements, cleanAnnounceSettings } from '../src/core/announce.js';
 
 const KEY = 'howlup-demo-2';
 const t = today();
@@ -46,7 +47,18 @@ if (!Array.isArray(lives)) {
     ...generateWeeks({ from: monday, weeks: 4, days: [6], time: '18:30', durationMin: 120, title: 'Chiacchiere e caffè con la chat', game: 'Just Chatting', gameId: '509658' }),
   ].filter((e) => e.start.slice(0, 10) >= t);
 }
-const saveLives = () => { try { localStorage.setItem(LIVE_KEY, JSON.stringify(lives)); } catch { /* niente */ } rev = Date.now(); };
+// annunci: nella demo si preparano davvero (spostando una live), ma non partono
+let announceSettings = {};
+let announceState = null;
+const announcements = new Announcements({
+  store: { load: () => announceState, save: (d) => { announceState = d; } },
+  getSettings: () => announceSettings,
+  getContext: () => ({ login: 'xandred_kaze' }),
+  onChange: () => { rev = Date.now(); },
+  send: async () => ({ telegram: 'nella demo non si invia davvero' }),
+});
+const saveLives = () => { try { localStorage.setItem(LIVE_KEY, JSON.stringify(lives)); } catch { /* niente */ } rev = Date.now(); announcements.observe(lives); };
+announcements.observe(lives);
 const livesState = () => ({ ok: true, error: '', canPublish: false, entries: lives });
 const GAMES = ['Just Chatting', 'Elden Ring', 'Minecraft', 'Fortnite', 'Valorant', 'Art', 'Music', 'League of Legends'];
 
@@ -76,7 +88,7 @@ window.fetch = async (input, init = {}) => {
   try {
     if (method === 'GET' && path === '/api/state') {
       if (url.searchParams.get('rev') === String(rev)) return json(200, { rev, unchanged: true });
-      return json(200, { rev, ...agenda.state(), lives: livesState(), pending: notifier.pending(), calendarPath: '/calendar/demo.ics' });
+      return json(200, { rev, ...agenda.state(), lives: livesState(), pending: notifier.pending(), announce: announcements.drafts.filter((d) => d.status === 'draft').length, calendarPath: '/calendar/demo.ics' });
     }
     if (method === 'PUT' && path === '/api/events') return json(200, { rev, event: agenda.saveEvent(body.event) });
     let m = /^\/api\/events\/([\w-]+)(\/occurrence)?$/.exec(path);
@@ -85,6 +97,16 @@ window.fetch = async (input, init = {}) => {
     if (method === 'PUT' && path === '/api/tasks') return json(200, { rev, task: agenda.saveTask(body.task) });
     m = /^\/api\/tasks\/([\w-]+)$/.exec(path);
     if (m && method === 'DELETE') return json(200, { rev, ok: agenda.deleteTask(m[1]) });
+    if (method === 'GET' && path === '/api/announce') return json(200, { settings: cleanAnnounceSettings(announceSettings), drafts: announcements.drafts, login: 'xandred_kaze', telegramChannel: '' });
+    if (method === 'PUT' && path === '/api/announce') { announceSettings = cleanAnnounceSettings(body.settings); return json(200, { settings: announceSettings }); }
+    const am = /^\/api\/announce\/([\w-]+)\/(send|hold|dismiss|text)$/.exec(path);
+    if (am && method === 'POST') {
+      if (am[2] === 'text') return json(200, { rev, draft: announcements.update(am[1], { text: body.text }) });
+      if (am[2] === 'hold') return json(200, { rev, draft: announcements.hold(am[1]) });
+      if (am[2] === 'dismiss') return json(200, { rev, draft: announcements.dismiss(am[1]) });
+      if (typeof body.text === 'string') announcements.update(am[1], { text: body.text });
+      return json(200, { rev, draft: await announcements.sendNow(am[1], {}) });
+    }
     if (method === 'GET' && path === '/api/notify') return json(200, { settings: notifyView(), pending: notifier.pending(), linkBase: 'http://twitchgestor.local:3100', telegram: null });
     if (method === 'PUT' && path === '/api/notify') {
       notifySettings = cleanSettings(body.settings);

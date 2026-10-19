@@ -12,7 +12,8 @@ import { fileURLToPath } from 'node:url';
 import { Agenda, toICS, livesToEvents } from './core/agenda.js';
 import { createTwitchLink } from './twitchgestor.js';
 import { Notifier, cleanSettings } from './core/notifier.js';
-import { sendNtfy, sendTelegramMsg } from './channels.js';
+import { sendNtfy, sendTelegramMsg, announceTelegram, announceDiscord } from './channels.js';
+import { Announcements, cleanAnnounceSettings } from './core/announce.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..'); // cartella di TwitchGestor
@@ -116,6 +117,45 @@ async function notifyTick() {
 }
 if (!env.HOWLUP_TEST) setInterval(notifyTick, 30000).unref();
 
+// --- annunci per la community quando cambiano le live (Telegram, Discord, storia Instagram) ---
+const ANNOUNCE_FILE = path.join(DATA, 'announce.json');
+const ANNOUNCE_STATE = path.join(DATA, 'announce-state.json');
+let announceSettings = readJson(ANNOUNCE_FILE, {});
+let loginCache = { at: 0, value: '' };
+const announcements = new Announcements({
+  store: { load: () => readJson(ANNOUNCE_STATE, null), save: (d) => writeJson(ANNOUNCE_STATE, d) },
+  getSettings: () => announceSettings,
+  getContext: () => ({ login: loginCache.value }),
+  onChange: () => { rev = Date.now(); },
+  log,
+  async send(draft, { text, image, targets }) {
+    const s = cleanAnnounceSettings(announceSettings);
+    const want = (k) => (targets ? targets.includes(k) : s[k]);
+    const results = {};
+    if (want('telegram')) {
+      try {
+        const t = await telegramTarget();
+        await announceTelegram({ token: t?.token, chatId: t?.channelId }, text, image);
+        results.telegram = 'ok';
+      } catch (err) { results.telegram = err.message; }
+    }
+    if (want('discord')) {
+      try { await announceDiscord(s.discordWebhook, text, image); results.discord = 'ok'; } catch (err) { results.discord = err.message; }
+    }
+    for (const [k, v] of Object.entries(results)) if (v !== 'ok') log(`Annuncio (${k}): ${v}`);
+    return results;
+  },
+});
+let lastSeen = '';
+async function announceTick() {
+  if (!twitch.state.ok) return;
+  if (Date.now() - loginCache.at > 30 * 60000) loginCache = { at: Date.now(), value: await twitch.login().catch(() => loginCache.value) };
+  const sig = JSON.stringify(twitch.state.entries);
+  if (sig !== lastSeen) { lastSeen = sig; announcements.observe(twitch.state.entries); }
+  await announcements.tick();
+}
+if (!env.HOWLUP_TEST) setInterval(() => announceTick().catch((err) => log(`Annunci: ${err.message}`)), 5000).unref();
+
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml',
@@ -181,7 +221,7 @@ const server = http.createServer(async (req, res) => {
 
       if (route === 'GET /api/state') {
         if (url.searchParams.get('rev') === String(rev)) return send(res, 200, { rev, unchanged: true });
-        return send(res, 200, { rev, ...agenda.state(), lives: lives(), pending: notifier.pending(), calendarPath: `/calendar/${calendarKey}.ics` });
+        return send(res, 200, { rev, ...agenda.state(), lives: lives(), pending: notifier.pending(), announce: announcements.drafts.filter((d) => d.status === 'draft').length, calendarPath: `/calendar/${calendarKey}.ics` });
       }
       if (route === 'PUT /api/events') return send(res, 200, { rev, event: agenda.saveEvent((await readBody(req)).event) });
       let m = /^\/api\/events\/([\w-]+)(\/occurrence)?$/.exec(url.pathname);
@@ -201,7 +241,7 @@ const server = http.createServer(async (req, res) => {
       }
       // --- notifiche ---
       if (route === 'GET /api/notify') {
-        return send(res, 200, { settings: notifyView(), pending: notifier.pending(), linkBase: linkBase(), telegram: await telegramTarget().then((t) => (t ? { name: t.name } : null)) });
+        return send(res, 200, { settings: notifyView(), pending: notifier.pending(), linkBase: linkBase(), telegram: await telegramTarget().then((t) => (t?.chatId ? { name: t.name } : null)) });
       }
       if (route === 'PUT /api/notify') {
         notifySettings = cleanSettings((await readBody(req)).settings);
@@ -213,6 +253,27 @@ const server = http.createServer(async (req, res) => {
         const body = await readBody(req);
         notifier.ack(body.id ? String(body.id) : '');
         return send(res, 200, { rev, pending: notifier.pending() });
+      }
+      // --- annunci ---
+      if (route === 'GET /api/announce') {
+        const t = await telegramTarget();
+        return send(res, 200, { settings: cleanAnnounceSettings(announceSettings), drafts: announcements.drafts, login: loginCache.value, telegramChannel: t?.channelId ? (t.channelName || 'canale') : '' });
+      }
+      if (route === 'PUT /api/announce') {
+        announceSettings = cleanAnnounceSettings((await readBody(req)).settings);
+        writeJson(ANNOUNCE_FILE, announceSettings);
+        return send(res, 200, { settings: announceSettings });
+      }
+      a = /^\/api\/announce\/([\w-]+)\/(send|hold|dismiss|text)$/.exec(url.pathname);
+      if (a && req.method === 'POST') {
+        const body = await readBody(req, 12_000_000);
+        if (a[2] === 'text') return send(res, 200, { rev, draft: announcements.update(a[1], { text: body.text }) });
+        if (a[2] === 'hold') return send(res, 200, { rev, draft: announcements.hold(a[1]) });
+        if (a[2] === 'dismiss') return send(res, 200, { rev, draft: announcements.dismiss(a[1]) });
+        if (typeof body.text === 'string') announcements.update(a[1], { text: body.text });
+        const image = /^data:image\/png;base64,/.test(body.image ?? '') ? Buffer.from(body.image.split(',')[1], 'base64') : null;
+        const targets = Array.isArray(body.targets) ? body.targets.filter((x) => ['telegram', 'discord'].includes(x)) : undefined;
+        return send(res, 200, { rev, draft: await announcements.sendNow(a[1], { image, targets }) });
       }
       // --- live (Programmazione di TwitchGestor) ---
       if (route === 'PUT /api/lives') return send(res, 200, { rev, live: await twitch.saveLive((await readBody(req)).live), lives: lives() });

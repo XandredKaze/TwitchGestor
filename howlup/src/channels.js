@@ -42,3 +42,39 @@ export async function sendTelegramMsg({ token, chatId }, msg, { ackUrl, openUrl,
   }
   if (!data.ok) throw new Error(`Telegram: ${data.description ?? res.status}`);
 }
+
+/** Annuncio sul canale Telegram (quello impostato in TwitchGestor): con la storia come foto, se c'è. */
+export async function announceTelegram({ token, chatId }, text, image, { fetchFn = fetch } = {}) {
+  if (!token || !chatId) throw new Error('canale Telegram non collegato in TwitchGestor');
+  let res;
+  if (image) {
+    const form = new FormData();
+    form.append('chat_id', chatId);
+    form.append('caption', text.slice(0, 1000));
+    form.append('photo', new Blob([image], { type: 'image/png' }), 'live.png');
+    res = await fetchFn(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(30000) });
+  } else {
+    res = await fetchFn(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: text.slice(0, 4000) }), signal: AbortSignal.timeout(15000),
+    });
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!data.ok) throw new Error(`Telegram: ${data.description ?? res.status}`);
+}
+
+/** Annuncio su Discord con il webhook del canale (gratis, senza bot): testo e, se c'è, l'immagine. */
+export async function announceDiscord(webhook, text, image, { fetchFn = fetch } = {}) {
+  if (!webhook) throw new Error('webhook di Discord non impostato');
+  const payload = { content: text.slice(0, 1900), username: 'Howl-UP', allowed_mentions: { parse: [] } };
+  let res;
+  if (image) {
+    const form = new FormData();
+    form.append('payload_json', JSON.stringify(payload));
+    form.append('files[0]', new Blob([image], { type: 'image/png' }), 'live.png');
+    res = await fetchFn(`${webhook}?wait=true`, { method: 'POST', body: form, signal: AbortSignal.timeout(30000) });
+  } else {
+    res = await fetchFn(`${webhook}?wait=true`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(15000) });
+  }
+  if (!res.ok) throw new Error(`Discord ha risposto ${res.status}`);
+}
