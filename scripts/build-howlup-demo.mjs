@@ -24,7 +24,7 @@ let html = fs.readFileSync(path.join(H, 'public', 'index.html'), 'utf8')
   .replace('<title>Howl-UP</title>', '<title>Howl-UP Demo</title>')
   .replace(/<link rel="manifest"[^>]*>\s*/, '').replace(/<link rel="apple-touch-icon"[^>]*>\s*/, '')
   .replace(/<link rel="icon"[^>]*>/, `<link rel="icon" href="${icon}">`)
-  .replace('<link rel="stylesheet" href="app.css">', `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap">\n<style>${css}</style>`)
+  .replace('<link rel="stylesheet" href="app.css">', `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&family=Bungee&family=Share+Tech+Mono&family=Outfit:wght@400;600;800&display=swap">\n<style>${css}</style>`)
   .replaceAll('src="icon.svg"', `src="${icon}"`)
   .replace('<script type="module" src="app.js"></script>', `<script>${js.outputFiles[0].text.replaceAll('</script', '<\\/script').replaceAll('src: "icon.svg"', `src: ${JSON.stringify(icon)}`)}</script>`);
 fs.writeFileSync(path.join(OUT, 'index.html'), html);

@@ -120,6 +120,7 @@ if (!env.HOWLUP_TEST) setInterval(notifyTick, 30000).unref();
 // --- annunci per la community quando cambiano le live (Telegram, Discord, storia Instagram) ---
 const ANNOUNCE_FILE = path.join(DATA, 'announce.json');
 const ANNOUNCE_STATE = path.join(DATA, 'announce-state.json');
+const MASCOT_FILE = path.join(DATA, 'mascot.png');
 let announceSettings = readJson(ANNOUNCE_FILE, {});
 let loginCache = { at: 0, value: '' };
 const announcements = new Announcements({
@@ -214,6 +215,13 @@ const server = http.createServer(async (req, res) => {
       return res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Howl-UP</title><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#121016;color:#ece8f2;font:600 20px system-ui,sans-serif;text-align:center"><div><div style="font-size:56px">✅</div><p>Visto! La notifica non si ripete più.</p><p><a href="/#today" style="color:#e36dc9">Apri Howl-UP</a></p></div></body>');
     }
 
+    // il lupo del canale per le storie (immagine pubblica come il logo)
+    if (route === 'GET /mascot.png') {
+      if (!fs.existsSync(MASCOT_FILE)) return send(res, 404, 'Nessuna immagine');
+      res.writeHead(200, { 'Content-Type': fs.readFileSync(MASCOT_FILE).subarray(0, 4).toString('latin1') === 'RIFF' ? 'image/webp' : 'image/png', 'Cache-Control': 'no-cache' });
+      return fs.createReadStream(MASCOT_FILE).pipe(res);
+    }
+
     if (url.pathname.startsWith('/api/')) {
       if (!authorized(req, url)) return send(res, 401, { error: 'Password mancante o sbagliata' });
       rememberHost(req);
@@ -257,13 +265,21 @@ const server = http.createServer(async (req, res) => {
       // --- annunci ---
       if (route === 'GET /api/announce') {
         const t = await telegramTarget();
-        return send(res, 200, { settings: cleanAnnounceSettings(announceSettings), drafts: announcements.drafts, login: loginCache.value, telegramChannel: t?.channelId ? (t.channelName || 'canale') : '' });
+        return send(res, 200, { settings: cleanAnnounceSettings(announceSettings), drafts: announcements.drafts, login: loginCache.value, telegramChannel: t?.channelId ? (t.channelName || 'canale') : '', mascot: fs.existsSync(MASCOT_FILE) ? Math.round(fs.statSync(MASCOT_FILE).mtimeMs) : 0 });
       }
       if (route === 'PUT /api/announce') {
         announceSettings = cleanAnnounceSettings((await readBody(req)).settings);
         writeJson(ANNOUNCE_FILE, announceSettings);
         return send(res, 200, { settings: announceSettings });
       }
+      if (route === 'POST /api/announce/mascot') {
+        const body = await readBody(req, 5_000_000);
+        const m = /^data:image\/(png|webp);base64,(.+)$/.exec(String(body.image ?? ''));
+        if (!m) return send(res, 400, { error: 'Serve un\'immagine PNG o WebP' });
+        fs.writeFileSync(MASCOT_FILE, Buffer.from(m[2], 'base64'));
+        return send(res, 200, { ok: true });
+      }
+      if (route === 'DELETE /api/announce/mascot') { fs.rmSync(MASCOT_FILE, { force: true }); return send(res, 200, { ok: true }); }
       a = /^\/api\/announce\/([\w-]+)\/(send|hold|dismiss|text)$/.exec(url.pathname);
       if (a && req.method === 'POST') {
         const body = await readBody(req, 12_000_000);

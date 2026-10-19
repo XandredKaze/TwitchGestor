@@ -33,7 +33,8 @@ Gira sullo stesso Raspberry di TwitchGestor, si aggiorna insieme a lui e usa la 
 
 - **📣 Annunci:** quando una live viene aggiunta, spostata, annullata o cambiata (da Howl-UP o da TwitchGestor)
   compare un annuncio pronto: testo per Telegram e Discord (modificabile) e **storia Instagram** 1080×1920
-  con la tua grafica. "📤 Invia con la storia" lo manda al canale Telegram (quello di TwitchGestor) e a Discord
+  con l'estetica del canale (nero con linee topografiche, titolo a blocchi lilla e bianco, cornici bianche,
+  "STAY CONNECTED", ストリーマー) e, se lo carichi, il tuo lupo. "📤 Invia con la storia" lo manda al canale Telegram (quello di TwitchGestor) e a Discord
   (webhook del canale); "⬇ Storia Instagram" scarica l'immagine da pubblicare. Facoltativo: invio automatico
   del testo dopo 5–60 minuti, fermabile. La pubblicazione automatica su Instagram (account Business) richiede
   un'app di Meta e verrà valutata più avanti.

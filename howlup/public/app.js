@@ -362,14 +362,17 @@ function notifySection() {
 
 // ---------- annunci per la community ----------
 let ann = null;
-let iconImg = null;
-const loadIcon = () => new Promise((resolve) => {
-  if (iconImg) return resolve(iconImg);
-  const img = new Image();
-  img.onload = () => { iconImg = img; resolve(img); };
-  img.onerror = () => resolve(null);
-  img.src = document.querySelector('.brand img')?.src ?? 'icon.svg';
-});
+// il lupo del canale (caricato in Annunci → Dove inviare): compare in alto nella storia
+let mascot;
+const loadMascot = () => {
+  if (mascot !== undefined) return Promise.resolve(mascot);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => { mascot = img; resolve(img); };
+    img.onerror = () => { mascot = null; resolve(null); };
+    img.src = `mascot.png?v=${ann?.mascot ?? 0}`;
+  });
+};
 async function loadAnnounce() {
   ann = await api('/api/announce');
   if (view === 'announce') render();
@@ -377,7 +380,7 @@ async function loadAnnounce() {
 const STATUS = { draft: 'Da inviare', sent: 'Inviato', dismissed: 'Ignorato' };
 function draftCard(d) {
   const canvas = el('canvas', { className: 'story', 'aria-label': 'Storia Instagram' });
-  loadIcon().then((icon) => drawStory(canvas, d, { login: ann?.login, icon }));
+  loadMascot().then((m) => drawStory(canvas, d, { login: ann?.login, mascot: m }));
   const text = el('textarea', { rows: '7', maxlength: '3500', disabled: d.status !== 'draft' });
   text.value = d.text;
   text.onchange = () => api(`/api/announce/${d.id}/text`, { method: 'POST', body: { text: text.value } });
@@ -443,6 +446,22 @@ function viewAnnounce() {
           sw('⏳ Invia da solo se non lo faccio io', () => s.auto.enabled, (v) => { s.auto.enabled = v; }),
           el('label', { className: 'field' }, el('span', {}, 'Dopo'), delay),
           el('p', { className: 'hint' }, 'Parte solo il testo; la storia la invii tu dal pulsante. Fino ad allora puoi modificarlo o fermarlo.')),
+        el('div', { className: 'nsec' },
+          el('b', {}, '🐺 Il tuo lupo nella storia'),
+          el('p', { className: 'hint' }, 'Carica l\'illustrazione del lupo del canale (PNG con lo sfondo trasparente): compare in alto accanto al titolo.'),
+          el('div', { className: 'row' },
+            el('label', { className: 'btn small' }, ann.mascot ? 'Cambia immagine' : 'Carica immagine', el('input', {
+              type: 'file', accept: 'image/png,image/webp', hidden: true,
+              onchange: (e) => {
+                const f = e.target.files[0];
+                if (!f) return;
+                if (f.size > 3 * 1024 * 1024) { toast('Immagine troppo grande (massimo 3 MB)'); return; }
+                const r = new FileReader();
+                r.onload = async () => { if (await api('/api/announce/mascot', { method: 'POST', body: { image: r.result } })) { mascot = undefined; toast('Lupo caricato 🐺'); loadAnnounce(); } };
+                r.readAsDataURL(f);
+              },
+            })),
+            ann.mascot ? el('button', { type: 'button', className: 'btn small danger', onclick: async () => { if (await api('/api/announce/mascot', { method: 'DELETE' })) { mascot = undefined; loadAnnounce(); } } }, 'Togli') : null)),
         el('div', { className: 'nsec' },
           el('b', {}, '📸 Instagram'),
           el('p', { className: 'hint' }, 'Scarica la storia e pubblicala dall\'app di Instagram. La pubblicazione automatica con l\'account Business richiede un\'app di Meta: la possiamo aggiungere più avanti.')))),
