@@ -1,0 +1,134 @@
+/**
+ * Howl-UP: agenda, cose da fare e (presto) automatismi, accanto a TwitchGestor sullo stesso Raspberry.
+ * Pagina: http://<raspberry>:3100 (anche dal telefono, a casa o con Tailscale). Password: la stessa della dashboard.
+ * Dati: data/howlup/ (dentro la cartella di TwitchGestor, quindi nelle copie di sicurezza e negli aggiornamenti).
+ */
+
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { Agenda, toICS } from './core/agenda.js';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(HERE, '..', '..'); // cartella di TwitchGestor
+const PUBLIC = path.resolve(HERE, '..', 'public');
+const CORE = path.join(HERE, 'core');
+const DATA = process.env.HOWLUP_DATA || path.join(ROOT, 'data', 'howlup');
+const AGENDA_FILE = path.join(DATA, 'agenda.json');
+const KEY_FILE = path.join(DATA, 'calendar-key');
+
+if (!process.env.HOWLUP_TEST && fs.existsSync(path.join(ROOT, '.env'))) process.loadEnvFile(path.join(ROOT, '.env'));
+const env = process.env;
+const PORT = env.HOWLUP_PORT !== undefined ? Number(env.HOWLUP_PORT) : 3100;
+const HOST = env.HOST || '127.0.0.1';
+const log = (...a) => console.log(new Date().toLocaleTimeString('it-IT'), '[howl-up]', ...a);
+
+fs.mkdirSync(DATA, { recursive: true });
+// scrittura sicura: prima un file temporaneo, poi lo scambio (niente file a metà se va via la corrente)
+function writeJson(file, data) {
+  const tmp = `${file}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(data));
+  fs.renameSync(tmp, file);
+}
+
+let rev = Date.now(); // cambia a ogni modifica: le pagine aperte (telefono, PC) si aggiornano
+const agenda = new Agenda({
+  store: { load: () => JSON.parse(fs.readFileSync(AGENDA_FILE, 'utf8')), save: (d) => writeJson(AGENDA_FILE, d) },
+  onChange: () => { rev = Date.now(); },
+});
+agenda.cleanupDone();
+
+// chiave del link del calendario (diversa dalla password: il link finisce nelle app del calendario)
+let calendarKey = '';
+try { calendarKey = fs.readFileSync(KEY_FILE, 'utf8').trim(); } catch { /* prima volta */ }
+if (!/^[a-f0-9]{24}$/.test(calendarKey)) { calendarKey = crypto.randomBytes(12).toString('hex'); fs.writeFileSync(KEY_FILE, calendarKey); }
+
+const MIME = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml',
+  '.png': 'image/png', '.woff2': 'font/woff2',
+};
+
+const safeEqual = (a, b) => {
+  const x = Buffer.from(String(a ?? ''));
+  const y = Buffer.from(String(b ?? ''));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+};
+const authorized = (req, url) => !env.DASHBOARD_TOKEN || safeEqual(req.headers['x-dashboard-token'] ?? url.searchParams.get('token'), env.DASHBOARD_TOKEN);
+const sameOrigin = (req) => !req.headers.origin || new URL(req.headers.origin).host === req.headers.host;
+
+function send(res, status, body, headers = {}) {
+  const isText = typeof body === 'string';
+  res.writeHead(status, { 'Content-Type': isText ? 'text/plain; charset=utf-8' : 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
+  res.end(isText ? body : JSON.stringify(body));
+}
+
+function serveFile(res, base, rel) {
+  let file;
+  try { file = path.normalize(path.join(base, decodeURIComponent(rel))); } catch { return send(res, 400, 'Percorso non valido'); }
+  if (!file.startsWith(base + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return send(res, 404, 'Non trovato');
+  res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' });
+  fs.createReadStream(file).pipe(res);
+}
+
+async function readBody(req, limit = 200_000) {
+  let data = '';
+  for await (const chunk of req) {
+    data += chunk;
+    if (data.length > limit) throw Object.assign(new Error('Richiesta troppo grande'), { status: 413 });
+  }
+  try { return data ? JSON.parse(data) : {}; } catch { throw Object.assign(new Error('Dati non validi'), { status: 400 }); }
+}
+
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, 'http://localhost');
+  const route = `${req.method} ${url.pathname}`;
+  try {
+    if (route === 'GET /' || route === 'GET /index.html') return serveFile(res, PUBLIC, 'index.html');
+    if (req.method === 'GET' && url.pathname.startsWith('/core/')) return serveFile(res, CORE, url.pathname.slice(6));
+    // calendario per le app (Google Calendar, iPhone, ICSx⁵): link con una chiave sua
+    if (req.method === 'GET' && url.pathname === `/calendar/${calendarKey}.ics`) {
+      return send(res, 200, toICS(agenda.events, { categories: agenda.categories }), { 'Content-Type': 'text/calendar; charset=utf-8' });
+    }
+
+    if (url.pathname.startsWith('/api/')) {
+      if (!authorized(req, url)) return send(res, 401, { error: 'Password mancante o sbagliata' });
+      if (req.method !== 'GET' && (req.headers['x-howlup'] !== '1' || !sameOrigin(req))) return send(res, 403, { error: 'Richiesta non consentita' });
+
+      if (route === 'GET /api/state') {
+        if (url.searchParams.get('rev') === String(rev)) return send(res, 200, { rev, unchanged: true });
+        return send(res, 200, { rev, ...agenda.state(), calendarPath: `/calendar/${calendarKey}.ics` });
+      }
+      if (route === 'PUT /api/events') return send(res, 200, { rev, event: agenda.saveEvent((await readBody(req)).event) });
+      let m = /^\/api\/events\/([\w-]+)(\/occurrence)?$/.exec(url.pathname);
+      if (m && req.method === 'POST' && m[2]) {
+        const body = await readBody(req);
+        return send(res, 200, { rev, event: agenda.saveOccurrence(m[1], String(body.day ?? ''), body.event ?? {}) });
+      }
+      if (m && req.method === 'DELETE' && !m[2]) {
+        const ok = agenda.deleteEvent(m[1], url.searchParams.get('only') || '');
+        return send(res, ok ? 200 : 404, ok ? { rev } : { error: 'Impegno non trovato' });
+      }
+      if (route === 'PUT /api/tasks') return send(res, 200, { rev, task: agenda.saveTask((await readBody(req)).task) });
+      m = /^\/api\/tasks\/([\w-]+)$/.exec(url.pathname);
+      if (m && req.method === 'DELETE') {
+        const ok = agenda.deleteTask(m[1]);
+        return send(res, ok ? 200 : 404, ok ? { rev } : { error: 'Non trovata' });
+      }
+      if (route === 'PUT /api/categories') return send(res, 200, { rev, categories: agenda.saveCategories((await readBody(req)).categories) });
+      return send(res, 404, { error: 'Non trovato' });
+    }
+    if (req.method === 'GET') return serveFile(res, PUBLIC, url.pathname.slice(1));
+    return send(res, 404, 'Non trovato');
+  } catch (err) {
+    const status = err.status ?? 500;
+    if (status >= 500) log(err);
+    return send(res, status, url.pathname.startsWith('/api/') ? { error: err.message } : err.message);
+  }
+});
+
+setInterval(() => agenda.cleanupDone(), 6 * 3600 * 1000).unref();
+export const ready = new Promise((resolve) => server.listen(PORT, HOST, () => { log(`Howl-UP pronto: http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${server.address().port}`); resolve(server.address().port); }));
+export { server, agenda };

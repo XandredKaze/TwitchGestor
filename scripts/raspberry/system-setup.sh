@@ -27,6 +27,25 @@ AmbientCapabilities=CAP_NET_BIND_SERVICE
 WantedBy=multi-user.target
 UNIT
 
+# Howl-UP (agenda): stessa cartella e stessi aggiornamenti di TwitchGestor, pagina sulla porta 3100
+cat > /etc/systemd/system/howlup.service <<UNIT
+[Unit]
+Description=Howl-UP
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=$ME
+WorkingDirectory=$DIR
+ExecStart=$NODE howlup/src/index.js
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
 cat > /etc/systemd/system/twitchgestor-update.service <<UNIT
 [Unit]
 Description=Aggiornamento di TwitchGestor
@@ -63,7 +82,8 @@ WantedBy=timers.target
 UNIT
 
 systemctl daemon-reload
-systemctl enable twitchgestor.service twitchgestor-update.path twitchgestor-update.timer >/dev/null 2>&1
+systemctl enable twitchgestor.service howlup.service twitchgestor-update.path twitchgestor-update.timer >/dev/null 2>&1
+{ [ -f "$DIR/howlup/src/index.js" ] && systemctl start howlup.service; } || true
 systemctl start twitchgestor-update.path twitchgestor-update.timer
 systemctl restart twitchgestor-update.timer # il nuovo orario vale subito
 

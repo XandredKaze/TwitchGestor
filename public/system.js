@@ -190,6 +190,9 @@
 
   async function open() {
     dialog.showModal();
+    // Howl-UP gira accanto a TwitchGestor sul Raspberry (porta 3100), con lo stesso nome o indirizzo
+    $('sys-howlup-sec').hidden = !state?.managed;
+    $('sys-howlup-link').href = `http://${location.hostname}:3100/${window.TG.token() ? `?token=${encodeURIComponent(window.TG.token())}` : ''}`;
     loadRemote();
     info = null;
     render();

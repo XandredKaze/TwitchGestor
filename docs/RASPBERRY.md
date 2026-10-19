@@ -108,6 +108,14 @@ Il Raspberry ha una **cartella condivisa** in rete, così copi i file dal PC com
 
 Se `\\twitchgestor` non risponde, usa l'indirizzo del Raspberry, per esempio `\\192.168.1.50\TwitchGestor`. La cartella si vede solo nella rete di casa. Le copie di sicurezza non contengono la musica (pesa troppo): tienine una copia anche sul PC.
 
+## Howl-UP, la tua agenda
+
+Sullo stesso Raspberry gira anche **Howl-UP**, l'agenda dei tuoi impegni. Si installa e si aggiorna da sola insieme a TwitchGestor.
+
+- A casa apri `http://twitchgestor.local:3100`; fuori casa (con Tailscale) `http://100.x.x.x:3100`. Lo trovi anche in **⚙ Sistema → Howl-UP**.
+- La password è la stessa della dashboard.
+- Sul telefono: menu del browser → **Aggiungi a schermata Home**, e si apre come un'app con l'icona del lupo.
+
 ## Accesso da fuori casa (facoltativo)
 
 Per aprire la dashboard quando non sei a casa (dal telefono o da un portatile) TwitchGestor usa **Tailscale**: una rete privata gratuita tra i tuoi dispositivi. Non si apre nessuna porta sul router: entra solo chi usa il tuo account Tailscale. Si fa **una volta, da casa**:
