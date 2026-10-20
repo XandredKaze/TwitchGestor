@@ -533,7 +533,7 @@ function viewAnnounce() {
   const done = ann.drafts.filter((d) => d.status !== 'draft');
   return [el('div', { className: 'col' },
     el('h1', {}, 'Annunci'),
-    el('p', { className: 'muted', style: { margin: '-8px 0 0' } }, 'Quando una live viene aggiunta, spostata, annullata o cambiata (da qui o da TwitchGestor), qui trovi l\'annuncio pronto per la community.'),
+    el('p', { className: 'muted', style: { margin: '-8px 0 0' } }, 'Quando una live viene aggiunta, spostata, annullata o cambiata (da qui o da TwitchGestor), qui trovi l\'annuncio pronto per la community. Puoi crearne uno quando vuoi anche con "📣 Crea annuncio" nella scheda di una live.'),
     open.length ? open.map(draftCard) : el('div', { className: 'empty' }, 'Nessun annuncio da inviare. Prova a spostare una live: l\'annuncio compare qui.'),
     el('details', { className: 'card' }, el('summary', { className: 'sum' }, '⚙️ Dove inviare e invio automatico'),
       el('div', { className: 'notify' },
