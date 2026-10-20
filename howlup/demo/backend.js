@@ -102,6 +102,9 @@ window.fetch = async (input, init = {}) => {
     let m = /^\/api\/events\/([\w-]+)(\/occurrence)?$/.exec(path);
     if (m && method === 'POST' && m[2]) return json(200, { rev, event: agenda.saveOccurrence(m[1], body.day, body.event) });
     if (m && method === 'DELETE') return json(200, { rev, ok: agenda.deleteEvent(m[1], url.searchParams.get('only') || '') });
+    if (method === 'PUT' && path === '/api/notes') return json(200, { rev, note: agenda.saveNote(body.note) });
+    m = /^\/api\/notes\/([\w-]+)$/.exec(path);
+    if (m && method === 'DELETE') return json(200, { rev, ok: agenda.deleteNote(m[1]) });
     if (method === 'PUT' && path === '/api/tasks') return json(200, { rev, task: agenda.saveTask(body.task) });
     m = /^\/api\/tasks\/([\w-]+)$/.exec(path);
     if (m && method === 'DELETE') return json(200, { rev, ok: agenda.deleteTask(m[1]) });

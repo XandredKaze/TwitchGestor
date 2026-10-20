@@ -177,7 +177,9 @@ function viewToday() {
   const left = el('div', { className: 'col' },
     tgWarning(),
     pendingCard(),
-    el('div', {}, el('h1', {}, `${greeting()} 🐺`), el('div', { className: 'muted' }, `${todayList.length ? `${todayList.length} ${todayList.length === 1 ? 'impegno' : 'impegni'} oggi` : 'Nessun impegno oggi'}${urgent.length ? ` · ${urgent.length} da fare` : ''}`)),
+    el('div', { className: 'hello' },
+      el('div', {}, el('h1', {}, `${greeting()} 🐺`), el('div', { className: 'muted' }, `${todayList.length ? `${todayList.length} ${todayList.length === 1 ? 'impegno' : 'impegni'} oggi` : 'Nessun impegno oggi'}${urgent.length ? ` · ${urgent.length} da fare` : ''}`)),
+      notesButton()),
     next
       ? el('button', { type: 'button', className: 'card next', style: { '--c': colorOf(next.category), textAlign: 'left' }, onclick: () => (next.source === 'twitchgestor' ? liveSheet(next) : eventSheet(next)) },
         el('div', { className: 'label' }, next.day === t ? 'Prossimo' : 'Prossimo impegno'),
@@ -838,6 +840,96 @@ function shiftSheet(fromDay = today()) {
       el('p', { className: 'hint' }, 'Vale per i turni nuovi; quelli già segnati restano come sono.')),
     el('p', { className: 'hint' }, '⏱️ Straordinario? Tocca quel turno nel calendario e cambia l\'ora di inizio o di fine: vale solo per quel giorno.'),
     el('div', { className: 'sheet-actions' }, el('span', { className: 'grow' }), el('button', { type: 'button', className: 'btn', onclick: () => close() }, 'Annulla'), saveBtn));
+}
+
+// ---------- note (pulsante col blocco note in Oggi) ----------
+// icona del blocco note: fogli con la spirale in alto e le righe
+const NOTEPAD_SVG = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="4" width="15" height="17.5" rx="2.5"/><path d="M8 2.5v3M12 2.5v3M16 2.5v3M8 10h8M8 13.5h8M8 17h5"/></svg>';
+function notesButton() {
+  const n = (data.notes ?? []).length;
+  const btn = el('button', { type: 'button', className: 'notes-btn', title: 'Note', 'aria-label': `Note (${n})`, onclick: () => notesSheet() });
+  btn.innerHTML = NOTEPAD_SVG; // icona fissa, nessun dato dell'utente
+  if (n) btn.append(el('i', { className: 'badge' }, String(n)));
+  return btn;
+}
+
+function noteWhen(n) {
+  if (!n.date) return '';
+  return `📅 ${longDate(n.date)}${n.time ? ` · 🕒 ${n.time}` : ''}`;
+}
+
+function notesSheet({ open = null } = {}) {
+  const box = el('div', { className: 'notes' });
+  const close = openSheet(box);
+  const sorted = () => [...(data.notes ?? [])].sort((a, b) => b.updatedAt - a.updatedAt);
+
+  function list(highlight = null) {
+    const notes = sorted();
+    box.replaceChildren(
+      el('div', { className: 'row', style: { alignItems: 'center' } },
+        el('h3', { className: 'grow' }, '🗒️ Note'),
+        el('button', { type: 'button', className: 'btn primary small', onclick: () => form() }, '＋ Nuova nota'),
+        el('button', { type: 'button', className: 'btn small', onclick: () => close() }, 'Chiudi')),
+      notes.length ? el('div', { className: 'note-list' }, notes.map((n) => noteCard(n, n.id === highlight)))
+        : el('div', { className: 'empty' }, 'Nessuna nota. Premi "＋ Nuova nota" per scriverne una.'));
+    if (highlight) box.querySelector('.note.hl')?.scrollIntoView({ block: 'nearest' });
+  }
+
+  function noteCard(n, hl) {
+    return el('article', { className: `note card${hl ? ' hl' : ''}` },
+      el('header', {},
+        el('h4', {}, n.title),
+        n.subtitle ? el('div', { className: 'sub' }, n.subtitle) : null,
+        noteWhen(n) ? el('div', { className: 'when' }, noteWhen(n)) : null),
+      n.body ? el('div', { className: 'body' }, n.body) : null,
+      el('div', { className: 'row' },
+        el('button', { type: 'button', className: 'btn small', onclick: () => form(n) }, '✏️ Modifica'),
+        el('button', {
+          type: 'button', className: 'btn small danger',
+          onclick: async () => {
+            if (!confirm(`Eliminare la nota "${n.title}"?`)) return;
+            if (await api(`/api/notes/${encodeURIComponent(n.id)}`, { method: 'DELETE' })) {
+              data.notes = (data.notes ?? []).filter((x) => x.id !== n.id);
+              toast('Nota eliminata');
+              list();
+              load(true);
+            }
+          },
+        }, '🗑 Elimina')));
+  }
+
+  function form(n = null) {
+    const title = el('input', { type: 'text', value: n?.title ?? '', maxlength: '200', placeholder: 'Titolo' });
+    const subtitle = el('input', { type: 'text', value: n?.subtitle ?? '', maxlength: '200', placeholder: 'Sottotitolo (facoltativo)' });
+    const date = el('input', { type: 'date', value: n?.date ?? '' });
+    const time = el('input', { type: 'time', value: n?.time ?? '' });
+    const body = el('textarea', { rows: '9', maxlength: '20000', placeholder: 'Scrivi qui la nota…' });
+    body.value = n?.body ?? '';
+    const save = async () => {
+      if (!title.value.trim()) { title.focus(); toast('Serve il titolo'); return; }
+      const r = await api('/api/notes', { method: 'PUT', body: { note: { id: n?.id, title: title.value, subtitle: subtitle.value, date: date.value, time: date.value ? time.value : '', body: body.value } } });
+      if (!r) return;
+      data.notes = [...(data.notes ?? []).filter((x) => x.id !== r.note.id), r.note];
+      toast('Nota salvata 🗒️');
+      list(r.note.id);
+      load(true);
+    };
+    box.replaceChildren(
+      el('h3', {}, n ? '✏️ Modifica nota' : '🗒️ Nuova nota'),
+      el('label', { className: 'field' }, el('span', {}, 'Titolo'), title),
+      el('label', { className: 'field' }, el('span', {}, 'Sottotitolo'), subtitle),
+      el('div', { className: 'grid2' },
+        el('label', { className: 'field' }, el('span', {}, 'Giorno (facoltativo)'), date),
+        el('label', { className: 'field' }, el('span', {}, 'Ora (facoltativa)'), time)),
+      el('label', { className: 'field' }, el('span', {}, 'Nota'), body),
+      el('div', { className: 'sheet-actions' },
+        el('span', { className: 'grow' }),
+        el('button', { type: 'button', className: 'btn', onclick: () => list() }, 'Annulla'),
+        el('button', { type: 'button', className: 'btn primary', onclick: save }, 'Salva')));
+    setTimeout(() => title.focus(), 50);
+  }
+
+  if (open) form(open); else list();
 }
 
 // ---------- disegno ----------

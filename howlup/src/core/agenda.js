@@ -6,6 +6,7 @@
  *   impegno:      { id, title, category, date, time, endTime, allDay, notes, remindMin,
  *                   repeat: { freq: 'none'|'daily'|'weekly'|'monthly'|'yearly', interval, days: [1..7], until }, skip: [date] }
  *   cosa da fare: { id, title, category, due, done, doneAt, notes }
+ *   nota:         { id, title, subtitle, date, time, body, createdAt, updatedAt }  (giorno e ora facoltativi)
  */
 
 export const DEFAULT_CATEGORIES = [
@@ -78,6 +79,22 @@ export function cleanShift(x = {}, categories = DEFAULT_CATEGORIES) {
     time: TIME.test(String(o.time ?? '')) ? o.time : d.time,
     endTime: TIME.test(String(o.endTime ?? '')) ? o.endTime : d.endTime,
     remindMin: o.remindMin === null ? null : Number.isFinite(remind) && remind >= 0 && remind <= 10080 ? Math.round(remind) : d.remindMin,
+  };
+}
+
+/** Una nota con i campi ripuliti (null se manca il titolo). */
+export function cleanNote(n = {}, now = Date.now()) {
+  if (!n || typeof n !== 'object' || !String(n.title ?? '').trim()) return null;
+  const date = DATE.test(String(n.date ?? '')) ? n.date : '';
+  return {
+    id: cleanId(n.id, 'n'),
+    title: str(n.title, 200).trim(),
+    subtitle: str(n.subtitle, 200).trim(),
+    date,
+    time: date && TIME.test(String(n.time ?? '')) ? n.time : '',
+    body: str(n.body, 20000),
+    createdAt: Number(n.createdAt) || now,
+    updatedAt: now,
   };
 }
 
@@ -204,13 +221,14 @@ export class Agenda {
     this.categories = cleanCategories(saved?.categories);
     this.events = (saved?.events ?? []).map((e) => cleanEvent(e, this.categories)).filter(Boolean);
     this.tasks = (saved?.tasks ?? []).map((t) => cleanTask(t, this.categories)).filter(Boolean);
+    this.notes = (saved?.notes ?? []).map((n) => ({ ...cleanNote(n, n?.updatedAt), updatedAt: Number(n?.updatedAt) || Date.now() })).filter((n) => n.id);
     // il tipo "Cube" per i turni c'è sempre (si può rinominare o cambiare colore in Altro → Categorie)
     if (!saved?.shift && !this.categories.some((c) => c.id === SHIFT_CATEGORY.id)) this.categories = [...this.categories, { ...SHIFT_CATEGORY }];
     this.shift = cleanShift(saved?.shift, this.categories);
   }
 
   state() {
-    return { categories: this.categories, events: this.events, tasks: this.tasks, shift: this.shift };
+    return { categories: this.categories, events: this.events, tasks: this.tasks, shift: this.shift, notes: this.notes };
   }
 
   /**
@@ -281,6 +299,22 @@ export class Agenda {
     if (i >= 0) this.tasks[i] = t; else this.tasks.push(t);
     this.#save();
     return t;
+  }
+
+  saveNote(input) {
+    const old = this.notes.find((x) => x.id === input?.id);
+    const n = cleanNote({ ...input, createdAt: old?.createdAt }, this.now());
+    if (!n) throw Object.assign(new Error('Serve il titolo'), { status: 400 });
+    if (old) this.notes = this.notes.map((x) => (x.id === n.id ? n : x)); else this.notes.push(n);
+    this.#save();
+    return n;
+  }
+
+  deleteNote(id) {
+    const n = this.notes.length;
+    this.notes = this.notes.filter((x) => x.id !== id);
+    if (this.notes.length !== n) this.#save();
+    return this.notes.length !== n;
   }
 
   deleteTask(id) {

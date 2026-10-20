@@ -79,3 +79,19 @@ test('turni di notte: si segnano i giorni del mese in un colpo, gli straordinari
   assert.equal(a.shift.time, '22:00');
   assert.throws(() => a.setShifts({ from: '2026-11-30', to: '2026-11-01' }), /Periodo/);
 });
+
+test('note: titolo obbligatorio, giorno e ora facoltativi, modifica ed eliminazione', async () => {
+  const { Agenda } = await import('../src/core/agenda.js');
+  let saved = null;
+  const a = new Agenda({ store: { load: () => saved, save: (d) => { saved = structuredClone(d); } } });
+  assert.throws(() => a.saveNote({ title: '  ' }), /titolo/);
+  const n = a.saveNote({ title: 'Idee live', subtitle: 'Halloween', body: 'Costume da lupo\nGiochi horror', time: '21:00' });
+  assert.deepEqual([n.date, n.time], ['', '']); // l'ora senza giorno non vale
+  const dated = a.saveNote({ title: 'Riunione', date: '2026-10-21', time: '10:30' });
+  assert.deepEqual([dated.date, dated.time], ['2026-10-21', '10:30']);
+  const edited = a.saveNote({ ...n, body: 'Solo costume' });
+  assert.equal(edited.createdAt, n.createdAt);
+  assert.equal(new Agenda({ store: { load: () => saved } }).notes.find((x) => x.id === n.id).body, 'Solo costume');
+  assert.equal(a.deleteNote(n.id), true);
+  assert.deepEqual(a.notes.map((x) => x.title), ['Riunione']);
+});

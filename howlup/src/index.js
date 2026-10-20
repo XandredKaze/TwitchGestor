@@ -258,6 +258,12 @@ const server = http.createServer(async (req, res) => {
         const ok = agenda.deleteEvent(m[1], url.searchParams.get('only') || '');
         return send(res, ok ? 200 : 404, ok ? { rev } : { error: 'Impegno non trovato' });
       }
+      if (route === 'PUT /api/notes') return send(res, 200, { rev, note: agenda.saveNote((await readBody(req)).note) });
+      const nm = /^\/api\/notes\/([\w-]+)$/.exec(url.pathname);
+      if (nm && req.method === 'DELETE') {
+        const ok = agenda.deleteNote(nm[1]);
+        return send(res, ok ? 200 : 404, ok ? { rev } : { error: 'Nota non trovata' });
+      }
       if (route === 'PUT /api/tasks') return send(res, 200, { rev, task: agenda.saveTask((await readBody(req)).task) });
       m = /^\/api\/tasks\/([\w-]+)$/.exec(url.pathname);
       if (m && req.method === 'DELETE') {
