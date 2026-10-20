@@ -205,3 +205,4 @@ summary.sum { cursor: pointer; font-weight: 800; }
 .note .body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
 .notes textarea { resize: vertical; min-height: 160px; }
 .notes .grow { flex: 1; }
+.more-days { width: 100%; margin-top: 10px; }

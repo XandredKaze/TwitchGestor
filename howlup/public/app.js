@@ -159,6 +159,7 @@ function pendingCard() {
 const tgWarning = () => (data.lives && !data.lives.ok && data.lives.error ? el('div', { className: 'card warn' }, '⚠️ ', data.lives.error) : null);
 
 // ---------- viste ----------
+let laterOpen = false; // "Prossimi giorni" in Oggi: aperto anche oltre il primo giorno
 function viewToday() {
   const t = today();
   const list = occurrences(allEvents(), t, addDays(t, 7));
@@ -199,7 +200,12 @@ function viewToday() {
         : null,
       quickTask(t)),
     el('section', { className: 'card' }, el('h2', {}, 'Prossimi giorni'),
-      later.length ? el('div', { className: 'items' }, groupByDay(later)) : el('div', { className: 'empty' }, 'Settimana libera.')));
+      later.length ? el('div', { className: 'items' }, groupByDay(laterOpen ? later : later.filter((o) => o.day === later[0].day))) : el('div', { className: 'empty' }, 'Settimana libera.'),
+      // di base solo il primo giorno; il pulsante mostra anche quelli dopo (fino a una settimana)
+      later.some((o) => o.day !== later[0].day)
+        ? el('button', { type: 'button', className: 'btn small more-days', onclick: () => { laterOpen = !laterOpen; render(); } },
+          laterOpen ? '▴ Mostra meno' : `▾ Mostra i giorni successivi (${new Set(later.filter((o) => o.day !== later[0].day).map((o) => o.day)).size})`)
+        : null));
   return [left, right];
 }
 
