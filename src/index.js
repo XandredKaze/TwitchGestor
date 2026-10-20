@@ -642,7 +642,11 @@ const app = {
     async publish(ids) {
       const results = [];
       for (const e of schedule.entries.filter((x) => ids.includes(x.id))) {
-        try { await publishSchedule(e); results.push({ id: e.id, ok: true }); } catch (err) { results.push({ id: e.id, ok: false, error: err.message }); }
+        try { await publishSchedule(e); results.push({ id: e.id, ok: true }); } catch (err) {
+          // Twitch permette le live "una tantum" sul calendario solo ad alcuni canali (di solito i partner)
+          const oneOff = /single segment creation not authorized/i.test(err.message);
+          results.push({ id: e.id, ok: false, error: oneOff ? 'Twitch non permette al tuo canale di aggiungere live singole al calendario (di solito è riservato ai partner): si possono pubblicare solo live che si ripetono ogni settimana.' : err.message });
+        }
       }
       return results;
     },
