@@ -172,8 +172,7 @@ function viewToday() {
   const noDue = open.filter((x) => !x.due);
   const shown = [...urgent, ...soon, ...noDue];
   const MAX_TASKS = 8;
-  const tomorrow = list.filter((o) => o.day === addDays(t, 1));
-  const later = list.filter((o) => o.day > addDays(t, 1));
+  const later = list.filter((o) => o.day > t); // da domani in poi
 
   const left = el('div', { className: 'col' },
     tgWarning(),
@@ -190,15 +189,13 @@ function viewToday() {
       : null,
     el('section', { className: 'card' }, el('h2', {}, 'Oggi'),
       todayList.length ? el('div', { className: 'items' }, todayList.map(itemRow)) : el('div', { className: 'empty' }, 'Giornata libera. Premi ＋ per aggiungere un impegno.')),
-    el('section', { className: 'card' }, el('h2', {}, 'Domani'),
-      tomorrow.length ? el('div', { className: 'items' }, tomorrow.map(itemRow)) : el('div', { className: 'empty' }, 'Niente in programma.')));
-  const right = el('div', { className: 'col' },
     el('section', { className: 'card' }, el('h2', {}, 'Da fare'),
       shown.length ? el('div', { className: 'tasks' }, shown.slice(0, MAX_TASKS).map(taskRow)) : el('div', { className: 'muted small' }, 'Niente da fare. 🎉'),
       open.length > Math.min(shown.length, MAX_TASKS)
         ? el('button', { type: 'button', className: 'btn small', style: { marginTop: '8px' }, onclick: () => { view = 'tasks'; history.replaceState(null, '', '#tasks'); render(); window.scrollTo({ top: 0 }); } }, `Vedi tutte (${open.length})`)
         : null,
-      quickTask(t)),
+      quickTask(t)));
+  const right = el('div', { className: 'col' },
     el('section', { className: 'card' }, el('h2', {}, 'Prossimi giorni'),
       later.length ? el('div', { className: 'items' }, groupByDay(laterOpen ? later : later.filter((o) => o.day === later[0].day))) : el('div', { className: 'empty' }, 'Settimana libera.'),
       // di base solo il primo giorno; il pulsante mostra anche quelli dopo (fino a una settimana)
@@ -213,7 +210,7 @@ function groupByDay(list) {
   const out = [];
   let last = '';
   for (const o of list) {
-    if (o.day !== last) { out.push(el('div', { className: 'day-head' }, longDate(o.day))); last = o.day; }
+    if (o.day !== last) { out.push(el('div', { className: 'day-head' }, o.day === addDays(today(), 1) ? `Domani · ${longDate(o.day)}` : longDate(o.day))); last = o.day; }
     out.push(itemRow(o));
   }
   return out;
