@@ -166,6 +166,11 @@ function viewToday() {
   const next = todayList.find((o) => o.allDay ? false : endMin(o) >= nowMin()) ?? list.find((o) => o.day > t);
   const open = data.tasks.filter((x) => !x.done);
   const urgent = open.filter((x) => x.due && x.due <= t).sort((a, b) => a.due.localeCompare(b.due));
+  // poi quelle dei prossimi 7 giorni e quelle senza scadenza (le altre stanno in "Da fare")
+  const soon = open.filter((x) => x.due && x.due > t && x.due <= addDays(t, 7)).sort((a, b) => a.due.localeCompare(b.due));
+  const noDue = open.filter((x) => !x.due);
+  const shown = [...urgent, ...soon, ...noDue];
+  const MAX_TASKS = 8;
   const tomorrow = list.filter((o) => o.day === addDays(t, 1));
   const later = list.filter((o) => o.day > addDays(t, 1));
 
@@ -186,7 +191,10 @@ function viewToday() {
       tomorrow.length ? el('div', { className: 'items' }, tomorrow.map(itemRow)) : el('div', { className: 'empty' }, 'Niente in programma.')));
   const right = el('div', { className: 'col' },
     el('section', { className: 'card' }, el('h2', {}, 'Da fare'),
-      urgent.length ? el('div', { className: 'tasks' }, urgent.map(taskRow)) : el('div', { className: 'muted small' }, 'Niente in scadenza oggi.'),
+      shown.length ? el('div', { className: 'tasks' }, shown.slice(0, MAX_TASKS).map(taskRow)) : el('div', { className: 'muted small' }, 'Niente da fare. 🎉'),
+      open.length > Math.min(shown.length, MAX_TASKS)
+        ? el('button', { type: 'button', className: 'btn small', style: { marginTop: '8px' }, onclick: () => { view = 'tasks'; history.replaceState(null, '', '#tasks'); render(); window.scrollTo({ top: 0 }); } }, `Vedi tutte (${open.length})`)
+        : null,
       quickTask(t)),
     el('section', { className: 'card' }, el('h2', {}, 'Prossimi giorni'),
       later.length ? el('div', { className: 'items' }, groupByDay(later)) : el('div', { className: 'empty' }, 'Settimana libera.')));
