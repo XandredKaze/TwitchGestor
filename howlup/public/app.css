@@ -212,3 +212,5 @@ summary.sum { cursor: pointer; font-weight: 800; }
 .cat-defaults { display: grid; gap: 4px; padding: 12px; border-radius: 14px; border: 1px dashed var(--border); background: color-mix(in srgb, var(--inset) 50%, transparent); }
 .cat-notes { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; background: var(--inset); white-space: pre-wrap; font-size: 14px; }
 .cat-notes[hidden] { display: none; }
+.overlap-bg { z-index: 30; }
+.overlap { display: grid; gap: 12px; }

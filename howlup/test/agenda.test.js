@@ -114,3 +114,23 @@ test('caratteristiche della categoria: orario, promemoria e note fisse, anche su
   assert.deepEqual([ev(f1.id).time, ev(f1.id).remindMin], ['11:00', null]);
   assert.equal(ev(f2.id).time, '16:00');
 });
+
+test('sovrapposizioni: avvisa se l\'impegno si accavalla con un altro (anche di notte e nelle serie)', async () => {
+  const { findOverlaps, cleanEvent } = await import('../src/core/agenda.js');
+  const ev = [
+    cleanEvent({ id: 'cube', title: 'Turno al Cube', category: 'work', date: '2026-10-21', time: '23:00', endTime: '07:00' }),
+    cleanEvent({ id: 'gym', title: 'Palestra', category: 'personal', date: '2026-10-19', time: '18:30', endTime: '19:30', repeat: { freq: 'weekly', days: [1, 3] } }),
+    cleanEvent({ id: 'all', title: 'Compleanno', category: 'personal', date: '2026-10-22', allDay: true }),
+    { id: 'tg-1', title: 'Live', category: 'live', date: '2026-10-22', time: '21:00', endTime: '', durationMin: 180 },
+  ];
+  const t = '2026-10-20';
+  const c = (x) => cleanEvent({ title: 'Nuovo', category: 'personal', ...x });
+  assert.deepEqual(findOverlaps(c({ date: '2026-10-22', time: '06:00', endTime: '08:00' }), ev, { today: t }).map((o) => o.title), ['Turno al Cube']); // il turno finisce alle 7 del giorno dopo
+  assert.deepEqual(findOverlaps(c({ date: '2026-10-22', time: '07:00' }), ev, { today: t }), []); // finisce esattamente quando inizia
+  assert.deepEqual(findOverlaps(c({ date: '2026-10-22', time: '23:30' }), ev, { today: t }).map((o) => o.title), ['Live']); // live di 3 ore
+  assert.deepEqual(findOverlaps(c({ date: '2026-10-21', time: '19:00' }), ev, { today: t }).map((o) => o.title), ['Palestra']); // serie del mercoledì
+  const weekly = findOverlaps(c({ date: '2026-10-20', time: '19:00', repeat: { freq: 'weekly', days: [3] } }), ev, { today: t, max: 3 });
+  assert.equal(weekly.length, 3);
+  assert.deepEqual(findOverlaps({ ...ev[1] }, ev, { today: t }), []); // se stesso non conta
+  assert.deepEqual(findOverlaps(c({ date: '2026-10-22', allDay: true }), ev, { today: t }), []);
+});

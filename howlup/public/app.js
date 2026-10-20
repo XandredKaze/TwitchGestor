@@ -1,6 +1,6 @@
 // Howl-UP: la pagina (telefono e PC). I dati stanno sul Raspberry; qui si mostrano e si modificano.
 import { drawStory } from './story.js';
-import { occurrences, repeatText, today, addDays, parseDate, dateKey, weekday, WEEKDAYS, FREQS, livesToEvents } from './core/agenda.js';
+import { occurrences, repeatText, today, addDays, parseDate, dateKey, weekday, WEEKDAYS, FREQS, livesToEvents, findOverlaps } from './core/agenda.js';
 
 const $ = (id) => document.getElementById(id);
 function el(tag, attrs = {}, ...children) {
@@ -584,6 +584,39 @@ function openSheet(...content) {
   return close;
 }
 
+/**
+ * Prima di salvare: se l'impegno si sovrappone ad altri, chiede se salvare lo stesso.
+ * La finestra sta sopra a quella dell'impegno, così tornando indietro le modifiche restano.
+ */
+function okOverlaps(candidate) {
+  const list = findOverlaps(candidate, allEvents(), { today: today(), skipId: candidate.id });
+  if (!list.length) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const done = (v) => { layer.remove(); document.removeEventListener('keydown', esc, true); resolve(v); };
+    const esc = (e) => { if (e.key === 'Escape') { e.stopImmediatePropagation(); done(false); } };
+    const many = list.length >= 5;
+    const layer = el('div', { className: 'sheet-bg overlap-bg', onclick: (e) => { if (e.target === layer) done(false); } },
+      el('div', { className: 'sheet overlap', role: 'alertdialog', 'aria-modal': 'true' },
+        el('h3', {}, '⚠️ Impegni sovrapposti'),
+        el('p', { style: { margin: '0' } }, `"${candidate.title}" si sovrappone con:`),
+        el('div', { className: 'items' }, list.map((o) => {
+          const c = cat(o.category);
+          return el('div', { className: 'item', style: { '--c': colorOf(o.category) } },
+            el('span', { className: 't' }, o.time, o.endTime ? el('small', {}, o.endTime < o.time ? `${o.endTime} +1` : o.endTime) : null),
+            el('span', { className: 'bar' }),
+            el('span', { className: 'what' }, el('b', {}, o.title), el('span', {}, [relDay(o.day), c ? `${c.icon} ${c.name}` : ''].filter(Boolean).join(' · '))));
+        })),
+        many ? el('p', { className: 'muted small', style: { margin: '0' } }, 'E forse altri ancora (l\'impegno si ripete).') : null,
+        el('p', { style: { margin: '0' } }, 'Vuoi salvarlo lo stesso?'),
+        el('div', { className: 'sheet-actions' },
+          el('span', { className: 'grow' }),
+          el('button', { type: 'button', className: 'btn', onclick: () => done(false) }, 'Torna indietro'),
+          el('button', { type: 'button', className: 'btn primary', onclick: () => done(true) }, 'Salva lo stesso'))));
+    document.addEventListener('keydown', esc, true);
+    document.body.append(layer);
+  });
+}
+
 function chooseScope(title) {
   return new Promise((resolve) => {
     const close = openSheet(el('h3', {}, title), el('p', { className: 'muted', style: { margin: '0' } }, 'È un impegno che si ripete.'),
@@ -689,6 +722,7 @@ function eventSheet(o = {}) {
         onclick: async () => {
           const next = collect();
           if (!next.title.trim()) { title.focus(); toast('Scrivi cosa devi fare'); return; }
+          if (!(await okOverlaps({ ...next, id: existing?.id }))) return;
           let r;
           // una live nuova va nella Programmazione di TwitchGestor (una sola o più settimane)
           if (!existing && category === 'live' && data.lives?.ok && ['none', 'weekly'].includes(next.repeat.freq)) {
@@ -767,6 +801,7 @@ function liveSheet(o) {
         onclick: async () => {
           if (!date.value || !time.value) { toast('Scegli giorno e ora'); return; }
           const live = { ...entry, start: `${date.value}T${time.value}`, durationMin: Number(dur.value), title: title.value, game: game.name, gameId: game.id, notes: notes.value, autoTitle: auto.checked };
+          if (!(await okOverlaps({ id: o.id, title: live.title || 'Live', date: date.value, time: time.value, durationMin: live.durationMin, allDay: false, repeat: { freq: 'none' } }))) return;
           if (await api('/api/lives', { method: 'PUT', body: { live } })) { close(); toast('Live aggiornata anche in TwitchGestor'); load(true); }
         },
       }, 'Salva')));

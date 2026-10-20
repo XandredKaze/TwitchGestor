@@ -163,6 +163,39 @@ export function occursOn(e, day) {
 }
 
 /** Gli impegni giorno per giorno tra from e to (compresi), in ordine di ora. */
+/**
+ * Impegni che si sovrappongono a quello che stai salvando (solo quelli con orario).
+ * Fine prima dell'inizio = il giorno dopo; senza fine si conta un'ora (le live: la loro durata).
+ * Per un impegno che si ripete si guardano i prossimi 60 giorni. Ritorna [{ day, time, endTime, title, category, with }]
+ */
+export function findOverlaps(candidate, events, { today: t = today(), skipId = candidate?.id, max = 5 } = {}) {
+  if (!candidate || candidate.allDay || !TIME.test(String(candidate.time ?? ''))) return [];
+  const span = (o) => {
+    const start = parseDate(o.day).getTime() - 12 * 3600000 + toMinutes(o.time) * 60000;
+    let end;
+    if (o.endTime) end = parseDate(o.day).getTime() - 12 * 3600000 + (toMinutes(o.endTime) + (o.endTime <= o.time ? 1440 : 0)) * 60000;
+    else end = start + (Number(o.durationMin) || 60) * 60000;
+    return [start, end];
+  };
+  const single = (candidate.repeat?.freq ?? 'none') === 'none';
+  const from = single ? candidate.date : (candidate.date > t ? candidate.date : t);
+  const to = single ? candidate.date : addDays(from, 60);
+  const mine = occurrences([{ ...candidate, id: candidate.id || '__new' }], from, to);
+  if (!mine.length) return [];
+  const others = occurrences(events.filter((e) => e.id !== skipId && !e.allDay && e.time), addDays(from, -1), addDays(to, 1));
+  const out = [];
+  for (const m of mine) {
+    const [a, b] = span(m);
+    for (const o of others) {
+      const [c, d] = span(o);
+      if (a < d && c < b) out.push({ day: o.day, time: o.time, endTime: o.endTime, title: o.title, category: o.category, with: m.day });
+      if (out.length >= max) return out;
+    }
+  }
+  return out;
+}
+const toMinutes = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+
 export function occurrences(events, from, to) {
   const out = [];
   for (let d = from, i = 0; d <= to && i < 400; d = addDays(d, 1), i++) {
