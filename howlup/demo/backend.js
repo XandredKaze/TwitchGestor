@@ -5,7 +5,7 @@
 import { Agenda, toICS, today, addDays, weekday, livesToEvents } from '../src/core/agenda.js';
 import { cleanEntry, generateWeeks } from '../../src/core/schedule.js';
 import { Notifier, cleanSettings } from '../src/core/notifier.js';
-import { Announcements, cleanAnnounceSettings } from '../src/core/announce.js';
+import { Announcements, cleanAnnounceSettings, announceSource } from '../src/core/announce.js';
 
 const KEY = 'howlup-demo-3';
 const t = today();
@@ -63,8 +63,9 @@ const announcements = new Announcements({
   onChange: () => { rev = Date.now(); },
   send: async () => ({ telegram: 'nella demo non si invia davvero' }),
 });
-const saveLives = () => { try { localStorage.setItem(LIVE_KEY, JSON.stringify(lives)); } catch { /* niente */ } rev = Date.now(); announcements.observe(lives); };
-announcements.observe(lives);
+const observeLives = () => announcements.observe(announceSource(lives, agenda.events));
+const saveLives = () => { try { localStorage.setItem(LIVE_KEY, JSON.stringify(lives)); } catch { /* niente */ } rev = Date.now(); observeLives(); };
+observeLives();
 const livesState = () => ({ ok: true, error: '', canPublish: false, entries: lives });
 const GAMES = ['Just Chatting', 'Elden Ring', 'Minecraft', 'Fortnite', 'Valorant', 'Art', 'Music', 'League of Legends'];
 
@@ -98,10 +99,10 @@ window.fetch = async (input, init = {}) => {
       if (url.searchParams.get('rev') === String(rev)) return json(200, { rev, unchanged: true });
       return json(200, { rev, ...agenda.state(), lives: livesState(), pending: notifier.pending(), announce: announcements.drafts.filter((d) => d.status === 'draft').length, calendarPath: '/calendar/demo.ics' });
     }
-    if (method === 'PUT' && path === '/api/events') return json(200, { rev, event: agenda.saveEvent(body.event) });
+    if (method === 'PUT' && path === '/api/events') { const event = agenda.saveEvent(body.event); observeLives(); return json(200, { rev, event }); }
     let m = /^\/api\/events\/([\w-]+)(\/occurrence)?$/.exec(path);
-    if (m && method === 'POST' && m[2]) return json(200, { rev, event: agenda.saveOccurrence(m[1], body.day, body.event) });
-    if (m && method === 'DELETE') return json(200, { rev, ok: agenda.deleteEvent(m[1], url.searchParams.get('only') || '') });
+    if (m && method === 'POST' && m[2]) { const event = agenda.saveOccurrence(m[1], body.day, body.event); observeLives(); return json(200, { rev, event }); }
+    if (m && method === 'DELETE') { const ok = agenda.deleteEvent(m[1], url.searchParams.get('only') || ''); observeLives(); return json(200, { rev, ok }); }
     if (method === 'PUT' && path === '/api/notes') return json(200, { rev, note: agenda.saveNote(body.note) });
     m = /^\/api\/notes\/([\w-]+)$/.exec(path);
     if (m && method === 'DELETE') return json(200, { rev, ok: agenda.deleteNote(m[1]) });

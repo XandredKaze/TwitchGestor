@@ -13,7 +13,7 @@ import { Agenda, toICS, livesToEvents } from './core/agenda.js';
 import { createTwitchLink } from './twitchgestor.js';
 import { Notifier, cleanSettings } from './core/notifier.js';
 import { sendNtfy, sendTelegramMsg, announceTelegram, announceDiscord } from './channels.js';
-import { Announcements, cleanAnnounceSettings } from './core/announce.js';
+import { Announcements, cleanAnnounceSettings, announceSource } from './core/announce.js';
 import { createSecureLink } from './secure.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -166,8 +166,10 @@ let lastSeen = '';
 async function announceTick() {
   if (!twitch.state.ok) return;
   if (Date.now() - loginCache.at > 30 * 60000) loginCache = { at: Date.now(), value: await twitch.login().catch(() => loginCache.value) };
-  const sig = JSON.stringify(twitch.state.entries);
-  if (sig !== lastSeen) { lastSeen = sig; announcements.observe(twitch.state.entries); }
+  // solo le live: Programmazione di TwitchGestor + impegni di Howl-UP con categoria "Live"
+  const source = announceSource(twitch.state.entries, agenda.events);
+  const sig = JSON.stringify(source);
+  if (sig !== lastSeen) { lastSeen = sig; announcements.observe(source); }
   await announcements.tick();
 }
 if (!env.HOWLUP_TEST) setInterval(() => announceTick().catch((err) => log(`Annunci: ${err.message}`)), 5000).unref();

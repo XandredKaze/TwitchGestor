@@ -5,7 +5,7 @@
  * Non dipende da Node: lo usano il programma sul Raspberry e la demo.
  */
 
-import { parseDate } from './agenda.js';
+import { parseDate, occurrences, today, addDays } from './agenda.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 const ms = (start) => new Date(`${start}:00`).getTime();
@@ -87,6 +87,18 @@ export function buildAnnouncement(changes, { login = '', next = null } = {}) {
   };
 }
 
+/**
+ * Cosa può generare un annuncio: SOLO le live. Cioè la Programmazione di TwitchGestor (sono tutte live)
+ * più gli impegni di Howl-UP con la categoria "Live" (per esempio quelli che si ripetono ogni mese).
+ * Gli impegni delle altre categorie non generano mai annunci.
+ */
+export function announceSource(entries = [], events = [], { now = Date.now() } = {}) {
+  const t = today(now);
+  const local = occurrences(events.filter((e) => e.category === 'live' && !e.allDay && e.time && e.source !== 'twitchgestor'), t, addDays(t, 60))
+    .map((o) => ({ id: `h-${o.id}@${o.day}`, start: `${o.day}T${o.time}`, title: o.title ?? '', game: '' }));
+  return [...entries, ...local];
+}
+
 let counter = 0;
 const newId = () => `a${Date.now().toString(36)}${(counter++).toString(36)}`;
 
@@ -107,7 +119,8 @@ export class Announcements {
   /** Nuovo elenco di live da TwitchGestor: se è cambiato qualcosa, prepara l'annuncio. */
   observe(entries) {
     const list = (entries ?? []).map((e) => ({ id: e.id, start: e.start, title: e.title ?? '', game: e.game ?? '' }));
-    if (!this.state.last) { this.state.last = list; this.#save(); return null; }
+    // primo elenco (o elenco calcolato in modo nuovo dopo un aggiornamento): solo punto di partenza, nessun annuncio
+    if (!this.state.last || this.state.v !== 2) { this.state.last = list; this.state.v = 2; this.#save(); return null; }
     const changes = diffLives(this.state.last, list, this.now());
     this.state.last = list;
     if (!changes.length) { this.#save(); return null; }

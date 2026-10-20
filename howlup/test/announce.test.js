@@ -57,3 +57,24 @@ test('impostazioni: webhook di Discord valido', () => {
   assert.equal(cleanAnnounceSettings({ discordWebhook: 'https://sito-strano.example/x' }).discordWebhook, '');
   assert.equal(cleanAnnounceSettings({}).auto.enabled, false);
 });
+
+test('annunci solo per le live: Programmazione di TwitchGestor e impegni con categoria Live', async () => {
+  const { announceSource, Announcements } = await import('../src/core/announce.js');
+  const { cleanEvent } = await import('../src/core/agenda.js');
+  const now = new Date(2026, 9, 20, 12).getTime();
+  const tg = [{ id: 'a', start: '2026-10-22T21:00', title: 'Isaac', game: 'Isaac' }];
+  const events = [
+    cleanEvent({ id: 'x', title: 'Incontrare Megumi', category: 'personal', date: '2026-10-22', time: '14:07' }),
+    cleanEvent({ id: 'c', title: 'Turno al Cube', category: 'work', date: '2026-10-23', time: '23:00' }),
+    cleanEvent({ id: 'm', title: 'Live mensile', category: 'live', date: '2026-10-25', time: '18:00', repeat: { freq: 'monthly' } }),
+  ];
+  const src = announceSource(tg, events, { now });
+  assert.deepEqual(src.map((e) => e.title), ['Isaac', 'Live mensile', 'Live mensile']);
+  const a = new Announcements({ getSettings: () => ({}), now: () => now, send: async () => ({}) });
+  a.observe(src);
+  // un impegno personale nuovo: nessun annuncio
+  assert.equal(a.observe(announceSource(tg, [...events, cleanEvent({ title: 'Cena', category: 'personal', date: '2026-10-24', time: '20:00' })], { now })), null);
+  // una live nuova in Howl-UP: annuncio
+  const d = a.observe(announceSource(tg, [...events, cleanEvent({ title: 'Live speciale', category: 'live', date: '2026-10-31', time: '21:00' })], { now }));
+  assert.equal(d.kind, 'new');
+});

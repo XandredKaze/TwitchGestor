@@ -629,7 +629,8 @@ function chooseScope(title) {
 
 function eventSheet(o = {}) {
   const existing = data.events.find((e) => e.id === o.id);
-  const e = existing ? { ...existing } : { title: '', category: data.categories[0]?.id, date: o.date ?? today(), time: '21:00', endTime: '', allDay: false, notes: '', remindMin: 30, repeat: { freq: 'none' } };
+  // impegno nuovo: di base non è una live (una live nuova finisce in TwitchGestor e può generare un annuncio)
+  const e = existing ? { ...existing } : { title: '', category: (data.categories.find((c) => c.id !== 'live') ?? data.categories[0])?.id, date: o.date ?? today(), time: '21:00', endTime: '', allDay: false, notes: '', remindMin: 30, repeat: { freq: 'none' } };
   const day = o.day ?? e.date; // il giorno toccato (per gli impegni che si ripetono)
   const title = el('input', { type: 'text', className: 'title-input', placeholder: 'Cosa devi fare?', value: e.title, maxlength: '140' });
   let category = e.category;
