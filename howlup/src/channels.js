@@ -7,15 +7,14 @@
 export async function sendNtfy({ server, topic }, msg, { ackUrl, openUrl, fetchFn = fetch } = {}) {
   if (!topic) throw new Error('ntfy: manca il nome dell\'argomento');
   const actions = [];
-  if (ackUrl) actions.push({ action: 'http', label: msg.alarm ? '✅ Sono sveglio' : '✅ Ho visto', url: ackUrl, method: 'POST', clear: true });
+  if (ackUrl) actions.push({ action: 'http', label: '✅ Ho visto', url: ackUrl, method: 'POST', clear: true });
   if (openUrl) actions.push({ action: 'view', label: 'Apri Howl-UP', url: openUrl });
   const res = await fetchFn(server.replace(/\/$/, ''), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      topic, title: msg.title, message: msg.text.slice(0, 3800), tags: msg.alarm ? ['alarm_clock'] : ['wolf'],
-      // sveglia: priorità massima (nell'app ntfy può suonare senza fermarsi e passare il "Non disturbare")
-      priority: msg.alarm ? 5 : msg.repeat ? 4 : 3, click: openUrl || undefined, actions,
+      topic, title: msg.title, message: msg.text.slice(0, 3800), tags: ['wolf'],
+      priority: msg.repeat ? 4 : 3, click: openUrl || undefined, actions,
     }),
     signal: AbortSignal.timeout(15000),
   }).catch((err) => { throw new Error(`il Raspberry non raggiunge ${server} (${err.cause?.code ?? err.message})`); });
@@ -25,7 +24,7 @@ export async function sendNtfy({ server, topic }, msg, { ackUrl, openUrl, fetchF
 export async function sendTelegramMsg({ token, chatId }, msg, { ackUrl, openUrl, fetchFn = fetch } = {}) {
   if (!token || !chatId) throw new Error('Telegram non collegato in TwitchGestor');
   const buttons = [];
-  if (ackUrl) buttons.push({ text: msg.alarm ? '✅ Sono sveglio' : '✅ Ho visto', url: ackUrl });
+  if (ackUrl) buttons.push({ text: '✅ Ho visto', url: ackUrl });
   if (openUrl) buttons.push({ text: 'Apri Howl-UP', url: openUrl });
   const res = await fetchFn(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',

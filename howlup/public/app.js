@@ -112,7 +112,7 @@ function itemRow(o) {
     el('span', { className: 'what' }, el('b', {}, o.title),
       el('span', {}, (fromTg
         ? [`${c?.icon ?? '🔴'} Live`, o.game ? `🎮 ${o.game}` : '', 'da TwitchGestor']
-        : [c ? `${c.icon} ${c.name}` : '', o.repeat?.freq !== 'none' ? `↻ ${repeatText(o)}` : '', o.alarms?.length ? `⏰ ${o.alarms.length === 1 ? '1 sveglia' : `${o.alarms.length} sveglie`}` : '']).filter(Boolean).join(' · '))));
+        : [c ? `${c.icon} ${c.name}` : '', o.repeat?.freq !== 'none' ? `↻ ${repeatText(o)}` : '']).filter(Boolean).join(' · '))));
 }
 
 function taskRow(t) {
@@ -417,8 +417,7 @@ function notifySection() {
       el('ol', { className: 'steps small' },
         el('li', {}, 'Installa l\'app gratuita ', el('b', {}, 'ntfy'), ' (Google Play o App Store).'),
         el('li', {}, 'Nell\'app premi ＋ e scrivi questo nome (è segreto, non condividerlo):', el('div', { className: 'copy', style: { marginTop: '6px' } }, el('code', {}, topic), el('button', { type: 'button', className: 'btn small', onclick: () => copy(topic) }, 'Copia'))),
-        el('li', {}, 'Accendi l\'interruttore qui sopra e premi "Manda una prova".'),
-        el('li', {}, el('b', {}, 'Per le sveglie: '), 'nell\'app ntfy apri ⋮ → Impostazioni e attiva le notifiche "insistenti" per la priorità massima (suonano finché non le tocchi). Nelle impostazioni del telefono, alla voce Non disturbare, permetti a ntfy di suonare lo stesso.')),
+        el('li', {}, 'Accendi l\'interruttore qui sopra e premi "Manda una prova".')),
       el('p', { className: 'hint' }, 'Le notifiche passano dal servizio gratuito ntfy.sh. Il pulsante "✅ Ho visto" funziona quando il telefono raggiunge il Raspberry (a casa o con Tailscale attivo).')),
     el('div', { className: 'nsec' },
       sw('✈️ Telegram (chat privata)', () => s.channels.telegram.enabled, (v) => { s.channels.telegram.enabled = v; }),
@@ -603,14 +602,10 @@ function eventSheet(o = {}) {
     dayChips);
   const remind = el('select', {}, ...[['', 'Nessun promemoria'], ['0', 'All\'ora dell\'impegno'], ['10', '10 minuti prima'], ['30', '30 minuti prima'], ['60', '1 ora prima'], ['1440', '1 giorno prima']].map(([v, l]) => el('option', { value: v }, l)));
   remind.value = e.remindMin == null ? '' : String(e.remindMin);
-  const alarms = [...(e.alarms ?? [])];
-  const alarmsBox = el('div', { className: 'field' }, el('span', {}, 'Sveglie'), alarmsField(alarms),
-    el('p', { className: 'hint', style: { margin: '4px 0 0' } }, 'Suonano con l\'app ntfy finché non tocchi "Sono sveglio" (Altro → Notifiche).'));
   const notes = el('textarea', { placeholder: 'Note (facoltative)', maxlength: '2000' });
   notes.value = e.notes ?? '';
   const sync = () => {
     times.hidden = allDay.checked;
-    alarmsBox.hidden = allDay.checked;
     repeatBox.hidden = freq.value === 'none';
     dayChips.hidden = freq.value !== 'weekly';
   };
@@ -620,7 +615,7 @@ function eventSheet(o = {}) {
 
   const collect = () => ({
     ...e, title: title.value, category, date: date.value, allDay: allDay.checked, time: time.value, endTime: endTime.value,
-    notes: notes.value, remindMin: remind.value === '' ? null : Number(remind.value), alarms,
+    notes: notes.value, remindMin: remind.value === '' ? null : Number(remind.value),
     repeat: { freq: freq.value, interval: Number(interval.value) || 1, days, until: until.value },
   });
   const close = openSheet(
@@ -633,7 +628,6 @@ function eventSheet(o = {}) {
     el('label', { className: 'field' }, el('span', {}, 'Si ripete'), freq),
     repeatBox,
     el('label', { className: 'field' }, el('span', {}, 'Promemoria'), remind),
-    alarmsBox,
     notes,
     el('div', { className: 'sheet-actions' },
       existing ? el('button', {
@@ -771,31 +765,9 @@ function taskSheet(t = {}) {
   if (!existing) setTimeout(() => title.focus(), 50);
 }
 
-// ---------- sveglie: minuti prima dell'inizio (anche più di una) ----------
-const ALARM_CHOICES = [0, 5, 10, 15, 20, 30, 40, 45, 50, 60, 90, 120, 180, 240];
-const alarmLabel = (m) => (m === 0 ? 'all\'inizio' : m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''} prima` : `${m} min prima`);
-/** Chip delle sveglie con × per toglierle e una tendina per aggiungerne (list viene modificata). */
-function alarmsField(list) {
-  const box = el('div', { className: 'chips alarms' });
-  const draw = () => {
-    list.sort((a, b) => b - a);
-    const add = el('select', {
-      'aria-label': 'Aggiungi una sveglia',
-      onchange: (e) => { const m = Number(e.target.value); if (e.target.value !== '' && !list.includes(m) && list.length < 10) list.push(m); draw(); },
-    }, el('option', { value: '' }, '＋ Aggiungi sveglia'), ...ALARM_CHOICES.filter((m) => !list.includes(m)).map((m) => el('option', { value: String(m) }, alarmLabel(m))));
-    box.replaceChildren(...list.map((m) => el('button', {
-      type: 'button', className: 'chip on', title: 'Togli questa sveglia',
-      onclick: () => { list.splice(list.indexOf(m), 1); draw(); },
-    }, `⏰ ${alarmLabel(m)} ✕`)), add);
-  };
-  draw();
-  return box;
-}
-
 // ---------- turni da dipendente: si toccano i giorni di lavoro del mese, l'orario è sempre quello del turno ----------
 function shiftSheet(fromDay = today()) {
-  const shift = { ...(data.shift ?? { title: 'Turno al Cube', category: 'cube', time: '23:00', endTime: '07:00', remindMin: 60, alarms: [50, 40, 30] }) };
-  shift.alarms = [...(shift.alarms ?? [])];
+  const shift = { ...(data.shift ?? { title: 'Turno al Cube', category: 'cube', time: '23:00', endTime: '07:00', remindMin: 60 }) };
   let month = fromDay.slice(0, 7);
   let picked = new Set();
   let monthLoaded = '';
@@ -857,7 +829,7 @@ function shiftSheet(fromDay = today()) {
   };
   draw();
   const close = openSheet(el('h3', {}, `🌙 ${shift.title}`),
-    el('p', { className: 'muted small', style: { marginTop: '0' } }, `Tocca i giorni in cui lavori (orario ${shift.time}–${shift.endTime}${shift.alarms.length ? `, sveglie ${shift.alarms.map((m) => `${m}′`).join(' · ')} prima` : ''}). Tocca una lettera per segnare o togliere quel giorno in tutto il mese. Puoi farlo un mese o una settimana alla volta.`),
+    el('p', { className: 'muted small', style: { marginTop: '0' } }, `Tocca i giorni in cui lavori (orario ${shift.time}–${shift.endTime}). Tocca una lettera per segnare o togliere quel giorno in tutto il mese. Puoi farlo un mese o una settimana alla volta.`),
     head, grid,
     el('p', { className: 'small' }, count),
     el('details', {}, el('summary', {}, '⚙️ Orario e dettagli del turno'),
@@ -868,8 +840,7 @@ function shiftSheet(fromDay = today()) {
       el('div', { className: 'grid2' },
         el('label', { className: 'field' }, el('span', {}, 'Tipo'), catSel),
         el('label', { className: 'field' }, el('span', {}, 'Promemoria'), remind)),
-      el('div', { className: 'field' }, el('span', {}, 'Sveglie'), alarmsField(shift.alarms)),
-      el('p', { className: 'hint' }, 'Orario, nome e promemoria valgono per i turni nuovi; le sveglie anche per quelli già segnati da oggi in poi.')),
+      el('p', { className: 'hint' }, 'Vale per i turni nuovi; quelli già segnati restano come sono.')),
     el('p', { className: 'hint' }, '⏱️ Straordinario? Tocca quel turno nel calendario e cambia l\'ora di inizio o di fine: vale solo per quel giorno.'),
     el('div', { className: 'sheet-actions' }, el('span', { className: 'grow' }), el('button', { type: 'button', className: 'btn', onclick: () => close() }, 'Annulla'), saveBtn));
 }

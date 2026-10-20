@@ -7,8 +7,7 @@
  *   getSettings()    impostazioni (vedi DEFAULT_SETTINGS)
  *   getData()        { events, tasks, categories } con le live già dentro gli events
  *   getExtra()       { recap } facoltativo: l'ultima live finita (dai riepiloghi di TwitchGestor)
- *   send(msg)        manda { id, kind, title, text, repeat, alarm } ai canali (ntfy, Telegram); può essere async
- *                    alarm = sveglia: priorità massima su ntfy, si ripete ogni 2 minuti anche di notte
+ *   send(msg)        manda { id, kind, title, text, repeat } ai canali (ntfy, Telegram); può essere async
  *   store            { load(), save(data) } per ricordare cosa è stato mandato e confermato
  */
 
@@ -119,7 +118,7 @@ export function buildWeekly({ events, tasks, categories }, { day }) {
 export class Notifier {
   constructor({ getSettings, getData, getExtra = () => ({}), send, store, now = () => Date.now(), log = () => {} } = {}) {
     Object.assign(this, { getSettings, getData, getExtra, send, store, now, log });
-    this.state = { briefing: '', weekly: '', reminded: [], alarmed: [], pending: [] };
+    this.state = { briefing: '', weekly: '', reminded: [], pending: [] };
     try { Object.assign(this.state, store?.load?.() ?? {}); } catch { /* prima volta */ }
   }
 
@@ -147,7 +146,7 @@ export class Notifier {
   async #notify(kind, key, msg) {
     const id = `${kind}-${key}`.replace(/[^\w-]/g, '-').slice(0, 80);
     if (this.state.pending.some((p) => p.id === id)) return;
-    const p = { id, kind, title: msg.title, text: msg.text, firstAt: this.now(), lastAt: this.now(), count: 1, ackAt: null, ...(msg.alarm ? { alarm: true, group: msg.group } : {}) };
+    const p = { id, kind, title: msg.title, text: msg.text, firstAt: this.now(), lastAt: this.now(), count: 1, ackAt: null };
     this.state.pending = [...this.state.pending, p].slice(-60);
     this.#save();
     await this.#deliver(p);
@@ -187,38 +186,9 @@ export class Notifier {
         });
       }
     }
-    // sveglie: X minuti prima dell'inizio (anche più di una per impegno), sempre attive
-    for (const o of occurrences(data.events, day, addDays(day, 1))) {
-      if (!o.alarms?.length || o.allDay) continue;
-      const start = new Date(`${o.day}T${o.time}:00`).getTime();
-      const group = `${o.id}@${o.day}`;
-      for (const m of o.alarms) {
-        const at = start - m * 60000;
-        const key = `${group}#${m}`;
-        if (this.now() < at || this.now() > at + 10 * 60000 || this.state.alarmed.includes(key)) continue;
-        this.state.alarmed = [...this.state.alarmed, key].slice(-500);
-        // la sveglia nuova sostituisce quelle prima dello stesso impegno ancora da confermare
-        for (const p of this.state.pending) if (p.alarm && p.group === group && !p.ackAt) p.ackAt = this.now();
-        const c = data.categories.find((x) => x.id === o.category);
-        await this.#notify('sveglia', key, {
-          title: `⏰ SVEGLIA – ${o.title} tra ${m >= 60 ? durText(m * 60000) : `${m} min`}`,
-          text: `${c?.icon ?? ''} ${o.title} alle ${o.time}${o.endTime ? `–${o.endTime}` : ''}${o.notes ? `\n📝 ${o.notes}` : ''}`.trim(),
-          alarm: true,
-          group,
-        });
-      }
-    }
-    // le sveglie non confermate suonano di nuovo ogni 2 minuti (al massimo 15 volte), anche di notte
-    for (const p of this.pending().filter((x) => x.alarm)) {
-      if (p.count >= 15 || this.now() - p.lastAt < 2 * 60000) continue;
-      p.count += 1;
-      p.lastAt = this.now();
-      this.#save();
-      await this.#deliver({ ...p, title: `🔁 ${p.title}` }, { repeatOf: p.count });
-    }
     // ripetizioni di quelle non ancora confermate
     if (s.repeat.enabled && !isQuiet(now, s.repeat.quietFrom, s.repeat.quietTo)) {
-      for (const p of this.pending().filter((x) => !x.alarm)) {
+      for (const p of this.pending()) {
         if (p.count >= s.repeat.maxTimes || this.now() - p.lastAt < s.repeat.everyMin * 60000) continue;
         if (this.now() - p.firstAt > 20 * 3600000) continue; // dopo quasi un giorno non ha più senso
         p.count += 1;

@@ -82,34 +82,3 @@ test('di notte non si ripete', async () => {
   go(10); await n.tick(); // 23:05
   assert.equal(sent.length, 1);
 });
-
-test('sveglie: 50, 40 e 30 minuti prima del turno, ripetute anche di notte finché non confermi', async () => {
-  let now = new Date(2026, 9, 19, 22, 0).getTime(); // lunedì 22:00, turno alle 23:00
-  const sent = [];
-  const events = [cleanEvent({ id: 'cube', title: 'Turno al Cube', category: 'work', date: '2026-10-19', time: '23:00', endTime: '07:00', alarms: [30, 50, 40] })];
-  const n = new Notifier({
-    getSettings: () => ({ reminders: { enabled: false }, briefing: { enabled: false }, weekly: { enabled: false }, repeat: { quietFrom: '21:00', quietTo: '08:00' }, channels: { ntfy: { enabled: true, topic: 'howlup-test01' } } }),
-    getData: () => ({ events, tasks: [], categories: DEFAULT_CATEGORIES }),
-    send: (m) => { sent.push(m); },
-    now: () => now,
-  });
-  const go = async (min) => { now += min * 60000; await n.tick(); };
-  await go(0);
-  assert.equal(sent.length, 0);
-  await go(10); // 22:10 = 50 minuti prima
-  assert.equal(sent.length, 1);
-  assert.match(sent[0].title, /SVEGLIA – Turno al Cube tra 50 min/);
-  assert.equal(sent[0].alarm, true);
-  await go(2); // non confermata: suona di nuovo dopo 2 minuti, anche se è "notte"
-  assert.equal(sent.length, 2);
-  assert.match(sent[1].title, /^🔁/);
-  await go(8); // 22:20 = 40 minuti prima: sostituisce la prima
-  assert.match(sent.at(-1).title, /tra 40 min/);
-  assert.equal(n.pending().filter((p) => p.alarm).length, 1);
-  n.ack(n.pending()[0].id); // "Sono sveglio"
-  const count = sent.length;
-  await go(4);
-  assert.equal(sent.length, count);
-  await go(6); // 22:30 = 30 minuti prima
-  assert.match(sent.at(-1).title, /tra 30 min/);
-});
