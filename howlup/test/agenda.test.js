@@ -95,3 +95,15 @@ test('note: titolo obbligatorio, giorno e ora facoltativi, modifica ed eliminazi
   assert.equal(a.deleteNote(n.id), true);
   assert.deepEqual(a.notes.map((x) => x.title), ['Riunione']);
 });
+
+test('sveglie dei turni: 50, 40 e 30 minuti prima, anche sui turni già segnati', async () => {
+  const { Agenda, cleanEvent } = await import('../src/core/agenda.js');
+  assert.deepEqual(cleanEvent({ title: 'X', date: '2026-11-02', time: '10:00', alarms: [30, '50', 30, -5, 'x'] }).alarms, [50, 30]);
+  // turno salvato prima delle sveglie
+  const old = { categories: null, shift: { title: 'Turno al Cube', category: 'cube', time: '23:00', endTime: '07:00', remindMin: 60 }, events: [{ id: 's1', title: 'Turno al Cube', category: 'cube', date: '2099-11-02', time: '23:00', endTime: '07:00', source: 'shift' }] };
+  const a = new Agenda({ store: { load: () => old, save: () => {} } });
+  assert.deepEqual(a.shift.alarms, [50, 40, 30]);
+  assert.deepEqual(a.events[0].alarms, [50, 40, 30]);
+  a.setShifts({ from: '2099-11-01', to: '2099-11-30', days: ['2099-11-02', '2099-11-03'], shift: { ...a.shift, alarms: [60, 30] } });
+  assert.deepEqual(a.events.map((e) => e.alarms), [[60, 30], [60, 30]]);
+});

@@ -3,7 +3,7 @@
  * Non dipende da Node: lo usano il programma sul Raspberry, la pagina nel browser e la demo.
  *
  * Le date sono "ora locale" senza fuso: giorno "2026-10-20", ora "21:00".
- *   impegno:      { id, title, category, date, time, endTime, allDay, notes, remindMin,
+ *   impegno:      { id, title, category, date, time, endTime, allDay, notes, remindMin, alarms: [minuti prima],
  *                   repeat: { freq: 'none'|'daily'|'weekly'|'monthly'|'yearly', interval, days: [1..7], until }, skip: [date] }
  *   cosa da fare: { id, title, category, due, done, doneAt, notes }
  *   nota:         { id, title, subtitle, date, time, body, createdAt, updatedAt }  (giorno e ora facoltativi)
@@ -16,7 +16,12 @@ export const DEFAULT_CATEGORIES = [
 ];
 // turni da dipendente: orario sempre uguale, si segnano i giorni di un mese o di una settimana in un colpo solo
 export const SHIFT_CATEGORY = { id: 'cube', name: 'Cube', color: '#9b7be0', icon: '🌙' };
-export const DEFAULT_SHIFT = { title: 'Turno al Cube', category: 'cube', time: '23:00', endTime: '07:00', remindMin: 60 };
+export const DEFAULT_SHIFT = { title: 'Turno al Cube', category: 'cube', time: '23:00', endTime: '07:00', remindMin: 60, alarms: [50, 40, 30] };
+
+/** Sveglie: minuti prima dell'inizio (al massimo 10, dalla più lontana alla più vicina). */
+export const cleanAlarms = (list) => (Array.isArray(list)
+  ? [...new Set(list.map(Number).filter((m) => Number.isInteger(m) && m >= 0 && m <= 10080))].sort((a, b) => b - a).slice(0, 10)
+  : []);
 export const FREQS = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
 export const WEEKDAYS = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
 
@@ -57,6 +62,7 @@ export function cleanEvent(e = {}, categories = DEFAULT_CATEGORIES) {
     allDay,
     notes: str(e.notes, 2000),
     remindMin: Number.isFinite(remind) && remind >= 0 && remind <= 10080 ? Math.round(remind) : null,
+    alarms: allDay ? [] : cleanAlarms(e.alarms),
     repeat: freq === 'none' ? { freq } : {
       freq,
       interval: Math.min(Math.max(Math.round(Number(r.interval) || 1), 1), 52),
@@ -79,6 +85,7 @@ export function cleanShift(x = {}, categories = DEFAULT_CATEGORIES) {
     time: TIME.test(String(o.time ?? '')) ? o.time : d.time,
     endTime: TIME.test(String(o.endTime ?? '')) ? o.endTime : d.endTime,
     remindMin: o.remindMin === null ? null : Number.isFinite(remind) && remind >= 0 && remind <= 10080 ? Math.round(remind) : d.remindMin,
+    alarms: Array.isArray(o.alarms) ? cleanAlarms(o.alarms) : [...d.alarms],
   };
 }
 
@@ -219,12 +226,13 @@ export class Agenda {
     let saved = null;
     try { saved = store?.load?.(); } catch { /* prima volta */ }
     this.categories = cleanCategories(saved?.categories);
-    this.events = (saved?.events ?? []).map((e) => cleanEvent(e, this.categories)).filter(Boolean);
-    this.tasks = (saved?.tasks ?? []).map((t) => cleanTask(t, this.categories)).filter(Boolean);
-    this.notes = (saved?.notes ?? []).map((n) => ({ ...cleanNote(n, n?.updatedAt), updatedAt: Number(n?.updatedAt) || Date.now() })).filter((n) => n.id);
     // il tipo "Cube" per i turni c'è sempre (si può rinominare o cambiare colore in Altro → Categorie)
     if (!saved?.shift && !this.categories.some((c) => c.id === SHIFT_CATEGORY.id)) this.categories = [...this.categories, { ...SHIFT_CATEGORY }];
     this.shift = cleanShift(saved?.shift, this.categories);
+    // turni segnati prima che esistessero le sveglie: prendono quelle del turno
+    this.events = (saved?.events ?? []).map((e) => cleanEvent(e?.source === 'shift' && !Array.isArray(e.alarms) ? { ...e, alarms: this.shift.alarms } : e, this.categories)).filter(Boolean);
+    this.tasks = (saved?.tasks ?? []).map((t) => cleanTask(t, this.categories)).filter(Boolean);
+    this.notes = (saved?.notes ?? []).map((n) => ({ ...cleanNote(n, n?.updatedAt), updatedAt: Number(n?.updatedAt) || Date.now() })).filter((n) => n.id);
   }
 
   state() {
@@ -240,7 +248,13 @@ export class Agenda {
     if (!DATE.test(String(from ?? '')) || !DATE.test(String(to ?? '')) || to < from || daysBetween(from, to) > 62) throw Object.assign(new Error('Periodo non valido'), { status: 400 });
     if (shift) {
       if (shift.category === SHIFT_CATEGORY.id && !this.categories.some((c) => c.id === SHIFT_CATEGORY.id)) this.categories = [...this.categories, { ...SHIFT_CATEGORY }];
+      const oldAlarms = JSON.stringify(this.shift.alarms);
       this.shift = cleanShift(shift, this.categories);
+      // sveglie cambiate: valgono anche per i turni già segnati da oggi in poi
+      if (JSON.stringify(this.shift.alarms) !== oldAlarms) {
+        const t = today(this.now());
+        for (const e of this.events) if (e.source === 'shift' && e.date >= t) e.alarms = [...this.shift.alarms];
+      }
     }
     const want = new Set((Array.isArray(days) ? days : []).filter((d) => DATE.test(String(d)) && d >= from && d <= to));
     const inRange = (e) => e.source === 'shift' && e.date >= from && e.date <= to;
@@ -252,7 +266,7 @@ export class Agenda {
     let added = 0;
     for (const date of [...want].sort()) {
       if (have.has(date)) continue;
-      this.events.push(cleanEvent({ title: s.title, category: s.category, date, time: s.time, endTime: s.endTime, remindMin: s.remindMin, source: 'shift' }, this.categories));
+      this.events.push(cleanEvent({ title: s.title, category: s.category, date, time: s.time, endTime: s.endTime, remindMin: s.remindMin, alarms: s.alarms, source: 'shift' }, this.categories));
       added++;
     }
     this.#save();

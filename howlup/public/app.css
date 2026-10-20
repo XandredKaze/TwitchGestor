@@ -206,3 +206,4 @@ summary.sum { cursor: pointer; font-weight: 800; }
 .notes textarea { resize: vertical; min-height: 160px; }
 .notes .grow { flex: 1; }
 .more-days { width: 100%; margin-top: 10px; }
+.alarms select { padding: 5px 8px; border-radius: 999px; border: 1px dashed var(--border); background: var(--inset); font-weight: 700; }
