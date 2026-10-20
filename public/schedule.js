@@ -214,6 +214,8 @@
 
   // ---------- immagine della settimana ----------
   async function drawWeek(canvas, { weekStart, style, format }) {
+    // stile del canale: lo stesso delle storie degli annunci di Howl-UP (channel-week.js)
+    if (style === 'canale' && window.drawChannelWeek) return window.drawChannelWeek(canvas, { weekStart, format, entries: state.entries, login: channelLogin });
     const W = 1920;
     const H = format === 'square' ? 1920 : format === 'portrait' ? 2400 : 1080;
     canvas.width = W; canvas.height = H;
@@ -297,8 +299,8 @@
     if (box.dataset.ready) return;
     box.dataset.ready = '1';
     const week = el('select', {}, el('option', { value: '0' }, 'Questa settimana'), el('option', { value: '1' }, 'Settimana prossima'), el('option', { value: '2' }, 'Tra due settimane'));
-    const style = el('select', {}, el('option', { value: 'classic' }, 'Classico (viola)'), el('option', { value: 'brutal' }, 'Brutalism'));
-    style.value = document.documentElement.dataset.ui === 'brutal' ? 'brutal' : 'classic';
+    const style = el('select', {}, el('option', { value: 'canale' }, 'Stile del canale (come gli annunci)'), el('option', { value: 'classic' }, 'Classico (viola)'), el('option', { value: 'brutal' }, 'Brutalism'));
+    style.value = 'canale';
     const format = el('select', {}, el('option', { value: 'wide' }, '16:9 (Discord, X, YouTube)'), el('option', { value: 'square' }, 'Quadrato (Instagram)'), el('option', { value: 'portrait' }, 'Verticale 4:5 (Instagram)'));
     const canvas = el('canvas', { className: 'sc-canvas' });
     const draw = () => drawWeek(canvas, { weekStart: mondayOf(Date.now()) + Number(week.value) * 7 * 86400000, style: style.value, format: format.value });

@@ -236,6 +236,8 @@ export function createServer(app) {
     try {
       if (route === 'GET /') return send(res, 302, '', { Location: '/dashboard' });
       if (route === 'GET /overlay') return serveStatic(res, '/overlay.html');
+      // il lupo caricato in Howl-UP (Annunci): lo usa anche l'immagine della settimana nello stile del canale
+      if (route === 'GET /howlup-mascot.png') return serveStatic(res, '/mascot.png', path.join(DATA_DIR, 'howlup'));
       if (route === 'GET /dashboard') return serveStatic(res, '/dashboard.html');
       if (route === 'GET /credits') return serveStatic(res, '/credits.html');
       if (route === 'GET /chat') return serveStatic(res, '/chat.html');
