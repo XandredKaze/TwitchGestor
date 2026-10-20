@@ -111,6 +111,24 @@ export function cleanTask(t = {}, categories = DEFAULT_CATEGORIES) {
   };
 }
 
+/**
+ * Caratteristiche di un'intera categoria: orario (inizio e fine), promemoria e note fisse.
+ * Orario e promemoria si usano per gli impegni nuovi; le note fisse compaiono in tutti gli impegni del tipo.
+ * remindMin: null = nessun promemoria, undefined = non impostato.
+ */
+export function cleanCategoryDefaults(d) {
+  const o = d && typeof d === 'object' ? d : {};
+  const out = {};
+  if (TIME.test(String(o.time ?? ''))) out.time = o.time;
+  if (out.time && TIME.test(String(o.endTime ?? '')) && o.endTime !== out.time) out.endTime = o.endTime;
+  const r = Number(o.remindMin);
+  if (o.remindMin === null) out.remindMin = null;
+  else if (o.remindMin !== undefined && o.remindMin !== '' && Number.isFinite(r) && r >= 0 && r <= 10080) out.remindMin = Math.round(r);
+  const notes = str(o.notes, 1000).trim();
+  if (notes) out.notes = notes;
+  return out;
+}
+
 export function cleanCategories(list) {
   if (!Array.isArray(list) || !list.length) return DEFAULT_CATEGORIES.map((c) => ({ ...c }));
   const seen = new Set();
@@ -119,6 +137,7 @@ export function cleanCategories(list) {
     name: str(c.name, 30).trim() || 'Senza nome',
     color: /^#[0-9a-f]{6}$/i.test(String(c.color ?? '')) ? c.color : '#9a8fb0',
     icon: str(c.icon, 4),
+    defaults: cleanCategoryDefaults(c.defaults),
   })).filter((c) => !seen.has(c.id) && seen.add(c.id));
   return out.length ? out : DEFAULT_CATEGORIES.map((c) => ({ ...c }));
 }
@@ -333,7 +352,24 @@ export class Agenda {
   }
 
   saveCategories(list) {
+    const before = new Map(this.categories.map((c) => [c.id, c.defaults ?? {}]));
     this.categories = cleanCategories(list);
+    // orario e promemoria cambiati: valgono anche per gli impegni già in calendario da oggi in poi,
+    // tranne quelli che avevi cambiato a mano (diversi dal valore di prima)
+    const t = today(this.now());
+    for (const c of this.categories) {
+      const old = before.get(c.id) ?? {};
+      const now = c.defaults ?? {};
+      for (const e of this.events) {
+        if (e.category !== c.id || e.allDay || e.source === 'twitchgestor') continue;
+        if (e.date < t && (e.repeat.freq === 'none' || (e.repeat.until && e.repeat.until < t))) continue;
+        for (const k of ['time', 'endTime', 'remindMin']) {
+          if (!(k in now) || now[k] === old[k]) continue;
+          // prima c'era un valore della categoria: si cambiano solo gli impegni che lo avevano ancora
+          if (!(k in old) || e[k] === old[k]) e[k] = now[k];
+        }
+      }
+    }
     const ids = new Set(this.categories.map((c) => c.id));
     for (const e of this.events) if (!ids.has(e.category)) e.category = this.categories[0].id;
     for (const t of this.tasks) if (t.category && !ids.has(t.category)) t.category = '';

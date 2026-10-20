@@ -277,20 +277,48 @@ function viewTasks() {
       el('p', { className: 'muted small' }, 'Le cose fatte si tolgono da sole dopo 30 giorni.')) : null)];
 }
 
+const REMIND_CHOICES = [['', 'Come scelgo nell\'impegno'], ['none', 'Nessun promemoria'], ['0', 'All\'ora dell\'impegno'], ['10', '10 minuti prima'], ['30', '30 minuti prima'], ['60', '1 ora prima'], ['120', '2 ore prima'], ['1440', '1 giorno prima']];
+/** Caratteristiche di un'intera categoria (orario, promemoria, note fisse): si modificano in c.defaults. */
+function catDefaultsForm(c) {
+  const d = c.defaults = { ...(c.defaults ?? {}) };
+  const setOr = (k, v) => { if (v === '' || v === undefined) delete d[k]; else d[k] = v; };
+  const time = el('input', { type: 'time', value: d.time ?? '', oninput: (e) => { setOr('time', e.target.value); if (!e.target.value) { delete d.endTime; end.value = ''; } } });
+  const end = el('input', { type: 'time', value: d.endTime ?? '', oninput: (e) => setOr('endTime', e.target.value) });
+  const remind = el('select', { onchange: (e) => { if (e.target.value === '') delete d.remindMin; else d.remindMin = e.target.value === 'none' ? null : Number(e.target.value); } },
+    ...REMIND_CHOICES.map(([v, l]) => el('option', { value: v }, l)));
+  remind.value = !('remindMin' in d) ? '' : d.remindMin === null ? 'none' : String(d.remindMin);
+  const notes = el('textarea', { rows: '2', maxlength: '1000', placeholder: 'Es. portare badge e pranzo', oninput: (e) => setOr('notes', e.target.value) });
+  notes.value = d.notes ?? '';
+  return el('div', { className: 'cat-defaults' },
+    el('p', { className: 'hint', style: { margin: '0' } }, `Valgono per tutti gli impegni "${c.name}": i nuovi le prendono da soli, quelli già in calendario da oggi in poi si aggiornano (tranne quelli che hai cambiato a mano). Lascia vuoto ciò che non vuoi impostare.`),
+    el('div', { className: 'grid2' },
+      el('label', { className: 'field' }, el('span', {}, 'Inizio'), time),
+      el('label', { className: 'field' }, el('span', {}, 'Fine (prima dell\'inizio = giorno dopo)'), end)),
+    el('label', { className: 'field' }, el('span', {}, 'Promemoria'), remind),
+    el('label', { className: 'field' }, el('span', {}, '📌 Note fisse (compaiono in ogni impegno di questo tipo)'), notes));
+}
+
 function viewMore() {
   const cats = data.categories.map((c) => ({ ...c }));
   const rows = el('div', { className: 'items' });
-  const drawCats = () => rows.replaceChildren(...cats.map((c, i) => el('div', { className: 'cat-row' },
-    el('input', { type: 'text', value: c.icon, maxlength: '4', 'aria-label': 'Icona', oninput: (e) => { c.icon = e.target.value; } }),
-    el('input', { type: 'color', value: c.color, 'aria-label': 'Colore', oninput: (e) => { c.color = e.target.value; } }),
-    el('input', { type: 'text', value: c.name, maxlength: '30', 'aria-label': 'Nome', oninput: (e) => { c.name = e.target.value; } }),
-    el('button', { type: 'button', className: 'btn small danger', onclick: () => { if (cats.length > 1) { cats.splice(i, 1); drawCats(); } }, 'aria-label': 'Togli' }, '✕'))));
+  const opened = new Set();
+  const drawCats = () => rows.replaceChildren(...cats.map((c, i) => el('div', { className: 'cat-wrap' },
+    el('div', { className: 'cat-row' },
+      el('input', { type: 'text', value: c.icon, maxlength: '4', 'aria-label': 'Icona', oninput: (e) => { c.icon = e.target.value; } }),
+      el('input', { type: 'color', value: c.color, 'aria-label': 'Colore', oninput: (e) => { c.color = e.target.value; } }),
+      el('input', { type: 'text', value: c.name, maxlength: '30', 'aria-label': 'Nome', oninput: (e) => { c.name = e.target.value; } }),
+      el('button', {
+        type: 'button', className: `btn small${opened.has(c.id) ? ' on' : ''}`, title: 'Caratteristiche della categoria', 'aria-label': 'Caratteristiche',
+        onclick: () => { if (opened.has(c.id)) opened.delete(c.id); else opened.add(c.id); drawCats(); },
+      }, Object.keys(c.defaults ?? {}).length ? '⚙️•' : '⚙️'),
+      el('button', { type: 'button', className: 'btn small danger', onclick: () => { if (cats.length > 1) { cats.splice(i, 1); drawCats(); } }, 'aria-label': 'Togli' }, '✕')),
+    opened.has(c.id) ? catDefaultsForm(c) : null)));
   drawCats();
   const calUrl = `${location.origin}${data.calendarPath}`;
   const copyBtn = el('button', { type: 'button', className: 'btn small', onclick: async () => { try { await navigator.clipboard.writeText(calUrl); toast('Link copiato'); } catch { toast('Selezionalo e copialo'); } } }, 'Copia');
   return [el('div', { className: 'col' },
     el('section', { className: 'card' }, el('h2', {}, 'Categorie'),
-      el('p', { className: 'muted small', style: { marginTop: '0' } }, 'Ogni impegno ha un tipo, con il suo colore e la sua icona.'),
+      el('p', { className: 'muted small', style: { marginTop: '0' } }, 'Ogni impegno ha un tipo, con il suo colore e la sua icona. Con ⚙️ imposti orario, promemoria e note fisse per tutta la categoria. Poi premi Salva.'),
       rows,
       el('div', { className: 'row', style: { marginTop: '12px' } },
         el('button', { type: 'button', className: 'btn small', onclick: () => { cats.push({ id: `c${Date.now().toString(36)}`, name: 'Nuova', color: '#9a8fb0', icon: '⭐' }); drawCats(); } }, '＋ Categoria'),
@@ -576,9 +604,22 @@ function eventSheet(o = {}) {
   const liveHint = el('p', { className: 'hint' }, '🔴 Le live nuove si salvano nella Programmazione di TwitchGestor: lì titolo e categoria si impostano da soli prima della live.');
   const drawCats = () => {
     catChips.replaceChildren(...data.categories.map((c) => el('button', {
-      type: 'button', className: `chip${c.id === category ? ' on' : ''}`, style: { '--c': c.color }, onclick: () => { category = c.id; drawCats(); },
+      type: 'button', className: `chip${c.id === category ? ' on' : ''}`, style: { '--c': c.color }, onclick: () => { category = c.id; drawCats(); applyCatDefaults(); },
     }, `${c.icon} ${c.name}`)));
     liveHint.hidden = Boolean(existing) || category !== 'live' || !data.lives?.ok;
+    const fixed = cat(category)?.defaults?.notes;
+    catNotes.hidden = !fixed;
+    catNotes.textContent = fixed ? `📌 ${fixed}` : '';
+  };
+  const catNotes = el('p', { className: 'cat-notes' });
+  // impegno nuovo: orario e promemoria della categoria (se impostati)
+  const applyCatDefaults = () => {
+    if (existing) return;
+    const d = cat(category)?.defaults ?? {};
+    if (d.time) { time.value = d.time; allDay.checked = false; }
+    if (d.time) endTime.value = d.endTime ?? '';
+    if ('remindMin' in d) remind.value = d.remindMin === null ? '' : String(d.remindMin);
+    sync?.();
   };
   drawCats();
   const date = el('input', { type: 'date', value: existing && e.repeat.freq !== 'none' ? day : e.date });
@@ -612,6 +653,7 @@ function eventSheet(o = {}) {
   allDay.onchange = sync;
   freq.onchange = sync;
   sync();
+  applyCatDefaults(); // impegno nuovo: parte con orario e promemoria della categoria
 
   const collect = () => ({
     ...e, title: title.value, category, date: date.value, allDay: allDay.checked, time: time.value, endTime: endTime.value,
@@ -621,7 +663,7 @@ function eventSheet(o = {}) {
   const close = openSheet(
     el('h3', {}, existing ? 'Modifica impegno' : 'Nuovo impegno'),
     title,
-    el('div', { className: 'field' }, el('span', {}, 'Tipo'), catChips, liveHint),
+    el('div', { className: 'field' }, el('span', {}, 'Tipo'), catChips, liveHint, catNotes),
     el('label', { className: 'field' }, el('span', {}, 'Giorno'), date),
     el('label', { className: 'switch' }, 'Tutto il giorno', allDay),
     times,

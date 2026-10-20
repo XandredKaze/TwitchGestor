@@ -182,7 +182,7 @@ export class Notifier {
         const mins = Math.round((start - this.now()) / 60000);
         await this.#notify('promemoria', key, {
           title: `⏰ ${mins > 0 ? `Tra ${mins} min` : 'Adesso'}: ${o.title}`,
-          text: `${c?.icon ?? ''} ${o.title} alle ${o.time}${o.endTime ? `–${o.endTime}` : ''}${o.game ? `\n🎮 ${o.game}` : ''}${o.notes ? `\n📝 ${o.notes}` : ''}`.trim(),
+          text: `${c?.icon ?? ''} ${o.title} alle ${o.time}${o.endTime ? `–${o.endTime}` : ''}${o.game ? `\n🎮 ${o.game}` : ''}${o.notes ? `\n📝 ${o.notes}` : ''}${c?.defaults?.notes ? `\n📌 ${c.defaults.notes}` : ''}`.trim(),
         });
       }
     }

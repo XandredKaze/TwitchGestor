@@ -95,3 +95,22 @@ test('note: titolo obbligatorio, giorno e ora facoltativi, modifica ed eliminazi
   assert.equal(a.deleteNote(n.id), true);
   assert.deepEqual(a.notes.map((x) => x.title), ['Riunione']);
 });
+
+test('caratteristiche della categoria: orario, promemoria e note fisse, anche sugli impegni futuri già creati', async () => {
+  const { Agenda } = await import('../src/core/agenda.js');
+  let now = new Date(2026, 9, 20, 12).getTime();
+  const a = new Agenda({ now: () => now });
+  const past = a.saveEvent({ title: 'Vecchio', category: 'work', date: '2026-10-01', time: '09:00' });
+  const f1 = a.saveEvent({ title: 'Ufficio', category: 'work', date: '2026-10-22', time: '09:00', remindMin: 30 });
+  const f2 = a.saveEvent({ title: 'Cliente', category: 'work', date: '2026-10-23', time: '15:00', remindMin: 30 });
+  const set = (defaults) => a.saveCategories(a.categories.map((c) => (c.id === 'work' ? { ...c, defaults } : c)));
+  set({ time: '10:00', endTime: '12:00', remindMin: 60, notes: '  Portare il badge  ', extra: 'no' });
+  assert.deepEqual(a.categories.find((c) => c.id === 'work').defaults, { time: '10:00', endTime: '12:00', remindMin: 60, notes: 'Portare il badge' });
+  const ev = (id) => a.events.find((e) => e.id === id);
+  assert.deepEqual([ev(f1.id).time, ev(f1.id).endTime, ev(f1.id).remindMin], ['10:00', '12:00', 60]);
+  assert.equal(ev(past.id).time, '09:00'); // quelli passati non si toccano
+  a.saveEvent({ ...ev(f2.id), time: '16:00' }); // cambiato a mano
+  set({ time: '11:00', endTime: '12:00', remindMin: null });
+  assert.deepEqual([ev(f1.id).time, ev(f1.id).remindMin], ['11:00', null]);
+  assert.equal(ev(f2.id).time, '16:00');
+});
