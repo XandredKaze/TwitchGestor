@@ -533,7 +533,7 @@ function viewAnnounce() {
   const done = ann.drafts.filter((d) => d.status !== 'draft');
   return [el('div', { className: 'col' },
     el('h1', {}, 'Annunci'),
-    el('p', { className: 'muted', style: { margin: '-8px 0 0' } }, 'Quando una live viene aggiunta, spostata, annullata o cambiata (da qui o da TwitchGestor), qui trovi l\'annuncio pronto per la community. Puoi crearne uno quando vuoi anche con "📣 Crea annuncio" nella scheda di una live.'),
+    el('p', { className: 'muted', style: { margin: '-8px 0 0' } }, 'Quando una live viene aggiunta, spostata, annullata o cambiata (da qui o da TwitchGestor), qui trovi l\'annuncio pronto per la community. Puoi crearne uno quando vuoi anche con il pulsante 📣 nella scheda di una live.'),
     open.length ? open.map(draftCard) : el('div', { className: 'empty' }, 'Nessun annuncio da inviare. Prova a spostare una live: l\'annuncio compare qui.'),
     el('details', { className: 'card' }, el('summary', { className: 'sum' }, '⚙️ Dove inviare e invio automatico'),
       el('div', { className: 'notify' },
@@ -630,7 +630,7 @@ async function createAnnouncement(live, close) {
   render();
   window.scrollTo({ top: 0 });
 }
-const announceBtn = (live, close) => el('button', { type: 'button', className: 'btn', title: 'Prepara l\'annuncio di questa live (Telegram, Discord, storia Instagram)', onclick: () => createAnnouncement(live, close) }, '📣 Crea annuncio');
+const announceBtn = (live, close) => el('button', { type: 'button', className: 'btn', title: 'Crea l\'annuncio di questa live (Telegram, Discord, storia Instagram)', 'aria-label': 'Crea annuncio', onclick: () => createAnnouncement(live, close) }, '📣');
 
 function chooseScope(title) {
   return new Promise((resolve) => {
