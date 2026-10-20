@@ -78,3 +78,15 @@ test('annunci solo per le live: Programmazione di TwitchGestor e impegni con cat
   const d = a.observe(announceSource(tg, [...events, cleanEvent({ title: 'Live speciale', category: 'live', date: '2026-10-31', time: '21:00' })], { now }));
   assert.equal(d.kind, 'new');
 });
+
+test('annuncio creato a mano per una live, in qualunque momento', async () => {
+  const { Announcements } = await import('../src/core/announce.js');
+  const now = new Date(2026, 9, 20, 12).getTime();
+  const a = new Announcements({ getSettings: () => ({ auto: { enabled: true, delayMin: 5 } }), getContext: () => ({ login: 'xandred_kaze' }), now: () => now, send: async () => ({}) });
+  const d = a.create({ id: 'x', start: '2026-10-22T21:00', title: 'Isaac', game: 'The Binding of Isaac' });
+  assert.equal(d.kind, 'promo');
+  assert.equal(d.headline, 'PROSSIMA LIVE');
+  assert.equal(d.sendAt, null); // non parte da solo
+  assert.match(d.text, /Prossima live!\nGiovedì 22 ottobre alle 21:00\nIsaac\n🎮 The Binding of Isaac\n\n👉 twitch.tv\/xandred_kaze/);
+  assert.throws(() => a.create({ start: 'domani' }), /giorno e ora/);
+});

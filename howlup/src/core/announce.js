@@ -99,6 +99,13 @@ export function announceSource(entries = [], events = [], { now = Date.now() } =
   return [...entries, ...local];
 }
 
+/** Annuncio fatto a mano per una live (pulsante "📣 Crea annuncio"): la ricorda alla community. */
+export function buildPromo(live, { login = '' } = {}) {
+  const link = login ? `\n\n👉 twitch.tv/${login}` : '';
+  const t = `${live.title ? `\n${live.title}` : ''}${live.game ? `\n🎮 ${live.game}` : ''}`;
+  return { kind: 'promo', headline: 'PROSSIMA LIVE', title: `📣 Live di ${when(live.start)}`, text: `🔴 Prossima live!\n${cap(when(live.start))}${t}${link}`, lives: [live] };
+}
+
 let counter = 0;
 const newId = () => `a${Date.now().toString(36)}${(counter++).toString(36)}`;
 
@@ -129,6 +136,17 @@ export class Announcements {
     const a = buildAnnouncement(changes, { login: ctx.login, next });
     const s = this.settings;
     const draft = { id: newId(), createdAt: this.now(), status: 'draft', ...a, edited: false, sendAt: s.auto.enabled ? this.now() + s.auto.delayMin * 60000 : null, results: {} };
+    this.state.drafts = [draft, ...this.state.drafts].slice(0, 40);
+    this.#save();
+    return draft;
+  }
+
+  /** Annuncio creato a mano per una live, in qualunque momento (non parte da solo: lo invii tu). */
+  create(input) {
+    const live = { id: String(input?.id ?? '').slice(0, 80), start: String(input?.start ?? ''), title: String(input?.title ?? '').slice(0, 140), game: String(input?.game ?? '').slice(0, 100) };
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(live.start)) throw Object.assign(new Error('Servono giorno e ora della live'), { status: 400 });
+    const a = buildPromo(live, { login: (this.getContext() ?? {}).login });
+    const draft = { id: newId(), createdAt: this.now(), status: 'draft', ...a, edited: false, sendAt: null, results: {}, manual: true };
     this.state.drafts = [draft, ...this.state.drafts].slice(0, 40);
     this.#save();
     return draft;

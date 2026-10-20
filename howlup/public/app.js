@@ -617,6 +617,21 @@ function okOverlaps(candidate) {
   });
 }
 
+/** "📣 Crea annuncio": prepara subito l'annuncio di una live e apre la scheda Annunci. */
+async function createAnnouncement(live, close) {
+  const r = await api('/api/announce/create', { method: 'POST', body: { live } });
+  if (!r) return;
+  close?.();
+  toast('Annuncio pronto 📣');
+  ann = null;
+  view = 'announce';
+  history.replaceState(null, '', '#announce');
+  load(true);
+  render();
+  window.scrollTo({ top: 0 });
+}
+const announceBtn = (live, close) => el('button', { type: 'button', className: 'btn', title: 'Prepara l\'annuncio di questa live (Telegram, Discord, storia Instagram)', onclick: () => createAnnouncement(live, close) }, '📣 Crea annuncio');
+
 function chooseScope(title) {
   return new Promise((resolve) => {
     const close = openSheet(el('h3', {}, title), el('p', { className: 'muted', style: { margin: '0' } }, 'È un impegno che si ripete.'),
@@ -716,6 +731,9 @@ function eventSheet(o = {}) {
           if (await api(`/api/events/${existing.id}${scope === 'one' ? `?only=${day}` : ''}`, { method: 'DELETE' })) { close(); toast('Eliminato'); load(true); }
         },
       }, 'Elimina') : null,
+      existing && existing.category === 'live' && !existing.allDay
+        ? announceBtn({ id: `h-${existing.id}@${day}`, start: `${day}T${existing.time}`, title: existing.title }, () => close())
+        : null,
       el('span', { className: 'grow' }),
       el('button', { type: 'button', className: 'btn', onclick: () => close() }, 'Annulla'),
       el('button', {
@@ -795,6 +813,7 @@ function liveSheet(o) {
         type: 'button', className: 'btn danger',
         onclick: async () => { if (!confirm(`Eliminare la live "${entry.title || 'Live'}" anche da TwitchGestor?`)) return; if (await api(`/api/lives/${entry.id}`, { method: 'DELETE' })) { close(); toast('Live eliminata'); load(true); } },
       }, 'Elimina'),
+      announceBtn({ id: entry.id, start: entry.start, title: entry.title, game: entry.game }, () => close()),
       el('span', { className: 'grow' }),
       el('button', { type: 'button', className: 'btn', onclick: () => close() }, 'Annulla'),
       el('button', {

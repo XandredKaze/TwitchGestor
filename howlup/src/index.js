@@ -306,6 +306,7 @@ const server = http.createServer(async (req, res) => {
         fs.writeFileSync(MASCOT_FILE, Buffer.from(m[2], 'base64'));
         return send(res, 200, { ok: true });
       }
+      if (route === 'POST /api/announce/create') return send(res, 200, { rev, draft: announcements.create((await readBody(req)).live) });
       if (route === 'DELETE /api/announce/mascot') { fs.rmSync(MASCOT_FILE, { force: true }); return send(res, 200, { ok: true }); }
       a = /^\/api\/announce\/([\w-]+)\/(send|hold|dismiss|text)$/.exec(url.pathname);
       if (a && req.method === 'POST') {

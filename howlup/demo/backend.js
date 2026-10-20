@@ -111,6 +111,7 @@ window.fetch = async (input, init = {}) => {
     if (m && method === 'DELETE') return json(200, { rev, ok: agenda.deleteTask(m[1]) });
     if (path === '/api/announce/mascot') return json(400, { error: 'Nella demo non si può caricare l\'immagine: nel programma vero sì.' });
     if (method === 'GET' && path === '/api/announce') return json(200, { settings: cleanAnnounceSettings(announceSettings), drafts: announcements.drafts, login: 'xandred_kaze', telegramChannel: '' });
+    if (method === 'POST' && path === '/api/announce/create') return json(200, { rev, draft: announcements.create(body.live) });
     if (method === 'PUT' && path === '/api/announce') { announceSettings = cleanAnnounceSettings(body.settings); return json(200, { settings: announceSettings }); }
     const am = /^\/api\/announce\/([\w-]+)\/(send|hold|dismiss|text)$/.exec(path);
     if (am && method === 'POST') {
