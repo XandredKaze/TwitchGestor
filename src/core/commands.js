@@ -7,12 +7,12 @@
  *   send(text)            scrive in chat (con il bot, se collegato)
  *   vars                  funzioni (anche async) per le variabili che richiedono dati esterni:
  *                         uptime(), followage(userId), game(), title(), lastfollow(), scene()
- *   actions               azioni speciali: scene(name) → nome della scena attivata, credits()
+ *   actions               azioni speciali: scene(name) → nome della scena attivata, credits(), clip() → link della clip
  *   counts                { get(id), set(id, n) } per i contatori {count}
  */
 
 export const PERMISSIONS = ['everyone', 'subscriber', 'vip', 'moderator', 'broadcaster'];
-export const ACTIONS = ['reply', 'list', 'scene', 'credits'];
+export const ACTIONS = ['reply', 'list', 'scene', 'credits', 'clip'];
 const RANK = { everyone: 0, subscriber: 1, vip: 2, moderator: 3, broadcaster: 4 };
 
 /** Livello di chi scrive, dai badge della chat di Twitch. */
@@ -115,6 +115,9 @@ export class ChatCommands {
         actionResult = dryRun ? `${wanted} (prova: la scena non cambia)` : await this.actions.scene?.(wanted);
       } else if (cmd.action === 'credits') {
         if (!dryRun) await this.actions.credits?.();
+      } else if (cmd.action === 'clip') {
+        // clip degli ultimi secondi della live (la durata la decide Twitch); {result} = link della clip
+        actionResult = dryRun ? 'https://clips.twitch.tv/prova' : await this.actions.clip?.();
       } else if (cmd.action === 'list') {
         actionResult = (cfg.list ?? []).filter((c) => c.enabled !== false && (c.permission ?? 'everyone') === 'everyone')
           .map((c) => prefix + c.name).join(' ');

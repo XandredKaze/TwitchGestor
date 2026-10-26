@@ -117,3 +117,20 @@ test('impostazioni: nomi unici, senza "!", senza doppioni tra i nomi alternativi
   assert.equal(out.list[1].cooldown, 3600);
   assert.equal(humanDuration(3 * 3600 * 1000 + 12 * 60000), '3 ore e 12 minuti');
 });
+
+test('!clip: crea la clip e risponde con il link; fuori live spiega perché', async () => {
+  let live = true;
+  const c = new ChatCommands({
+    getConfig: () => ({ enabled: true, prefix: '!', list: [{ id: 'clip', name: 'clip', aliases: [], action: 'clip', response: '🎬 Clip creata da {user}: {result}', permission: 'everyone', cooldown: 0, userCooldown: 0, enabled: true }], timers: [] }),
+    send() {},
+    actions: { clip: async () => { if (!live) throw new Error('le clip si possono fare solo durante la live'); return 'https://clips.twitch.tv/Abc'; } },
+    log: { warn() {} },
+  });
+  assert.equal(await c.handle(viewer('!clip')), '🎬 Clip creata da Anna: https://clips.twitch.tv/Abc');
+  live = false;
+  assert.equal(await c.handle(viewer('!clip', 'Bea')), '⚠️ le clip si possono fare solo durante la live');
+  assert.equal(await c.handle(viewer('!clip'), { dryRun: true }), '🎬 Clip creata da Anna: https://clips.twitch.tv/prova');
+  const cfg = sanitizeConfig({ commands: { list: [{ id: 'x', name: 'clip', action: 'clip', response: '{result}' }] } }, defaults);
+  assert.equal(cfg.commands.list.find((x) => x.name === 'clip').action, 'clip');
+  assert.equal(defaults.commands.list.find((x) => x.id === 'clip').action, 'clip');
+});

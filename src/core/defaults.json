@@ -139,6 +139,17 @@
         "enabled": true
       },
       {
+        "id": "clip",
+        "name": "clip",
+        "aliases": [],
+        "action": "clip",
+        "response": "🎬 Clip creata da {user}: {result}",
+        "permission": "everyone",
+        "cooldown": 60,
+        "userCooldown": 120,
+        "enabled": true
+      },
+      {
         "id": "titoli",
         "name": "titoli",
         "aliases": [],

@@ -12,6 +12,7 @@
     ['list', 'Elenca i comandi ({result})'],
     ['scene', 'Cambia scena di OBS ({scene})'],
     ['credits', 'Fa ripartire i titoli di coda'],
+    ['clip', 'Crea una clip della live ({result} = link)'],
   ];
   const VARIABLES = [
     ['{user}', 'chi scrive'],
@@ -29,7 +30,7 @@
     ['{count}', 'quante volte è stato usato il comando'],
     ['{random:1-100}', 'numero a caso'],
     ['{scene}', 'scena di OBS attivata'],
-    ['{result}', 'risultato dell\'azione (es. elenco dei comandi)'],
+    ['{result}', 'risultato dell\'azione (es. elenco dei comandi, link della clip)'],
   ];
 
   let saved = null; // impostazioni salvate nel programma
@@ -142,6 +143,7 @@
       scene: `Scrivi ${prefix()}${c.name} seguito dal nome della scena (basta l'inizio, es. ${prefix()}${c.name} gio). Serve OBS collegato (scheda Live → Scene OBS).`,
       credits: 'Fa ripartire da capo la sorgente dei titoli di coda in OBS.',
       list: 'Elenca i comandi attivi che possono usare tutti.',
+      clip: 'Twitch crea una clip degli ultimi secondi della live (la durata la decide Twitch, di solito 30 secondi) e {result} diventa il link. Funziona solo in live; tieni un\'attesa di almeno un minuto per non riempire il canale di clip.',
     }[c.action];
 
     box.replaceChildren(

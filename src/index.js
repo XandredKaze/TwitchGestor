@@ -191,6 +191,21 @@ const commandDeps = {
       return name;
     },
     credits: () => creditsStore.set('cmd', { type: 'restart', at: Date.now() }),
+    /** !clip: Twitch crea la clip degli ultimi secondi della live (come il pulsante Clip). Ritorna il link. */
+    async clip() {
+      if (!auth.user) throw new Error('il canale non è collegato a TwitchGestor');
+      try {
+        const c = (await helix.request('POST', `/clips?broadcaster_id=${auth.user.id}`)).data?.[0];
+        if (!c?.id) throw new Error('Twitch non ha creato la clip');
+        log.info(`Clip creata dalla chat: https://clips.twitch.tv/${c.id}`);
+        return `https://clips.twitch.tv/${c.id}`;
+      } catch (err) {
+        if (err.status === 404 || /offline|not live/i.test(err.message)) throw new Error('le clip si possono fare solo durante la live');
+        if (err.status === 401 || err.status === 403) throw new Error('manca il permesso per le clip: esci e accedi di nuovo con Twitch dalla dashboard');
+        if (err.status === 429) throw new Error('troppe clip di fila, riprova tra poco');
+        throw err;
+      }
+    },
   },
 };
 const commands = new ChatCommands({ ...commandDeps, getConfig: () => config.get().commands, send: sendChat });

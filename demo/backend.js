@@ -229,6 +229,7 @@ class DemoBackend {
           return name;
         },
         credits: () => { this.credits.state.cmd = { type: 'restart', at: Date.now() }; this.credits.rev += 1; },
+        clip: async () => 'https://clips.twitch.tv/DemoClipFinta',
       },
     };
     this.commandDeps = commandDeps;

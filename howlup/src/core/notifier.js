@@ -73,7 +73,7 @@ const line = (o, cats) => {
 const durText = (ms) => { const m = Math.round(ms / 60000); return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60 ? `${m % 60} min` : ''}`.trim() : `${m} min`; };
 
 /** Il buongiorno: impegni di oggi, cose da fare, prossima live e com'è andata l'ultima. */
-export function buildBriefing({ events, tasks, categories }, { day, recap } = {}) {
+export function buildBriefing({ events, tasks, categories }, { day, recap, now = parseDate(day).getTime() } = {}) {
   const list = occurrences(events, day, day);
   const late = tasks.filter((t) => !t.done && t.due && t.due < day);
   const due = tasks.filter((t) => !t.done && t.due === day);
@@ -88,7 +88,7 @@ export function buildBriefing({ events, tasks, categories }, { day, recap } = {}
     const when = parseDate(nextLive.day).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
     parts.push(`🔴 Prossima live: ${when} alle ${nextLive.time}${nextLive.title ? ` – ${nextLive.title}` : ''}`);
   }
-  if (recap?.startedAt && Date.now() - recap.startedAt < 36 * 3600000) {
+  if (recap?.startedAt && now - recap.startedAt < 36 * 3600000) { // l'ultima live, se è di ieri o di oggi
     const bits = [`durata ${durText(recap.durationMs)}`, `${recap.viewers?.average ?? 0} spettatori in media (massimo ${recap.viewers?.peak ?? 0})`];
     if (Number.isFinite(recap.followers?.gained)) bits.push(`${recap.followers.gained >= 0 ? '+' : ''}${recap.followers.gained} follower`);
     if (recap.subscribers?.newSubs?.length) bits.push(`${recap.subscribers.newSubs.length} nuovi abbonati`);
@@ -163,7 +163,7 @@ export class Notifier {
     if (s.briefing.enabled && s.briefing.days.includes(weekday(day)) && nowHm >= s.briefing.time && this.state.briefing !== day) {
       this.state.briefing = day;
       this.#save();
-      await this.#notify('buongiorno', day, buildBriefing(data, { day, recap: this.getExtra()?.recap }));
+      await this.#notify('buongiorno', day, buildBriefing(data, { day, recap: this.getExtra()?.recap, now: this.now() }));
     }
     if (s.weekly.enabled && weekday(day) === s.weekly.day && nowHm >= s.weekly.time && this.state.weekly !== day) {
       this.state.weekly = day;
@@ -206,7 +206,7 @@ export class Notifier {
   /** Prova dalla pagina: manda subito il buongiorno di oggi (da confermare come gli altri). */
   async test() {
     const day = today(this.now());
-    const msg = buildBriefing(this.getData(), { day, recap: this.getExtra()?.recap });
+    const msg = buildBriefing(this.getData(), { day, recap: this.getExtra()?.recap, now: this.now() });
     await this.#notify('prova', String(this.now()), { ...msg, title: `🧪 Prova – ${msg.title}` });
   }
 
