@@ -110,6 +110,7 @@ if as_user git reset --hard --quiet "$NEW" && deps "$OLD" "$NEW"; then
   [ -f scripts/raspberry/system-setup.sh ] && bash scripts/raspberry/system-setup.sh "$DIR" "$OWNER"
   systemctl restart twitchgestor
   systemctl restart howlup 2>/dev/null
+  systemctl restart musicante 2>/dev/null
   if started "$NEW"; then
     VERSION="$(as_user node -p 'require("./package.json").version')"
     rm -f "$BAD_FILE"
@@ -126,6 +127,7 @@ as_user tar -xzf "$BACKUP" -C "$DIR" config/config.json 2>/dev/null
 systemctl reset-failed twitchgestor 2>/dev/null
 systemctl restart twitchgestor
 systemctl restart howlup 2>/dev/null
+systemctl restart musicante 2>/dev/null
 started "$OLD"
 as_user sh -c "echo $NEW > '$BAD_FILE'"
 status rollback "la versione nuova non partiva"

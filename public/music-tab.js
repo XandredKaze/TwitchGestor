@@ -128,6 +128,8 @@
       copyRow('🖼 Riquadro "in riproduzione" (facoltativo, 500×120)', window.TG.obsUrl('music?widget')),
       copyRow('🖼 Riquadro in stile brutalista', window.TG.obsUrl('music?widget&style=brutal')),
       el('p', { className: 'muted small' }, 'Musica di cui hai i diritti, per esempio quella "DMCA free" o della Libreria audio di YouTube: la musica protetta può farti silenziare i VOD su Twitch.'),
+      // Musicante (sul Raspberry, porta 3200): scarica in MP3 da un link direttamente in queste playlist
+      window.TG.managed?.() ? el('p', { className: 'small' }, el('a', { href: `http://${location.hostname}:3200/${window.TG.token() ? `?token=${encodeURIComponent(window.TG.token())}` : ''}`, target: '_blank', rel: 'noopener' }, '⬇ Scarica musica da un link con Musicante ↗')) : null,
     );
 
     const folders = data.playlists.filter((p) => p.id !== '*').map((p) => p.id);

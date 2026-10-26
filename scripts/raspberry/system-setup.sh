@@ -46,6 +46,25 @@ Environment=NODE_ENV=production
 WantedBy=multi-user.target
 UNIT
 
+# Musicante (scarica la musica in MP3 con yt-dlp nella cartella della musica): pagina sulla porta 3200
+cat > /etc/systemd/system/musicante.service <<UNIT
+[Unit]
+Description=Musicante
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=$ME
+WorkingDirectory=$DIR
+ExecStart=$NODE musicante/src/index.js
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
 cat > /etc/systemd/system/twitchgestor-update.service <<UNIT
 [Unit]
 Description=Aggiornamento di TwitchGestor
@@ -82,10 +101,27 @@ WantedBy=timers.target
 UNIT
 
 systemctl daemon-reload
-systemctl enable twitchgestor.service howlup.service twitchgestor-update.path twitchgestor-update.timer >/dev/null 2>&1
+systemctl enable twitchgestor.service howlup.service musicante.service twitchgestor-update.path twitchgestor-update.timer >/dev/null 2>&1
 { [ -f "$DIR/howlup/src/index.js" ] && systemctl start howlup.service; } || true
+{ [ -f "$DIR/musicante/src/index.js" ] && systemctl start musicante.service; } || true
 systemctl start twitchgestor-update.path twitchgestor-update.timer
 systemctl restart twitchgestor-update.timer # il nuovo orario vale subito
+
+# --- Musicante: ffmpeg (converte in MP3) e python3 (fa girare yt-dlp). Se qualcosa va storto non blocca nulla ---
+setup_musicante() {
+  set +e
+  local need=""
+  command -v ffmpeg >/dev/null 2>&1 || need="$need ffmpeg"
+  command -v python3 >/dev/null 2>&1 || need="$need python3"
+  [ -n "$need" ] || return 0
+  echo "Installo per Musicante:$need…"
+  DEBIAN_FRONTEND=noninteractive timeout 1800 apt-get install -y -q $need >/dev/null 2>&1 \
+    || { DEBIAN_FRONTEND=noninteractive timeout 600 apt-get update -q >/dev/null 2>&1 && DEBIAN_FRONTEND=noninteractive timeout 1800 apt-get install -y -q $need >/dev/null 2>&1; } \
+    || { echo "Pacchetti per Musicante non installati (riprovo al prossimo aggiornamento)"; return 0; }
+  systemctl restart musicante.service 2>/dev/null
+  return 0
+}
+setup_musicante || true
 
 # --- cartella condivisa in rete (Samba): da Windows \\twitchgestor\TwitchGestor ---
 # dentro: music (musica, una sottocartella per playlist), images e sounds (alert).

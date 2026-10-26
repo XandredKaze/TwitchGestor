@@ -1,0 +1,11 @@
+{
+  "name": "Musicante",
+  "short_name": "Musicante",
+  "description": "Scarica la musica in MP3 nella cartella di TwitchGestor.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#121016",
+  "theme_color": "#121016",
+  "lang": "it",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

@@ -75,6 +75,7 @@
     ? `http://${location.hostname}:${new URL(state.overlayUrl).port || 80}/${page}`
     : state.overlayUrl.replace(/overlay$/, page));
   window.TG.obsUrl = (page) => (state ? obsUrl(page) : '');
+  window.TG.managed = () => Boolean(state?.managed); // sul Raspberry (ci sono anche Howl-UP e Musicante)
   window.TG.obsScenes = () => (state?.obs?.status === 'connesso' ? state.obs.scenes ?? [] : []); // per la tab Alert (scene in-game)
 
   // TwitchGestor aggiornato (es. sul Raspberry): ricarica la pagina, se non ci sono modifiche non salvate
