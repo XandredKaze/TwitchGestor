@@ -77,3 +77,29 @@ test('errore, annullamento e pulizia dell\'elenco', async () => {
   await post('/api/downloads/clear');
   assert.equal((await state()).jobs.length, 0);
 });
+
+test('mix con i minutaggi: anteprima dei capitoli e un MP3 per capitolo (il file intero non resta)', async () => {
+  const p = await (await post('/api/probe', { url: 'https://www.youtube.com/watch?v=mix' })).json();
+  assert.deepEqual(p.info.chapters.map((c) => c.title), ['Intro', 'Pioggia sul vetro']);
+  const r = await (await post('/api/downloads', { url: 'https://www.youtube.com/watch?v=mix', split: true, folder: 'Mix' })).json();
+  const j = await waitDone(r.job.id);
+  assert.equal(j.status, 'done');
+  assert.deepEqual(j.files.sort(), ['Intro.mp3', 'Pioggia sul vetro.mp3']);
+  assert.deepEqual(fs.readdirSync(path.join(music, 'Mix')).sort(), ['Intro.mp3', 'Pioggia sul vetro.mp3']);
+  // senza "dividi" resta un solo MP3; un nome già presente non viene sovrascritto
+  const one = await (await post('/api/downloads', { url: 'https://www.youtube.com/watch?v=mix&x=1', folder: 'Mix' })).json();
+  assert.deepEqual((await waitDone(one.job.id)).files, ['Brano singolo.mp3']);
+  const again = await (await post('/api/downloads', { url: 'https://www.youtube.com/watch?v=mix&x=2', folder: 'Mix' })).json();
+  assert.deepEqual((await waitDone(again.job.id)).files, ['Brano singolo (2).mp3']);
+  // nella cartella di lavoro non resta niente
+  assert.deepEqual(fs.readdirSync(path.join(dir, 'data', 'lavoro')), []);
+});
+
+test('TwitchGestor chiede se Musicante è occupato prima di aggiornarsi', async () => {
+  const slow = await (await post('/api/downloads', { url: 'https://www.youtube.com/playlist?list=lento2', playlist: true })).json();
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal((await (await fetch(`${base}/api/busy`, { headers: h })).json()).busy, true);
+  await post(`/api/downloads/${slow.job.id}/cancel`);
+  await waitDone(slow.job.id);
+  assert.equal((await (await fetch(`${base}/api/busy`, { headers: h })).json()).busy, false);
+});

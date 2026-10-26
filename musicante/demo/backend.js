@@ -7,13 +7,15 @@ let rev = Date.now();
 const folders = ['Lo-fi', 'Pausa', 'Sigle'];
 const isList = (u) => /[?&]list=|\/playlist|\/sets\/|\/album\//i.test(u);
 const SONGS = ['Notte in città', 'Caffè e pioggia', 'Lupo solitario', 'Luci al neon', 'Strada di casa', 'Ultimo livello'];
-const songsFor = (url, playlist) => (playlist && isList(url) ? SONGS : [SONGS[url.length % SONGS.length]]);
+const CHAPTERS = [{ title: 'Intro tranquilla', start: 0, end: 142 }, { title: 'Pioggia sul vetro', start: 142, end: 331 }, { title: 'Città di notte', start: 331, end: 517 }, { title: 'Ultimo caffè', start: 517, end: 700 }];
+const isMix = (u) => /mix/i.test(u);
+const songsFor = (url, playlist, split) => (playlist && isList(url) ? SONGS : isMix(url) && split ? CHAPTERS.map((c) => c.title) : [isMix(url) ? 'Mix lo-fi di un\'ora' : SONGS[url.length % SONGS.length]]);
 
 const downloads = new Downloads({
   onChange: () => { rev = Date.now(); },
   // download finto: avanza a scatti e "salva" i brani
   run: (job, { onLine, signal }) => new Promise((resolve) => {
-    const songs = songsFor(job.url, job.playlist);
+    const songs = songsFor(job.url, job.playlist, job.split);
     let i = 0;
     let p = 0;
     const timer = setInterval(() => {
@@ -50,11 +52,12 @@ window.fetch = async (input, init = {}) => {
     if (path === '/api/probe') {
       const u = cleanUrl(body.url);
       if (!u) return json(400, { error: 'Incolla un link valido (https://…)' });
-      const songs = songsFor(u, body.playlist);
+      const songs = songsFor(u, body.playlist, false);
       await new Promise((r) => setTimeout(r, 700));
       return json(200, { info: songs.length > 1
         ? { title: 'Lo-fi per le live (demo)', uploader: 'Canale di esempio', isPlaylist: true, count: songs.length, duration: songs.length * 185, entries: songs.map((t, k) => ({ title: t, duration: 160 + k * 11 })) }
-        : { title: songs[0], uploader: 'Canale di esempio', isPlaylist: false, count: 1, duration: 203, entries: [] } });
+        : isMix(u) ? { title: 'Mix lo-fi di un\'ora (demo)', uploader: 'Canale di esempio', isPlaylist: false, count: 1, duration: 700, entries: [], chapters: CHAPTERS }
+          : { title: songs[0], uploader: 'Canale di esempio', isPlaylist: false, count: 1, duration: 203, entries: [], chapters: [] } });
     }
     if (method === 'POST' && path === '/api/downloads') { const job = downloads.add({ ...body, folder: cleanFolder(body.folder) }); return json(200, { job, ...view() }); }
     if (method === 'POST' && path === '/api/downloads/clear') { downloads.clearFinished(); return json(200, view()); }

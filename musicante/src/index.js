@@ -118,6 +118,8 @@ const server = http.createServer(async (req, res) => {
     if (!authorized(req, url)) return send(res, 401, { error: 'Password mancante o sbagliata' });
     if (req.method !== 'GET' && (req.headers['x-musicante'] !== '1' || !sameOrigin(req))) return send(res, 403, { error: 'Richiesta non consentita' });
 
+    // TwitchGestor lo chiede prima di aggiornarsi: durante un download l'aggiornamento aspetta
+    if (route === 'GET /api/busy') return send(res, 200, { busy: downloads.list().some((j) => j.status === 'running' || j.status === 'queued') });
     if (route === 'GET /api/state') {
       if (url.searchParams.get('rev') === String(rev)) return send(res, 200, { rev, unchanged: true });
       return send(res, 200, view());

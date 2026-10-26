@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, execFile } from 'node:child_process';
-import { probeArgs, parseProbe, downloadArgs, friendlyError } from './core/ytdlp.js';
+import { probeArgs, parseProbe, downloadArgs, friendlyError, parseLine, FILE_MARK } from './core/ytdlp.js';
 
 const RELEASE_URL = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp';
 
@@ -16,6 +16,19 @@ export function createTool({ dataDir, binPath = process.env.MUSICANTE_YTDLP, log
   const own = !binPath; // scaricato da Musicante (si può aggiornare da solo)
   const bin = binPath || path.join(dataDir, 'bin', 'yt-dlp');
   const archive = path.join(dataDir, 'archivio.txt');
+  // cartella di lavoro: yt-dlp scarica e converte qui; nella musica arrivano solo gli MP3 finiti
+  const workRoot = path.join(dataDir, 'lavoro');
+  try { fs.rmSync(workRoot, { recursive: true, force: true }); } catch { /* pezzi di download interrotti (riavvio) */ }
+
+  /** Sposta un file finito nella musica, senza mai sovrascriverne uno con lo stesso nome. */
+  function moveInto(file, dir) {
+    const ext = path.extname(file);
+    const base = path.basename(file, ext);
+    let dest = path.join(dir, `${base}${ext}`);
+    for (let n = 2; fs.existsSync(dest); n++) dest = path.join(dir, `${base} (${n})${ext}`);
+    try { fs.renameSync(file, dest); } catch { fs.copyFileSync(file, dest); fs.rmSync(file, { force: true }); }
+    return dest;
+  }
   let state = { ytdlp: '', ffmpeg: false, busy: '', error: '', updatedAt: 0 };
 
   const exec = (file, args, timeout = 30000) => new Promise((resolve, reject) => {
@@ -84,12 +97,39 @@ export function createTool({ dataDir, binPath = process.env.MUSICANTE_YTDLP, log
     }
   }
 
-  /** Avvia il download: ogni riga scritta da yt-dlp va a onLine; ritorna il codice di uscita. */
+  /**
+   * Avvia il download: ogni riga scritta da yt-dlp va a onLine; ritorna il codice di uscita.
+   * I file completi passano dalla cartella di lavoro alla musica (dir) solo quando yt-dlp ha finito con loro;
+   * con i capitoli si spostano i capitoli e il file intero si butta (se il video non ha capitoli si tiene quello).
+   */
   function run(job, { onLine, signal, dir }) {
     return new Promise((resolve, reject) => {
       if (!state.ytdlp) { reject(new Error('yt-dlp non è pronto')); return; }
       fs.mkdirSync(dir, { recursive: true });
-      const child = spawn(bin, downloadArgs({ url: job.url, playlist: job.playlist, dir, archive }), { signal, stdio: ['ignore', 'pipe', 'pipe'] });
+      const work = path.join(workRoot, job.id);
+      fs.mkdirSync(work, { recursive: true });
+      let chapters = [];
+      const handle = (l) => {
+        const r = parseLine(l);
+        if (r?.type === 'chapter') { chapters.push(r.path); return; }
+        if (r?.type === 'main') {
+          try {
+            const done = chapters.filter((c) => fs.existsSync(c));
+            if (job.split && done.length) {
+              for (const c of done) onLine(`${FILE_MARK}${moveInto(c, dir)}`);
+              fs.rmSync(r.path, { force: true });
+            } else if (fs.existsSync(r.path)) {
+              onLine(`${FILE_MARK}${moveInto(r.path, dir)}`);
+            }
+          } catch (err) {
+            onLine(`ERROR: file non spostato nella musica (${err.message})`);
+          }
+          chapters = [];
+          return;
+        }
+        onLine(l);
+      };
+      const child = spawn(bin, downloadArgs({ url: job.url, playlist: job.playlist, split: job.split, work, archive }), { signal, stdio: ['ignore', 'pipe', 'pipe'] });
       const lines = (stream) => {
         let buf = '';
         stream.setEncoding('utf8');
@@ -97,20 +137,16 @@ export function createTool({ dataDir, binPath = process.env.MUSICANTE_YTDLP, log
           buf += d;
           const parts = buf.split(/\r?\n|\r/);
           buf = parts.pop();
-          for (const l of parts) onLine(l);
+          for (const l of parts) handle(l);
         });
-        stream.on('end', () => { if (buf) onLine(buf); });
+        stream.on('end', () => { if (buf) handle(buf); });
       };
       lines(child.stdout);
       lines(child.stderr);
-      child.on('error', (err) => { if (err.name === 'AbortError') resolve(130); else reject(err); });
-      child.on('close', (code) => {
-        // download annullato: si tolgono i pezzi a metà
-        if (signal?.aborted) {
-          try { for (const f of fs.readdirSync(dir)) if (/\.(part|ytdl)$|\.part-Frag\d+/.test(f)) fs.rmSync(path.join(dir, f), { force: true }); } catch { /* niente */ }
-        }
-        resolve(code ?? 130);
-      });
+      const cleanup = () => { try { fs.rmSync(work, { recursive: true, force: true }); } catch { /* niente */ } };
+      child.on('error', (err) => { cleanup(); if (err.name === 'AbortError') resolve(130); else reject(err); });
+      // finito o annullato: quello che è rimasto nella cartella di lavoro è incompleto e si butta
+      child.on('close', (code) => { cleanup(); resolve(code ?? 130); });
     });
   }
 

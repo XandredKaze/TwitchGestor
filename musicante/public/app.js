@@ -60,7 +60,7 @@ function showLogin(wrong) {
 
 // ---------- stato ----------
 let data = null;
-const form = { url: '', playlist: false, folder: 'Musicante', newFolder: '', info: null, probing: false };
+const form = { url: '', playlist: false, split: false, folder: 'Musicante', newFolder: '', info: null, probing: false };
 const NEW = '__new__';
 
 async function load(force = false) {
@@ -93,6 +93,8 @@ function downloadCard() {
     previewBox.replaceChildren();
   };
   pl.onchange = () => { form.playlist = pl.checked; form.info = null; previewBox.replaceChildren(); };
+  // capitoli: un MP3 per ogni minutaggio della descrizione (si accende da solo se l'anteprima ne trova)
+  const sp = el('input', { type: 'checkbox', checked: form.split, onchange: () => { form.split = sp.checked; } });
   const paste = el('button', {
     type: 'button', className: 'btn', title: 'Incolla',
     onclick: async () => {
@@ -123,7 +125,11 @@ function downloadCard() {
       const r = await api('/api/probe', { method: 'POST', body: { url: form.url, playlist: form.playlist } });
       probeBtn.disabled = false;
       probeBtn.textContent = '🔎 Anteprima';
-      if (r) { form.info = r.info; previewBox.replaceChildren(previewView(r.info)); }
+      if (r) {
+        form.info = r.info;
+        if (r.info.chapters?.length && !form.split) { form.split = true; sp.checked = true; }
+        previewBox.replaceChildren(previewView(r.info));
+      }
     },
   }, '🔎 Anteprima');
   const go = el('button', {
@@ -132,11 +138,11 @@ function downloadCard() {
       if (!cleanUrl(form.url)) { toast('Incolla un link valido'); url.focus(); return; }
       if (form.folder === NEW && !target()) { toast('Scrivi il nome della cartella'); newName.focus(); return; }
       if (form.info?.isPlaylist && form.info.count > 50 && !confirm(`La playlist ha ${form.info.count} brani: scaricarli tutti?`)) return;
-      const r = await api('/api/downloads', { method: 'POST', body: { url: form.url, playlist: form.playlist, folder: target(), title: form.info?.title ?? '', count: form.info?.count ?? 0 } });
+      const r = await api('/api/downloads', { method: 'POST', body: { url: form.url, playlist: form.playlist, split: form.split, folder: target(), title: form.info?.title ?? '', count: form.info?.count ?? 0 } });
       if (!r) return;
       toast('Download aggiunto ⬇');
       if (form.folder === NEW) form.folder = target();
-      Object.assign(form, { url: '', info: null, newFolder: '', playlist: false });
+      Object.assign(form, { url: '', info: null, newFolder: '', playlist: false, split: false });
       data = { ...data, ...r };
       render();
     },
@@ -145,6 +151,7 @@ function downloadCard() {
   return el('section', { className: 'card' }, el('h2', {}, 'Scarica'),
     el('div', { className: 'url-row' }, url, paste),
     el('label', { className: 'switch' }, el('span', {}, 'Playlist intera', el('span', { className: 'hint', style: { display: 'block', fontWeight: 400 } }, 'Spento: solo il brano del link')), pl),
+    el('label', { className: 'switch' }, el('span', {}, 'Dividi per capitoli', el('span', { className: 'hint', style: { display: 'block', fontWeight: 400 } }, 'Un MP3 per ogni minutaggio della descrizione (per i mix lunghi)')), sp),
     el('label', { className: 'field' }, el('span', {}, 'Dove salvarla'), sel, newName),
     previewBox,
     el('div', { className: 'row' }, probeBtn, go),
@@ -156,13 +163,18 @@ function previewView(info) {
     el('b', {}, info.title || 'Senza titolo'),
     el('span', { className: 'hint' }, [info.uploader, info.isPlaylist ? `${info.count} brani` : 'brano singolo', info.duration ? formatDuration(info.duration) : ''].filter(Boolean).join(' · ')),
     info.isPlaylist && info.entries.length ? el('ol', {}, info.entries.map((e) => el('li', {}, `${e.title}${e.duration ? ` (${formatDuration(e.duration)})` : ''}`))) : null,
-    info.isPlaylist && info.count > info.entries.length ? el('span', { className: 'hint' }, `…e altri ${info.count - info.entries.length}`) : null);
+    info.isPlaylist && info.count > info.entries.length ? el('span', { className: 'hint' }, `…e altri ${info.count - info.entries.length}`) : null,
+    info.chapters?.length
+      ? [el('span', { className: 'hint' }, `✂️ ${info.chapters.length} capitoli: con "Dividi per capitoli" diventano ${info.chapters.length} MP3`),
+        el('ol', {}, info.chapters.map((c) => el('li', {}, `${formatDuration(c.start)} ${c.title}`)))]
+      : !info.isPlaylist ? el('span', { className: 'hint' }, 'Nessun capitolo: diventa un solo MP3') : null);
 }
 
 const STATUS = { queued: '⏳ In attesa', running: '⬇ In corso', done: '✓ Fatto', error: '⚠️ Errore', cancelled: 'Annullato' };
 
 function jobView(j) {
   const folder = j.folder ? `📁 ${j.folder}` : '📁 cartella principale';
+  const how = j.split ? ' · ✂️ per capitoli' : '';
   const progress = j.status === 'running'
     ? [j.total ? `${j.index ?? 1} di ${j.total}` : '', j.current].filter(Boolean).join(' · ')
     : '';
@@ -171,7 +183,7 @@ function jobView(j) {
     : j.status === 'error' && j.files.length ? `${j.files.length} scaricati prima dell'errore` : '';
   return el('div', { className: `job ${j.status}` },
     el('div', { className: 'job-head' },
-      el('div', { className: 'job-title' }, j.title || j.url, el('div', { className: 'job-meta' }, [folder, summary].filter(Boolean).join(' · '))),
+      el('div', { className: 'job-title' }, j.title || j.url, el('div', { className: 'job-meta' }, [folder + how, summary].filter(Boolean).join(' · '))),
       el('span', { className: `badge ${j.status}` }, STATUS[j.status] ?? j.status)),
     j.status === 'running' || j.status === 'queued' ? el('div', { className: 'bar' }, el('i', { style: { width: `${j.overall ?? 0}%` } })) : null,
     progress ? el('div', { className: 'job-meta' }, `${progress} · ${j.overall ?? 0}%`) : null,

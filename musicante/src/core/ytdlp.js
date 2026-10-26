@@ -29,12 +29,15 @@ export function cleanFolder(input) {
 
 export const FILE_MARK = 'MUSICANTE_FILE ';
 export const PROGRESS_MARK = 'MUSICANTE_PROGRESS ';
+export const MAIN_MARK = 'MUSICANTE_MAIN '; // file completo nella cartella di lavoro (Musicante poi lo sposta)
 
 /**
- * Argomenti di yt-dlp per scaricare l'audio in MP3 nella cartella scelta.
- * dir: cartella di destinazione, archive: file che ricorda i brani già scaricati (non li riscarica).
+ * Argomenti di yt-dlp per scaricare l'audio in MP3.
+ * work: cartella di lavoro (i file finiti li sposta Musicante nella musica, così lì non c'è mai niente a metà);
+ * archive: file che ricorda i brani già scaricati (non li riscarica);
+ * split: un MP3 per ogni capitolo del video (i minutaggi della descrizione), in work/capitoli.
  */
-export function downloadArgs({ url, playlist = false, dir, archive }) {
+export function downloadArgs({ url, playlist = false, work, archive, split = false }) {
   return [
     '--newline', '--color', 'never', '--ignore-config',
     '-x', '--audio-format', 'mp3', '--audio-quality', '0', '--embed-metadata',
@@ -42,9 +45,10 @@ export function downloadArgs({ url, playlist = false, dir, archive }) {
     '--ignore-errors', '--no-overwrites',
     ...(archive ? ['--download-archive', archive] : []),
     '--windows-filenames',
-    '-o', `${dir}/%(title).150B.%(ext)s`,
+    '-o', `${work}/%(title).150B.%(ext)s`,
+    ...(split ? ['--split-chapters', '-o', `chapter:${work}/capitoli/%(section_title).150B.%(ext)s`] : []),
     '--progress-template', `download:${PROGRESS_MARK}%(progress._percent_str)s|%(info.playlist_index)s|%(info.n_entries)s|%(info.title)s`,
-    '--print', `after_move:${FILE_MARK}%(filepath)s`,
+    '--print', `after_move:${MAIN_MARK}%(filepath)s`,
     '--', url,
   ];
 }
@@ -65,12 +69,15 @@ export function parseProbe(json) {
     count: entries ? entries.length : 1,
     duration: entries ? entries.reduce((s, e) => s + (Number(e.duration) || 0), 0) : Number(d?.duration) || 0,
     entries: (entries ?? []).slice(0, 100).map((e) => ({ title: String(e.title ?? e.id ?? '').slice(0, 200), duration: Number(e.duration) || 0 })),
+    // capitoli del video (YouTube li crea dai minutaggi nella descrizione)
+    chapters: (Array.isArray(d?.chapters) ? d.chapters : []).slice(0, 200).map((c) => ({ title: String(c?.title ?? '').slice(0, 200), start: Number(c?.start_time) || 0, end: Number(c?.end_time) || 0 })),
   };
 }
 
 /**
  * Una riga scritta da yt-dlp durante il download.
  * Ritorna { type: 'progress', percent, index, total, title } | { type: 'file', path } | { type: 'skip' } (già scaricato)
+ *   | { type: 'main', path } (file completo, nella cartella di lavoro) | { type: 'chapter', path } (un capitolo)
  *   | { type: 'error', text } | null
  */
 export function parseLine(raw) {
@@ -83,6 +90,9 @@ export function parseLine(raw) {
     return { type: 'progress', percent: Number.isFinite(percent) ? Math.min(100, Math.max(0, percent)) : null, index: n(index), total: n(total), title: title.join('|').trim() === 'NA' ? '' : title.join('|').trim() };
   }
   if (line.startsWith(FILE_MARK)) return { type: 'file', path: line.slice(FILE_MARK.length).trim() };
+  if (line.startsWith(MAIN_MARK)) return { type: 'main', path: line.slice(MAIN_MARK.length).trim() };
+  const ch = /^\[SplitChapters\] Chapter \d+; Destination: (.+)$/.exec(line);
+  if (ch) return { type: 'chapter', path: ch[1].trim() };
   if (/has already been recorded in the archive|has already been downloaded/i.test(line)) return { type: 'skip' };
   if (/^ERROR:/.test(line)) return { type: 'error', text: friendlyError(line.replace(/^ERROR:\s*/, '')) };
   return null;

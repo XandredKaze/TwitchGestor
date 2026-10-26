@@ -624,6 +624,19 @@ function testModeration(text, role = 'everyone', draft) {
 let eventsub = null;
 const streamelements = env.STREAMELEMENTS_JWT ? new StreamElementsSource({ jwt: env.STREAMELEMENTS_JWT }) : null;
 
+/** Musicante (stesso Raspberry, porta 3200) sta scaricando? Se non risponde, non blocca niente. */
+async function musicanteBusy() {
+  try {
+    const res = await fetch(`http://127.0.0.1:${Number(process.env.MUSICANTE_PORT) || 3200}/api/busy`, {
+      headers: process.env.DASHBOARD_TOKEN ? { 'x-dashboard-token': process.env.DASHBOARD_TOKEN } : {},
+      signal: AbortSignal.timeout(2000),
+    });
+    return res.ok && (await res.json()).busy === true;
+  } catch {
+    return false;
+  }
+}
+
 const app = {
   env,
   config,
@@ -670,6 +683,7 @@ const app = {
   /** In live adesso? (OBS sta trasmettendo o Twitch ti mostra in live): lo script di aggiornamento aspetta. */
   async isBusy() {
     if (obs.state().stream?.active) return true;
+    if (await musicanteBusy()) return true; // Musicante sta scaricando: l'aggiornamento lo interromperebbe
     if (!auth.user) return false;
     try {
       return Boolean(await autoShoutout.liveSince());
