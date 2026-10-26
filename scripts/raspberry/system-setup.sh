@@ -128,7 +128,8 @@ setup_musicante || true
 # Utente = quello del Raspberry, password = la stessa della dashboard. Se qualcosa va storto non blocca nulla.
 setup_share() {
   set +e
-  TOKEN="$(grep -E '^DASHBOARD_TOKEN=' "$DIR/.env" 2>/dev/null | cut -d= -f2-)"
+  # come la legge TwitchGestor: senza virgolette, spazi o "a capo" di Windows (altrimenti la password non corrisponde)
+  TOKEN="$(grep -E '^DASHBOARD_TOKEN=' "$DIR/.env" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/")"
   [ -n "$TOKEN" ] || return 0
   if ! command -v smbd >/dev/null 2>&1; then
     echo "Installo la cartella condivisa (Samba)…"
@@ -168,7 +169,9 @@ SMB
     CHANGED=1
   fi
   # password della cartella = password della dashboard (si aggiorna se la cambi)
-  printf '%s\n%s\n' "$TOKEN" "$TOKEN" | smbpasswd -s -a "$ME" >/dev/null 2>&1
+  printf '%s\n%s\n' "$TOKEN" "$TOKEN" | smbpasswd -s -a "$ME" >/dev/null 2>&1 \
+    || echo "Cartella condivisa: password per $ME non impostata (smbpasswd non riuscito)"
+  smbpasswd -e "$ME" >/dev/null 2>&1 # l'utente della cartella deve essere attivo
   if [ "$CHANGED" = 1 ] || ! systemctl is-active --quiet smbd; then
     systemctl enable smbd nmbd >/dev/null 2>&1
     systemctl restart smbd nmbd >/dev/null 2>&1

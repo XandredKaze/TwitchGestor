@@ -69,7 +69,8 @@ function shareInfo() {
     if (!/\[TwitchGestor\]/.test(fs.readFileSync('/etc/samba/smb.conf', 'utf8'))) return null;
   } catch { return null; }
   const host = os.hostname();
-  return { path: `\\\\${host}\\TwitchGestor`, host, user: os.userInfo().username, password: process.env.DASHBOARD_TOKEN ?? '' };
+  // utente scritto come "raspberry\\utente": così Windows non lo confonde con un account del PC (accesso negato)
+  return { path: `\\\\${host}\\TwitchGestor`, host, user: `${host}\\${os.userInfo().username}`, password: process.env.DASHBOARD_TOKEN ?? '' };
 }
 
 function safeEqual(a, b) {

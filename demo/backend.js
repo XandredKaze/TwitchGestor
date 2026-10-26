@@ -822,7 +822,7 @@ class DemoBackend {
     const setFile = (name, p) => { const i = ov.inputs.find((x) => x.name === name); Object.assign(i.settings, linkSettings(i.kind, p)); };
     switch (route) {
       case 'GET /api/overlay':
-        return ok({ files: ov.files, folders: ov.folders, root: ov.root, limit: 500 * 1024 * 1024, exts: OVERLAY_EXTS, share: { path: '\\\\twitchgestor\\TwitchGestor', host: 'twitchgestor', user: 'pi', password: '(la password della dashboard)' } });
+        return ok({ files: ov.files, folders: ov.folders, root: ov.root, limit: 500 * 1024 * 1024, exts: OVERLAY_EXTS, share: { path: '\\\\twitchgestor\\TwitchGestor', host: 'twitchgestor', user: 'twitchgestor\\pi', password: '(la password della dashboard)' } });
       case 'GET /api/overlay/obs': return ok(sources());
       case 'POST /api/overlay/upload': {
         const name = cleanFileName(decodeURIComponent(headers['x-filename'] ?? ''));

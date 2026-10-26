@@ -312,7 +312,8 @@
         copyRow('Cartella overlay', `${s.path}\\overlay`),
         copyRow('Nome utente', s.user),
         copyRow('Password', s.password || '(quella del Raspberry)'),
-        el('p', { className: 'muted small' }, 'Quando Windows la chiede, spunta "Memorizza credenziali": OBS legge i file solo se Windows ricorda l\'accesso.'),
+        el('p', { className: 'muted small' }, 'Quando Windows la chiede, scrivi il nome utente così com\'è (con "', s.host, '\\" davanti) e spunta "Memorizza credenziali": OBS legge i file solo se Windows ricorda l\'accesso.'),
+        el('p', { className: 'muted small' }, 'Se dice "accesso negato": apri "Gestione credenziali" di Windows → Credenziali di Windows, elimina quelle di ', s.host, ' e riprova.'),
       ] : data.root
         ? el('p', { className: 'muted small' }, 'La cartella è qui, sul disco di questo PC: ', el('code', {}, data.root))
         : el('p', { className: 'muted small' }, 'La cartella condivisa in rete c\'è solo sul Raspberry (si attiva da sola con l\'aggiornamento).'),
