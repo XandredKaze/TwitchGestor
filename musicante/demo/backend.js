@@ -34,7 +34,7 @@ const downloads = new Downloads({
   }),
 });
 
-const tool = { ytdlp: '2026.10.22', ffmpeg: true, busy: '', error: '', updatedAt: Date.now() };
+const tool = { ytdlp: '2026.10.22', ffmpeg: true, busy: '', error: '', updatedAt: Date.now(), cookies: false };
 const view = () => ({ rev, tool, folders: [...folders].sort((a, b) => a.localeCompare(b, 'it')), jobs: downloads.list().map((j) => ({ ...j, overall: Math.round(Downloads.overall(j)) })) });
 const json = (status, data) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 const realFetch = window.fetch.bind(window);
@@ -64,6 +64,7 @@ window.fetch = async (input, init = {}) => {
     const m = /^\/api\/downloads\/([\w-]+)(\/cancel)?$/.exec(path);
     if (m && method === 'POST' && m[2]) { downloads.cancel(m[1]); return json(200, view()); }
     if (m && method === 'DELETE') { downloads.remove(m[1]); return json(200, view()); }
+    if (path === '/api/cookies') { tool.cookies = method === 'PUT' && /\t/.test(body.text ?? ''); rev = Date.now(); return method === 'PUT' && !tool.cookies ? json(400, { error: 'Non sembra un file cookies.txt di YouTube (formato Netscape)' }) : json(200, view()); }
     if (path === '/api/tool/update') { await new Promise((r) => setTimeout(r, 800)); tool.updatedAt = Date.now(); rev = Date.now(); return json(200, view()); }
     return json(404, { error: 'Non trovato' });
   } catch (err) {

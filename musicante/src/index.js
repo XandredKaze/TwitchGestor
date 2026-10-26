@@ -140,6 +140,8 @@ const server = http.createServer(async (req, res) => {
     const m = /^\/api\/downloads\/([\w-]+)(\/cancel)?$/.exec(url.pathname);
     if (m && req.method === 'POST' && m[2]) return send(res, downloads.cancel(m[1]) ? 200 : 404, view());
     if (m && req.method === 'DELETE' && !m[2]) return send(res, downloads.remove(m[1]) ? 200 : 404, view());
+    if (route === 'PUT /api/cookies') { tool.setCookies((await readBody(req, 2_000_000)).text); rev = Date.now(); return send(res, 200, view()); }
+    if (route === 'DELETE /api/cookies') { tool.setCookies(''); rev = Date.now(); return send(res, 200, view()); }
     if (route === 'POST /api/tool/update') { await tool.update(); rev = Date.now(); return send(res, 200, view()); }
     return send(res, 404, { error: 'Non trovato' });
   } catch (err) {

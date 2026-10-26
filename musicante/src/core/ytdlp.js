@@ -37,8 +37,21 @@ export const MAIN_MARK = 'MUSICANTE_MAIN '; // file completo nella cartella di l
  * archive: file che ricorda i brani già scaricati (non li riscarica);
  * split: un MP3 per ogni capitolo del video (i minutaggi della descrizione), in work/capitoli.
  */
-export function downloadArgs({ url, playlist = false, work, archive, split = false }) {
+/**
+ * Opzioni per YouTube: jsRuntime = Node.js del Raspberry (yt-dlp lo usa per leggere le pagine di YouTube),
+ * cookies = file dei cookie di un account (quando YouTube chiede di confermare che non sei un bot).
+ */
+export function accessArgs({ jsRuntime = '', cookies = '' } = {}) {
   return [
+    // Node.js per i controlli di YouTube; gli script che servono si prendono dal sito di yt-dlp se mancano
+    ...(jsRuntime ? ['--js-runtimes', `node:${jsRuntime}`, '--remote-components', 'ejs:github'] : []),
+    ...(cookies ? ['--cookies', cookies] : []),
+  ];
+}
+
+export function downloadArgs({ url, playlist = false, work, archive, split = false, access = {} }) {
+  return [
+    ...accessArgs(access),
     // --print rende yt-dlp "silenzioso": --progress fa vedere lo stesso l'avanzamento
     '--newline', '--progress', '--color', 'never', '--ignore-config',
     '-x', '--audio-format', 'mp3', '--audio-quality', '0', '--embed-metadata',
@@ -55,8 +68,8 @@ export function downloadArgs({ url, playlist = false, work, archive, split = fal
 }
 
 /** Argomenti per l'anteprima: titolo e (per le playlist) l'elenco dei brani, senza scaricare. */
-export function probeArgs({ url, playlist = false }) {
-  return ['--color', 'never', '--ignore-config', '-J', '--flat-playlist', playlist ? '--yes-playlist' : '--no-playlist', '--', url];
+export function probeArgs({ url, playlist = false, access = {} }) {
+  return [...accessArgs(access), '--color', 'never', '--ignore-config', '-J', '--flat-playlist', playlist ? '--yes-playlist' : '--no-playlist', '--', url];
 }
 
 /** Dalla risposta JSON dell'anteprima a quello che serve alla pagina. */
@@ -106,7 +119,7 @@ export function friendlyError(text) {
   if (/Private video|private/i.test(t) && /video/i.test(t)) return 'Il video è privato';
   if (/Video unavailable|This video is not available|removed/i.test(t)) return 'Il video non è disponibile';
   if (/Sign in to confirm your age|age-restricted/i.test(t)) return 'Il video è vietato ai minori: non si può scaricare senza accesso';
-  if (/Sign in to confirm you.?re not a bot/i.test(t)) return 'YouTube chiede di confermare che non sei un bot: riprova più tardi (o aggiorna yt-dlp)';
+  if (/Sign in to confirm you.?re not a bot/i.test(t)) return 'YouTube chiede di confermare che non sei un bot: carica i cookie di YouTube (riquadro "Accesso a YouTube" qui sotto)';
   if (/ffmpeg|ffprobe/i.test(t) && /not found|not installed/i.test(t)) return 'Manca ffmpeg sul Raspberry (si installa da solo al prossimo aggiornamento)';
   if (/HTTP Error 429|Too Many Requests/i.test(t)) return 'Troppe richieste: riprova tra un po\'';
   if (/Unable to download webpage|Failed to resolve|Network is unreachable|timed out/i.test(t)) return 'Il Raspberry non riesce a raggiungere il sito: controlla internet';

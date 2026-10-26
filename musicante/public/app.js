@@ -216,6 +216,32 @@ function jobsCard() {
     jobs.length ? el('div', { className: 'jobs' }, jobs.map(jobView)) : el('div', { className: 'empty' }, 'Nessun download. Incolla un link qui sopra.'));
 }
 
+function cookiesCard() {
+  const has = data.tool.cookies;
+  const blocked = data.jobs.some((j) => (j.errors ?? []).some((e) => /non sei un bot/.test(e)));
+  const file = el('input', {
+    type: 'file', accept: '.txt,text/plain', hidden: true,
+    onchange: async () => {
+      const f = file.files[0];
+      if (!f) return;
+      const r = await api('/api/cookies', { method: 'PUT', body: { text: await f.text() } });
+      if (r) { data = r; render(); toast('Cookie caricati 🍪: riprova il download'); }
+    },
+  });
+  return el('details', { className: 'card', open: blocked && !has ? true : undefined },
+    el('summary', {}, el('b', {}, `🍪 Accesso a YouTube ${has ? '· cookie caricati ✓' : ''}`)),
+    el('p', { className: 'hint' }, 'Se YouTube risponde "conferma che non sei un bot", yt-dlp ha bisogno dei cookie di un account YouTube (il "biglietto d\'accesso" del tuo browser). È gratis e si fa una volta:'),
+    el('ol', { className: 'hint', style: { margin: '0', paddingLeft: '20px' } },
+      el('li', {}, 'Sul PC, in Chrome o Firefox, installa l\'estensione gratuita ', el('b', {}, 'Get cookies.txt LOCALLY'), '.'),
+      el('li', {}, 'Apri youtube.com con un account. Meglio un ', el('b', {}, 'account secondario'), ': in rari casi YouTube può limitare l\'account usato per scaricare.'),
+      el('li', {}, 'Premi l\'estensione e scegli ', el('b', {}, 'Export'), ': si salva un file cookies.txt.'),
+      el('li', {}, 'Qui sotto premi "Carica cookies.txt" e scegli quel file.')),
+    el('p', { className: 'hint' }, 'I cookie restano solo sul Raspberry. Scadono dopo un po\': se l\'errore torna, ripeti i passaggi.'),
+    el('div', { className: 'row' }, file,
+      el('button', { type: 'button', className: 'btn small', onclick: () => file.click() }, has ? 'Sostituisci cookies.txt' : 'Carica cookies.txt'),
+      has ? el('button', { type: 'button', className: 'btn small danger', onclick: async () => { const r = await api('/api/cookies', { method: 'DELETE' }); if (r) { data = r; render(); } } }, 'Togli') : null));
+}
+
 function infoCard() {
   const t = data.tool;
   return el('section', { className: `card${!t.ffmpeg || t.error ? ' warn' : ''}` }, el('h2', {}, 'Come funziona'),
@@ -242,12 +268,12 @@ function render() {
   const formNode = v.querySelector('[data-part="form"]');
   if (typing && formNode) {
     while (formNode.nextSibling) formNode.nextSibling.remove();
-    v.append(jobsCard(), infoCard());
+    v.append(jobsCard(), cookiesCard(), infoCard());
     return;
   }
   const f = downloadCard();
   f.dataset.part = 'form';
-  v.replaceChildren(f, jobsCard(), infoCard());
+  v.replaceChildren(f, jobsCard(), cookiesCard(), infoCard());
 }
 
 load(true);

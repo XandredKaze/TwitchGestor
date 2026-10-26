@@ -120,3 +120,16 @@ test('già scaricato: nessun file nuovo, avviso e "Scarica di nuovo"; file non s
   const ch = await waitDone((await (await post('/api/downloads', { url: 'https://www.youtube.com/watch?v=mix&y=1', split: true, folder: 'Mix2' })).json()).job.id);
   assert.deepEqual(ch.files.sort(), ['Intro.mp3', 'Pioggia sul vetro.mp3']);
 });
+
+test('YouTube chiede "non sei un bot": errore spiegato; con i cookie caricati funziona', async () => {
+  const url = 'https://www.youtube.com/watch?v=bot';
+  const blocked = await waitDone((await (await post('/api/downloads', { url })).json()).job.id);
+  assert.match(blocked.errors[0], /cookie/);
+  const put = (text) => fetch(`${base}/api/cookies`, { method: 'PUT', headers: h, body: JSON.stringify({ text }) });
+  assert.equal((await put('ciao')).status, 400);
+  const ok = await (await put('.youtube.com\tTRUE\t/\tTRUE\t0\tSID\tabc\n')).json();
+  assert.equal(ok.tool.cookies, true);
+  assert.equal((await waitDone((await (await post('/api/downloads', { url, force: true })).json()).job.id)).status, 'done');
+  const del = await (await fetch(`${base}/api/cookies`, { method: 'DELETE', headers: h })).json();
+  assert.equal(del.tool.cookies, false);
+});

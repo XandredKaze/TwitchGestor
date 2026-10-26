@@ -16,6 +16,9 @@ export function createTool({ dataDir, binPath = process.env.MUSICANTE_YTDLP, log
   const own = !binPath; // scaricato da Musicante (si può aggiornare da solo)
   const bin = binPath || path.join(dataDir, 'bin', 'yt-dlp');
   const archive = path.join(dataDir, 'archivio.txt');
+  // cookie di YouTube (caricati dalla pagina) e Node.js per i controlli JavaScript di YouTube
+  const cookiesFile = path.join(dataDir, 'cookies.txt');
+  const access = () => ({ jsRuntime: process.execPath, cookies: fs.existsSync(cookiesFile) ? cookiesFile : '' });
   // cartella di lavoro: yt-dlp scarica e converte qui; nella musica arrivano solo gli MP3 finiti
   const workRoot = path.join(dataDir, 'lavoro');
   try { fs.rmSync(workRoot, { recursive: true, force: true }); } catch { /* pezzi di download interrotti (riavvio) */ }
@@ -91,7 +94,7 @@ export function createTool({ dataDir, binPath = process.env.MUSICANTE_YTDLP, log
   async function probe({ url, playlist }) {
     if (!state.ytdlp) throw Object.assign(new Error('yt-dlp non è ancora pronto: riprova tra poco'), { status: 503 });
     try {
-      return parseProbe(await exec(bin, probeArgs({ url, playlist }), 90000));
+      return parseProbe(await exec(bin, probeArgs({ url, playlist, access: access() }), 90000));
     } catch (err) {
       throw Object.assign(new Error(friendlyError(err.message.replace(/^ERROR:\s*/, ''))), { status: 422 });
     }
@@ -133,7 +136,7 @@ export function createTool({ dataDir, binPath = process.env.MUSICANTE_YTDLP, log
         onLine(l);
       };
       // i capitoli o "Scarica di nuovo" non guardano l'archivio dei già scaricati
-      const child = spawn(bin, downloadArgs({ url: job.url, playlist: job.playlist, split: job.split, work, archive: job.split || job.force ? null : archive }), { signal, stdio: ['ignore', 'pipe', 'pipe'] });
+      const child = spawn(bin, downloadArgs({ url: job.url, playlist: job.playlist, split: job.split, work, archive: job.split || job.force ? null : archive, access: access() }), { signal, stdio: ['ignore', 'pipe', 'pipe'] });
       const lines = (stream) => {
         let buf = '';
         stream.setEncoding('utf8');
@@ -162,5 +165,14 @@ export function createTool({ dataDir, binPath = process.env.MUSICANTE_YTDLP, log
     });
   }
 
-  return { get state() { return state; }, ensure, update, probe, run };
+  /** Cookie di YouTube in formato Netscape (cookies.txt, da un'estensione del browser). */
+  function setCookies(text) {
+    const t = String(text ?? '');
+    if (!t.trim()) { fs.rmSync(cookiesFile, { force: true }); return false; }
+    if (!/\t/.test(t) || !/youtube\.com|google\.com/i.test(t)) throw Object.assign(new Error('Non sembra un file cookies.txt di YouTube (formato Netscape)'), { status: 400 });
+    fs.writeFileSync(cookiesFile, t.startsWith('# ') ? t : `# Netscape HTTP Cookie File\n${t}`, { mode: 0o600 });
+    return true;
+  }
+
+  return { get state() { return { ...state, cookies: fs.existsSync(cookiesFile) }; }, ensure, update, probe, run, setCookies };
 }

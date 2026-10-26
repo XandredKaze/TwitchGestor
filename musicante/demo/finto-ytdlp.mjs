@@ -6,6 +6,9 @@ const args = process.argv.slice(2);
 const url = args.at(-1);
 if (args.includes('--version')) { console.log('2026.10.01'); process.exit(0); }
 if (args.includes('-U')) { console.log('yt-dlp is up to date'); process.exit(0); }
+// come YouTube oggi: senza cookie a volte chiede di confermare che non sei un bot
+if (url.includes('bot') && !args.includes('--cookies')) { console.error('ERROR: [youtube] abc: Sign in to confirm you’re not a bot. This helps protect our community.'); process.exit(1); }
+if (!args.includes('--js-runtimes')) { console.error('ERROR: manca --js-runtimes'); process.exit(1); }
 if (url.includes('errore')) { console.error('ERROR: [youtube] abc: Video unavailable'); process.exit(1); }
 const playlist = args.includes('--yes-playlist') && url.includes('list=');
 const songs = playlist ? ['Primo brano', 'Secondo brano'] : ['Brano singolo'];
