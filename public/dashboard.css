@@ -1368,3 +1368,15 @@ html:root[data-ui="brutal"] {
 .sys-auto select { font: inherit; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--inset); color: var(--text); max-width: 100%; }
 [data-ui="brutal"] .sys-auto select { border-radius: 0; }
 .mu-btn.mu-listen.on { outline: 2px solid var(--accent); }
+
+/* ⚙ Sistema → 🧰 Tools */
+.sys-tools-list { display: grid; gap: 8px; }
+.sys-tool { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--inset); color: inherit; text-decoration: none; }
+.sys-tool:hover { border-color: var(--accent); }
+.sys-tool-icon { font-size: 26px; flex: none; }
+.sys-tool-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.sys-tool-go { flex: none; color: var(--muted); font-weight: 700; }
+.sys-tool-dot { font-size: 11px; color: var(--muted); vertical-align: middle; }
+.sys-tool-dot.ok { color: #2ecc71; }
+.sys-tool-dot.off { color: #e74c3c; }
+#sys-tools-btn.active { border-color: var(--accent); }

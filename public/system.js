@@ -188,14 +188,42 @@
     watchRemote();
   }
 
+  // ---------- 🧰 Tools ----------
+  // per aggiungere un programma futuro basta una riga qui (stesso Raspberry, porta sua, stessa password)
+  const TOOLS = [
+    { id: 'howlup', name: 'Howl-UP', icon: '🐺', port: 3100, desc: 'L\'agenda dei tuoi impegni: live, lavoro, vita personale, note e annunci per la community.' },
+    { id: 'musicante', name: 'Musicante', icon: '🎵', port: 3200, desc: 'Scarica la musica in MP3 (anche playlist e mix divisi per capitoli) nella musica di TwitchGestor.' },
+  ];
+  const toolUrl = (t) => `http://${location.hostname}:${t.port}/${window.TG.token() ? `?token=${encodeURIComponent(window.TG.token())}` : ''}`;
+  function renderTools() {
+    const list = $('sys-tools-list');
+    list.replaceChildren(...TOOLS.map((t) => {
+      const dot = el('span', { className: 'sys-tool-dot', title: 'Controllo…' }, '●');
+      // acceso o spento? (da una pagina https il browser non lascia controllare un indirizzo http: si salta)
+      if (location.protocol === 'http:') {
+        fetch(`http://${location.hostname}:${t.port}/`, { mode: 'no-cors', signal: AbortSignal.timeout(3000) })
+          .then(() => { dot.classList.add('ok'); dot.title = 'Acceso'; })
+          .catch(() => { dot.classList.add('off'); dot.title = 'Non risponde (si sta aggiornando o è spento)'; });
+      } else dot.hidden = true;
+      return el('a', { className: 'sys-tool', href: toolUrl(t), target: '_blank', rel: 'noopener' },
+        el('span', { className: 'sys-tool-icon', 'aria-hidden': 'true' }, t.icon),
+        el('span', { className: 'sys-tool-text' }, el('b', {}, t.name, ' ', dot), el('span', { className: 'small muted' }, t.desc)),
+        el('span', { className: 'sys-tool-go', 'aria-hidden': 'true' }, '↗'));
+    }));
+  }
+  $('sys-tools-btn').onclick = () => {
+    const box = $('sys-tools');
+    box.hidden = !box.hidden;
+    $('sys-tools-btn').setAttribute('aria-expanded', String(!box.hidden));
+    $('sys-tools-btn').classList.toggle('active', !box.hidden);
+    if (!box.hidden) { renderTools(); box.scrollIntoView({ block: 'nearest' }); }
+  };
+
   async function open() {
     dialog.showModal();
-    // Howl-UP gira accanto a TwitchGestor sul Raspberry (porta 3100), con lo stesso nome o indirizzo
-    $('sys-howlup-sec').hidden = !state?.managed;
-    $('sys-howlup-link').href = `http://${location.hostname}:3100/${window.TG.token() ? `?token=${encodeURIComponent(window.TG.token())}` : ''}`;
-    // Musicante: porta 3200, stesso Raspberry
-    $('sys-musicante-sec').hidden = !state?.managed;
-    $('sys-musicante-link').href = `http://${location.hostname}:3200/${window.TG.token() ? `?token=${encodeURIComponent(window.TG.token())}` : ''}`;
+    // 🧰 Tools: gli altri programmi sul Raspberry (Howl-UP, Musicante…), con lo stesso nome o indirizzo
+    $('sys-tools-btn').hidden = !state?.managed;
+    if (!state?.managed) $('sys-tools').hidden = true;
     loadRemote();
     info = null;
     render();
