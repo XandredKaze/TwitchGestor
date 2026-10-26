@@ -60,17 +60,26 @@
   function shareCheck(c) {
     if (!c) return el('p', { className: 'muted small' }, 'Il Raspberry controllerà la cartella al prossimo aggiornamento.');
     const when = c.at ? new Date(c.at).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' }) : '';
+    // "192.168.1.5=ok 2a01:…=NT_STATUS_ACCESS_DENIED"
+    const lan = String(c.lan ?? '').split(' ').filter(Boolean).map((x) => { const i = x.lastIndexOf('='); return { addr: x.slice(0, i), res: x.slice(i + 1) }; });
+    const lanBad = lan.filter((x) => x.res !== 'ok');
     let text;
     let good = false;
     if (c.smbd !== 'yes') text = 'Il servizio della cartella condivisa sul Raspberry è spento.';
     else if (c.path !== 'yes') text = 'Il Raspberry non riesce ad aprire la cartella dei file (permessi).';
-    else if (c.login === 'ok') {
+    else if (c.login !== 'ok') {
+      text = /LOGON_FAILURE|WRONG_PASSWORD/.test(c.login) ? 'La cartella non accetta la password della dashboard nemmeno dal Raspberry stesso.'
+        : /ACCESS_DENIED|BAD_NETWORK_NAME/.test(c.login) ? 'Utente e password vanno, ma la cartella rifiuta l\'accesso (impostazioni della cartella condivisa).'
+          : `Controllo non riuscito: ${c.login}`;
+    } else if (lanBad.length) text = `Utente e password vanno, ma dalla rete di casa l'accesso viene rifiutato (${lanBad.map((x) => `${x.addr}: ${x.res}`).join(', ')}).`;
+    else {
       good = true;
-      text = 'Il Raspberry è entrato nella cartella con questo utente e questa password: dal lato del Raspberry funziona. Se Windows dice "accesso negato", ha ricordato credenziali vecchie: apri "Gestione credenziali" → Credenziali di Windows, elimina quelle di twitchgestor, riavvia il PC e riprova copiando utente e password da qui.';
-    } else if (/LOGON_FAILURE|WRONG_PASSWORD/.test(c.login)) text = 'Il Raspberry non riesce a entrare con questa password neanche da solo: la cartella non accetta la password della dashboard.';
-    else if (/ACCESS_DENIED|BAD_NETWORK_NAME/.test(c.login)) text = 'Utente e password vanno, ma la cartella rifiuta l\'accesso (impostazioni della cartella condivisa).';
-    else text = `Controllo non riuscito: ${c.login}`;
-    return el('p', { className: `small ${good ? 'share-ok' : 'mu-warn'}` }, `${good ? '✓' : '⚠'} ${text}`, when ? el('span', { className: 'muted' }, ` (controllo del ${when}${c.login && c.login !== 'ok' ? `, ${c.login}` : ''})`) : null);
+      text = `Il Raspberry è entrato nella cartella con questo utente e questa password${lan.length ? ', anche dagli indirizzi della rete di casa' : ''}. Se Windows dice ancora "accesso negato": apri "Gestione credenziali" → Credenziali di Windows, elimina quelle di twitchgestor, riavvia il PC e riprova copiando utente e password da qui.`;
+    }
+    const denied = (c.denied ?? []).map((d) => d.replace(/^Denied connection from (.+)$/, 'rifiutato l\'indirizzo $1 (non ammesso)'));
+    return el('div', { className: 'share-check' },
+      el('p', { className: `small ${good ? 'share-ok' : 'mu-warn'}` }, `${good ? '✓' : '⚠'} ${text}`, when ? el('span', { className: 'muted' }, ` (controllo del ${when})`) : null),
+      denied.length ? el('p', { className: 'muted small' }, 'Ultimi accessi rifiutati dal Raspberry: ', denied.join(' · ')) : null);
   }
 
   window.TG = { api, el, money, shareCheck, token: () => token, API_LEVEL, RESTART_HELP, version: '' };

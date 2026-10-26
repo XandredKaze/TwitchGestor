@@ -41,6 +41,9 @@ if [ -f scripts/raspberry/system-setup.sh ] && ! grep -q CAP_NET_BIND_SERVICE /e
   echo "aggiornamento: servizi di sistema sistemati"
 fi
 
+# cartella condivisa: gli indirizzi della rete di casa possono cambiare (IPv6 del fornitore): si ricontrolla ogni volta
+[ -f scripts/raspberry/share-setup.sh ] && timeout 120 bash scripts/raspberry/share-setup.sh "$DIR" "$OWNER" quick
+
 if [ "$MODE" = auto ]; then
   read -r AUTO WHEN HOUR < <(as_user node -e '
     let s = {}; try { s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); } catch {}
