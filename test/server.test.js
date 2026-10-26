@@ -79,7 +79,7 @@ test('musica: comandi dalla dashboard, pagina /music e file a pezzi (Range)', as
   const app = fakeApp();
   const done = [];
   app.music = {
-    library: () => [{ id: 'a.mp3', folder: '', name: 'a.mp3' }],
+    library: () => [{ id: 'a.mp3', folder: '', name: 'a.mp3', url: '/media/music/a.mp3' }],
     rescan: () => done.push('rescan'),
     player: {
       playlists: () => [{ id: '*', name: 'Tutta la musica', count: 1 }],
@@ -97,6 +97,7 @@ test('musica: comandi dalla dashboard, pagina /music e file a pezzi (Range)', as
 
   const lib = await (await fetch(`${base}/api/music`, { headers: h })).json();
   assert.equal(lib.tracks.length, 1);
+  assert.match(lib.tracks[0].url ?? '', /^\/media\/music\//); // serve al pulsante 🎧 "Ascolta qui"
   assert.equal(lib.pages, 0);
   assert.equal(lib.share, null); // la cartella condivisa c'è solo sul Raspberry
   const r = await (await fetch(`${base}/api/music/toggle`, { method: 'POST', headers: h })).json();

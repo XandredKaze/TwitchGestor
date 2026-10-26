@@ -469,7 +469,7 @@ export function createServer(app) {
           const lib = app.music?.library() ?? [];
           return send(res, 200, {
             playlists: app.music?.player.playlists() ?? [],
-            tracks: lib.map((t) => ({ id: t.id, folder: t.folder, name: t.name })),
+            tracks: lib.map((t) => ({ id: t.id, folder: t.folder, name: t.name, url: t.url })),
             player: app.music?.player.snapshot() ?? null,
             pages: musicPages(),
             settings: app.config.get().music ?? {},

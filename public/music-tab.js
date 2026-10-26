@@ -29,7 +29,9 @@
     const p = data?.player ?? {};
     const track = p.track && data.tracks.find((x) => x.id === p.track.id);
     if (!monitor || !track) { monitorAudio.pause(); return; }
-    const src = new URL(mediaUrl(track.url), location.href).href;
+    // indirizzo del file (come lo usa il lettore in OBS): /media/music/<cartella>/<brano>
+    const url = track.url || `/media/music/${String(track.id).split('/').map(encodeURIComponent).join('/')}`;
+    const src = new URL(mediaUrl(url), location.href).href;
     if (monitorAudio.src !== src) { monitorError = ''; monitorAudio.src = src; monitorAudio.currentTime = p.position || 0; }
     else if (Math.abs((monitorAudio.currentTime || 0) - (p.position || 0)) > 3) monitorAudio.currentTime = p.position || 0;
     monitorAudio.volume = Math.min(1, Math.max(0, p.volume ?? 0.6));
