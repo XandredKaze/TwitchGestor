@@ -70,7 +70,10 @@ function shareInfo() {
   } catch { return null; }
   const host = os.hostname();
   // utente scritto come "raspberry\\utente": così Windows non lo confonde con un account del PC (accesso negato)
-  return { path: `\\\\${host}\\TwitchGestor`, host, user: `${host}\\${os.userInfo().username}`, password: process.env.DASHBOARD_TOKEN ?? '' };
+  // controllo fatto dal Raspberry a ogni aggiornamento (scripts/raspberry/system-setup.sh): entra con utente e password
+  let check = null;
+  try { check = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'condivisa-stato.json'), 'utf8')); } catch { /* non ancora fatto */ }
+  return { path: `\\\\${host}\\TwitchGestor`, host, user: `${host}\\${os.userInfo().username}`, password: process.env.DASHBOARD_TOKEN ?? '', check };
 }
 
 function safeEqual(a, b) {

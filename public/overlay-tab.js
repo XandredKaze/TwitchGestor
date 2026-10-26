@@ -312,6 +312,7 @@
         copyRow('Cartella overlay', `${s.path}\\overlay`),
         copyRow('Nome utente', s.user),
         copyRow('Password', s.password || '(quella del Raspberry)'),
+        window.TG.shareCheck(s.check),
         el('p', { className: 'muted small' }, 'Quando Windows la chiede, scrivi il nome utente così com\'è (con "', s.host, '\\" davanti) e spunta "Memorizza credenziali": OBS legge i file solo se Windows ricorda l\'accesso.'),
         el('p', { className: 'muted small' }, 'Se dice "accesso negato": apri "Gestione credenziali" di Windows → Credenziali di Windows, elimina quelle di ', s.host, ' e riprova.'),
       ] : data.root

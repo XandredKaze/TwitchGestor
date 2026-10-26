@@ -215,6 +215,7 @@
         el('p', { className: 'small' }, 'Se chiede le credenziali:'),
         copyRow('Nome utente', s.user),
         copyRow('Password', s.password || '(quella del Raspberry)'),
+        window.TG.shareCheck(s.check),
         el('p', { className: 'muted small' }, 'Spunta "Memorizza credenziali". Dentro trovi le cartelle music (musica, una sottocartella per playlist), images (immagini e video degli alert) e sounds (suoni). Consiglio: clic destro su "TwitchGestor" → "Connetti unità di rete" per averla sempre in Esplora file.'))
         : el('p', { className: 'muted small' }, 'La cartella condivisa in rete c\'è solo sul Raspberry (si attiva da sola con l\'aggiornamento). Su questo PC la cartella è data/media/music dentro la cartella di TwitchGestor.'),
     );

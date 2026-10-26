@@ -56,7 +56,24 @@
   const API_LEVEL = 22;
   const RESTART_HELP = 'Il programma TwitchGestor acceso è una versione precedente rispetto a questa pagina (succede se aggiorni i file mentre è acceso). Riavvialo: clicca "⏻ Spegni" in alto a destra, poi riapri OBS (oppure fai doppio clic su "Avvia TwitchGestor.vbs") e ricarica questa pagina con Ctrl+F5.';
 
-  window.TG = { api, el, money, token: () => token, API_LEVEL, RESTART_HELP, version: '' };
+  /** Risultato del controllo della cartella condivisa fatto dal Raspberry (null se non ancora fatto). */
+  function shareCheck(c) {
+    if (!c) return el('p', { className: 'muted small' }, 'Il Raspberry controllerà la cartella al prossimo aggiornamento.');
+    const when = c.at ? new Date(c.at).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' }) : '';
+    let text;
+    let good = false;
+    if (c.smbd !== 'yes') text = 'Il servizio della cartella condivisa sul Raspberry è spento.';
+    else if (c.path !== 'yes') text = 'Il Raspberry non riesce ad aprire la cartella dei file (permessi).';
+    else if (c.login === 'ok') {
+      good = true;
+      text = 'Il Raspberry è entrato nella cartella con questo utente e questa password: dal lato del Raspberry funziona. Se Windows dice "accesso negato", ha ricordato credenziali vecchie: apri "Gestione credenziali" → Credenziali di Windows, elimina quelle di twitchgestor, riavvia il PC e riprova copiando utente e password da qui.';
+    } else if (/LOGON_FAILURE|WRONG_PASSWORD/.test(c.login)) text = 'Il Raspberry non riesce a entrare con questa password neanche da solo: la cartella non accetta la password della dashboard.';
+    else if (/ACCESS_DENIED|BAD_NETWORK_NAME/.test(c.login)) text = 'Utente e password vanno, ma la cartella rifiuta l\'accesso (impostazioni della cartella condivisa).';
+    else text = `Controllo non riuscito: ${c.login}`;
+    return el('p', { className: `small ${good ? 'share-ok' : 'mu-warn'}` }, `${good ? '✓' : '⚠'} ${text}`, when ? el('span', { className: 'muted' }, ` (controllo del ${when}${c.login && c.login !== 'ok' ? `, ${c.login}` : ''})`) : null);
+  }
+
+  window.TG = { api, el, money, shareCheck, token: () => token, API_LEVEL, RESTART_HELP, version: '' };
 
   // Password della dashboard (DASHBOARD_TOKEN): su un dispositivo nuovo (es. il telefono) si chiede qui
   // e resta ricordata in questo browser.

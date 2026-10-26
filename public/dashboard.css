@@ -1439,3 +1439,4 @@ html:root[data-ui="brutal"] {
 .ov-inline { display: flex; gap: 4px; align-items: center; min-width: 0; }
 .ov-inline input, .ov-inline select { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--inset); color: var(--text); }
 .ov-drop .ov-inline { max-width: 420px; margin: 0 auto; }
+.share-ok { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--ok); }

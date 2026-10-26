@@ -131,9 +131,13 @@ setup_share() {
   # come la legge TwitchGestor: senza virgolette, spazi o "a capo" di Windows (altrimenti la password non corrisponde)
   TOKEN="$(grep -E '^DASHBOARD_TOKEN=' "$DIR/.env" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/")"
   [ -n "$TOKEN" ] || return 0
+  # smbclient: serve al controllo qui sotto (prova a entrare nella cartella come farebbe Windows)
+  if command -v smbd >/dev/null 2>&1 && ! command -v smbclient >/dev/null 2>&1; then
+    DEBIAN_FRONTEND=noninteractive timeout 600 apt-get install -y -q smbclient >/dev/null 2>&1
+  fi
   if ! command -v smbd >/dev/null 2>&1; then
     echo "Installo la cartella condivisa (Samba)…"
-    DEBIAN_FRONTEND=noninteractive timeout 900 apt-get install -y -q samba >/dev/null 2>&1 \
+    DEBIAN_FRONTEND=noninteractive timeout 900 apt-get install -y -q samba smbclient >/dev/null 2>&1 \
       || { DEBIAN_FRONTEND=noninteractive timeout 600 apt-get update -q >/dev/null 2>&1 && DEBIAN_FRONTEND=noninteractive timeout 900 apt-get install -y -q samba >/dev/null 2>&1; } \
       || { echo "Samba non installato (riprovo al prossimo aggiornamento)"; return 0; }
   fi
@@ -176,7 +180,41 @@ SMB
     systemctl enable smbd nmbd >/dev/null 2>&1
     systemctl restart smbd nmbd >/dev/null 2>&1
   fi
+  check_share
   return 0
+}
+
+# Controllo della cartella condivisa: entra con utente e password come farebbe Windows e scrive il risultato
+# in data/condivisa-stato.json (lo mostra la dashboard). Se l'utente manca o la password non va, la reimposta.
+check_share() {
+  local OUT="$DIR/data/condivisa-stato.json" ACCOUNT=no SMBD=no LOGIN="" PATHOK=no
+  systemctl is-active --quiet smbd && SMBD=yes
+  pdbedit -L 2>/dev/null | cut -d: -f1 | grep -qx "$ME" && ACCOUNT=yes
+  runuser -u "$ME" -- test -r "$DIR/data/media" -a -x "$DIR/data/media" && PATHOK=yes
+  try_login() { smbclient "//127.0.0.1/TwitchGestor" -U "$1%$TOKEN" -c 'ls' >/dev/null 2>/tmp/tg-smb.err && echo ok || grep -o 'NT_STATUS_[A-Z_]*' /tmp/tg-smb.err | head -n1; }
+  if command -v smbclient >/dev/null 2>&1; then
+    LOGIN="$(try_login "$ME")"
+    if [ "$LOGIN" != ok ]; then
+      # riprova da capo: utente della cartella ricreato con la password della dashboard
+      smbpasswd -x "$ME" >/dev/null 2>&1
+      printf '%s\n%s\n' "$TOKEN" "$TOKEN" | smbpasswd -s -a "$ME" >/dev/null 2>&1
+      smbpasswd -e "$ME" >/dev/null 2>&1
+      systemctl restart smbd >/dev/null 2>&1
+      sleep 2
+      LOGIN="$(try_login "$ME")"
+      pdbedit -L 2>/dev/null | cut -d: -f1 | grep -qx "$ME" && ACCOUNT=yes
+    fi
+    [ -n "$LOGIN" ] || LOGIN="errore sconosciuto"
+  else
+    LOGIN="smbclient non installato"
+  fi
+  local WINLOGIN=""
+  [ "$LOGIN" = ok ] && WINLOGIN="$(try_login "$(hostname)\\$ME")"
+  rm -f /tmp/tg-smb.err
+  printf '{"at":"%s","user":"%s","smbd":"%s","account":"%s","path":"%s","login":"%s","loginWithHost":"%s"}\n' \
+    "$(date -Iseconds)" "$ME" "$SMBD" "$ACCOUNT" "$PATHOK" "$LOGIN" "$WINLOGIN" > "$OUT"
+  chown "$ME" "$OUT" 2>/dev/null
+  echo "cartella condivisa: accesso $LOGIN (utente $ME, account $ACCOUNT)"
 }
 setup_share || true
 
