@@ -17,6 +17,30 @@
   const fill = (node, ...children) => node.replaceChildren(...children.flat().filter((c) => c !== null && c !== undefined && c !== false));
   const time = (s) => (s > 0 ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '–:––');
 
+  // "🎧 Ascolta qui": per controllare la musica dalla dashboard senza OBS. Suona lo stesso brano, allo stesso
+  // punto, solo su questo dispositivo (non va in live e non cambia niente nel lettore di OBS).
+  let monitor = false;
+  let monitorError = '';
+  const monitorAudio = new Audio();
+  monitorAudio.preload = 'auto';
+  monitorAudio.onerror = () => { if (monitor) { monitorError = 'Il brano non si apre: il file potrebbe essere rovinato o in un formato che il browser non legge.'; renderNow(); } };
+  const mediaUrl = (u) => (window.TG.token() ? `${u}${u.includes('?') ? '&' : '?'}token=${encodeURIComponent(window.TG.token())}` : u);
+  function syncMonitor() {
+    const p = data?.player ?? {};
+    const track = p.track && data.tracks.find((x) => x.id === p.track.id);
+    if (!monitor || !track) { monitorAudio.pause(); return; }
+    const src = new URL(mediaUrl(track.url), location.href).href;
+    if (monitorAudio.src !== src) { monitorError = ''; monitorAudio.src = src; monitorAudio.currentTime = p.position || 0; }
+    else if (Math.abs((monitorAudio.currentTime || 0) - (p.position || 0)) > 3) monitorAudio.currentTime = p.position || 0;
+    monitorAudio.volume = Math.min(1, Math.max(0, p.volume ?? 0.6));
+    if (p.playing && monitorAudio.paused) monitorAudio.play().catch((err) => {
+      if (err.name === 'AbortError') return; // cambio di brano mentre partiva
+      monitorError = err.name === 'NotAllowedError' ? 'Il browser ha bloccato l\'audio: premi di nuovo 🎧.' : 'Il brano non si apre: il file manca, è rovinato o è in un formato che il browser non legge.';
+      renderNow();
+    });
+    else if (!p.playing && !monitorAudio.paused) monitorAudio.pause();
+  }
+
   async function load() {
     const r = await api('/api/music', { method: 'GET', quiet: true });
     if (r) { data = r; render(); }
@@ -81,7 +105,21 @@
       el('div', { className: 'mu-controls' },
         el('button', { type: 'button', className: 'mu-btn', title: 'Brano precedente', 'aria-label': 'Brano precedente', onclick: () => cmd('prev') }, '⏮'),
         el('button', { type: 'button', className: 'mu-btn mu-play', title: p.playing ? 'Pausa' : 'Suona', 'aria-label': p.playing ? 'Pausa' : 'Suona', onclick: () => cmd('toggle') }, p.playing ? '⏸' : '▶'),
-        el('button', { type: 'button', className: 'mu-btn', title: 'Brano successivo', 'aria-label': 'Brano successivo', onclick: () => cmd('next') }, '⏭')),
+        el('button', { type: 'button', className: 'mu-btn', title: 'Brano successivo', 'aria-label': 'Brano successivo', onclick: () => cmd('next') }, '⏭'),
+        el('button', {
+          type: 'button', className: `mu-btn mu-listen${monitor ? ' on' : ''}`,
+          title: monitor ? 'Smetti di ascoltare qui' : 'Ascolta qui la musica, per controllare che funzioni (solo su questo dispositivo, non va in live)',
+          'aria-label': monitor ? 'Smetti di ascoltare qui' : 'Ascolta qui', 'aria-pressed': monitor ? 'true' : 'false',
+          onclick: () => {
+            monitor = !monitor;
+            monitorError = '';
+            // se non sta suonando, "Ascolta qui" fa anche partire la musica
+            if (monitor && !p.playing && data.tracks.length) cmd('toggle');
+            renderNow();
+          },
+        }, '🎧')),
+      monitor ? el('p', { className: `small ${monitorError ? 'mu-warn' : 'muted'}` }, monitorError
+        || (t ? `🎧 Stai ascoltando qui "${t.title}": se lo senti, il file va bene. Solo su questo dispositivo, non va in live. ${data.pages ? 'In live la suona il lettore in OBS (collegato ✓).' : 'Attenzione: in OBS il lettore non è collegato, quindi in live non si sente.'}` : '🎧 Pronto: premi ▶ per sentire qui.')) : null,
       el('div', { className: 'mu-options' },
         el('label', { className: 'field' }, el('span', { className: 'field-label' }, 'Playlist'), select),
         el('label', { className: 'field' }, el('span', { className: 'field-label' }, 'Volume'), el('div', { className: 'mu-vol' }, vol, volLabel)),
@@ -91,6 +129,7 @@
         el('ol', {}, ...p.upNext.map((x) => el('li', {}, el('b', {}, x.title), x.artist ? ` – ${x.artist}` : '')))) : null,
       el('p', { className: 'muted small' }, 'Gli spettatori possono scrivere ', el('code', {}, '!song'), ' se crei un comando con la variabile ', el('code', {}, '{song}'), ' (scheda Comandi).'),
     );
+    syncMonitor();
   }
 
   // ---------- libreria ----------
@@ -211,6 +250,7 @@
     // non ridisegnare mentre stai spostando il volume o scegliendo la playlist
     const busy = $('mu-now').contains(document.activeElement) && /^(INPUT|SELECT)$/.test(document.activeElement.tagName);
     if (!busy) renderNow();
+    else syncMonitor();
     if (changed) renderLibrary();
   });
   window.addEventListener('tg:state', (e) => {

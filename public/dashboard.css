@@ -1367,3 +1367,4 @@ html:root[data-ui="brutal"] {
 .sys-auto { justify-self: stretch; margin-top: 0; }
 .sys-auto select { font: inherit; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--inset); color: var(--text); max-width: 100%; }
 [data-ui="brutal"] .sys-auto select { border-radius: 0; }
+.mu-btn.mu-listen.on { outline: 2px solid var(--accent); }
