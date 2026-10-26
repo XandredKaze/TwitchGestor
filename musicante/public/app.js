@@ -178,7 +178,8 @@ function jobView(j) {
   const progress = j.status === 'running'
     ? [j.total ? `${j.index ?? 1} di ${j.total}` : '', j.current].filter(Boolean).join(' · ')
     : '';
-  const summary = j.status === 'done'
+  const summary = j.status === 'done' && j.already ? 'nessun brano nuovo'
+    : j.status === 'done'
     ? `${j.files.length} ${j.files.length === 1 ? 'brano scaricato' : 'brani scaricati'}${j.skipped ? ` · ${j.skipped} già presenti` : ''}`
     : j.status === 'error' && j.files.length ? `${j.files.length} scaricati prima dell'errore` : '';
   return el('div', { className: `job ${j.status}` },
@@ -188,13 +189,21 @@ function jobView(j) {
     j.status === 'running' || j.status === 'queued' ? el('div', { className: 'bar' }, el('i', { style: { width: `${j.overall ?? 0}%` } })) : null,
     progress ? el('div', { className: 'job-meta' }, `${progress} · ${j.overall ?? 0}%`) : null,
     j.errors?.length ? el('ul', { className: 'errors' }, j.errors.slice(-3).map((e) => el('li', {}, e))) : null,
+    j.already ? el('p', { className: 'hint', style: { color: 'var(--warn)' } }, 'yt-dlp non ha salvato niente: di solito vuol dire che questo link era già stato scaricato in passato (Musicante non riscarica gli stessi brani). Con "Scarica di nuovo" lo riscarichi lo stesso.') : null,
+    j.log?.length && (j.already || j.status === 'error') ? el('details', {}, el('summary', {}, 'Dettagli (per capire cosa è successo)'), el('pre', { className: 'log' }, j.log.join('\n'))) : null,
     j.files?.length ? el('details', {}, el('summary', {}, `File (${j.files.length})`), el('ul', {}, j.files.map((f) => el('li', {}, f)))) : null,
     el('div', { className: 'row' },
       j.status === 'running' || j.status === 'queued'
         ? el('button', { type: 'button', className: 'btn small danger', onclick: async () => { const r = await api(`/api/downloads/${j.id}/cancel`, { method: 'POST' }); if (r) { data = r; render(); } } }, 'Annulla')
         : el('button', { type: 'button', className: 'btn small', onclick: async () => { const r = await api(`/api/downloads/${j.id}`, { method: 'DELETE' }); if (r) { data = r; render(); } } }, 'Togli dall\'elenco'),
       j.status === 'error' || j.status === 'cancelled'
-        ? el('button', { type: 'button', className: 'btn small', onclick: () => { Object.assign(form, { url: j.url, playlist: j.playlist, folder: j.folder, info: null }); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); } }, '↻ Riprova')
+        ? el('button', { type: 'button', className: 'btn small', onclick: () => { Object.assign(form, { url: j.url, playlist: j.playlist, split: Boolean(j.split), folder: j.folder, info: null }); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); } }, '↻ Riprova')
+        : null,
+      j.already
+        ? el('button', {
+          type: 'button', className: 'btn small',
+          onclick: async () => { const r = await api('/api/downloads', { method: 'POST', body: { url: j.url, playlist: j.playlist, split: j.split, folder: j.folder, title: j.title, count: j.count, force: true } }); if (r) { toast('Download aggiunto ⬇'); data = { ...data, ...r }; render(); } },
+        }, '⬇ Scarica di nuovo')
         : null));
 }
 

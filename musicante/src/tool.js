@@ -108,28 +108,32 @@ export function createTool({ dataDir, binPath = process.env.MUSICANTE_YTDLP, log
       fs.mkdirSync(dir, { recursive: true });
       const work = path.join(workRoot, job.id);
       fs.mkdirSync(work, { recursive: true });
-      let chapters = [];
+      const audio = (d) => { try { return fs.readdirSync(d).filter((f) => /\.(mp3|m4a|opus|ogg|webm|flac|wav)$/i.test(f) && !/\.(part|ytdl|temp)\./i.test(f)).map((f) => path.join(d, f)); } catch { return []; } };
+      const chapDir = path.join(work, 'capitoli');
+      let moved = 0;
+      // un file finito: con i capitoli si spostano i capitoli (dalla loro cartella) e il file intero si butta
+      const finish = (main) => {
+        try {
+          const chapters = job.split ? audio(chapDir) : [];
+          if (chapters.length) {
+            for (const c of chapters) { onLine(`${FILE_MARK}${moveInto(c, dir)}`); moved += 1; }
+            if (main) fs.rmSync(main, { force: true });
+          } else if (main && fs.existsSync(main)) {
+            onLine(`${FILE_MARK}${moveInto(main, dir)}`);
+            moved += 1;
+          }
+        } catch (err) {
+          onLine(`ERROR: file non spostato nella musica (${err.message})`);
+        }
+      };
       const handle = (l) => {
         const r = parseLine(l);
-        if (r?.type === 'chapter') { chapters.push(r.path); return; }
-        if (r?.type === 'main') {
-          try {
-            const done = chapters.filter((c) => fs.existsSync(c));
-            if (job.split && done.length) {
-              for (const c of done) onLine(`${FILE_MARK}${moveInto(c, dir)}`);
-              fs.rmSync(r.path, { force: true });
-            } else if (fs.existsSync(r.path)) {
-              onLine(`${FILE_MARK}${moveInto(r.path, dir)}`);
-            }
-          } catch (err) {
-            onLine(`ERROR: file non spostato nella musica (${err.message})`);
-          }
-          chapters = [];
-          return;
-        }
+        if (r?.type === 'chapter') return;
+        if (r?.type === 'main') { finish(r.path); return; }
         onLine(l);
       };
-      const child = spawn(bin, downloadArgs({ url: job.url, playlist: job.playlist, split: job.split, work, archive }), { signal, stdio: ['ignore', 'pipe', 'pipe'] });
+      // i capitoli o "Scarica di nuovo" non guardano l'archivio dei già scaricati
+      const child = spawn(bin, downloadArgs({ url: job.url, playlist: job.playlist, split: job.split, work, archive: job.split || job.force ? null : archive }), { signal, stdio: ['ignore', 'pipe', 'pipe'] });
       const lines = (stream) => {
         let buf = '';
         stream.setEncoding('utf8');
@@ -146,7 +150,15 @@ export function createTool({ dataDir, binPath = process.env.MUSICANTE_YTDLP, log
       const cleanup = () => { try { fs.rmSync(work, { recursive: true, force: true }); } catch { /* niente */ } };
       child.on('error', (err) => { cleanup(); if (err.name === 'AbortError') resolve(130); else reject(err); });
       // finito o annullato: quello che è rimasto nella cartella di lavoro è incompleto e si butta
-      child.on('close', (code) => { cleanup(); resolve(code ?? 130); });
+      child.on('close', (code) => {
+        // rete di sicurezza: file completi rimasti nella cartella di lavoro (se yt-dlp non li ha segnalati)
+        if (!signal?.aborted && code === 0) {
+          if (job.split && audio(chapDir).length) finish(audio(work)[0] ?? null);
+          else for (const f of audio(work)) finish(f);
+        }
+        cleanup();
+        resolve(code ?? 130);
+      });
     });
   }
 

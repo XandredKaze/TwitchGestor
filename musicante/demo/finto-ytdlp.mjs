@@ -16,13 +16,19 @@ if (args.includes('-J')) {
   process.exit(0);
 }
 const out = args[args.indexOf('-o') + 1];
+// come quello vero: con --print è silenzioso (niente avanzamento senza --progress, niente messaggi sui capitoli)
+const quiet = args.includes('--print');
+const progress = !quiet || args.includes('--progress');
+// archivio dei già scaricati: se il link c'è, non fa niente
+const archive = args.includes('--download-archive') ? args[args.indexOf('--download-archive') + 1] : '';
+if (archive && fs.existsSync(archive) && fs.readFileSync(archive, 'utf8').split('\n').includes(url)) process.exit(0);
 const split = args.includes('--split-chapters') && url.includes('mix');
 const slow = url.includes('lento');
 let i = 0;
 const next = () => {
-  if (i >= songs.length) process.exit(0);
+  if (i >= songs.length) { if (archive) fs.appendFileSync(archive, `${url}\n`); process.exit(0); }
   const t = songs[i];
-  for (const p of ['10.0%', '55.5%', '100%']) console.log(`MUSICANTE_PROGRESS ${p}|${playlist ? i + 1 : 'NA'}|${playlist ? songs.length : 'NA'}|${t}`);
+  if (progress) for (const p of ['10.0%', '55.5%', '100%']) console.log(`MUSICANTE_PROGRESS ${p}|${playlist ? i + 1 : 'NA'}|${playlist ? songs.length : 'NA'}|${t}`);
   const file = out.replace('%(title).150B.%(ext)s', `${t}.mp3`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, 'mp3');
@@ -31,10 +37,10 @@ const next = () => {
       const cf = path.join(path.dirname(file), 'capitoli', `${c.title}.mp3`);
       fs.mkdirSync(path.dirname(cf), { recursive: true });
       fs.writeFileSync(cf, 'mp3');
-      console.log(`[SplitChapters] Chapter ${String(k + 1).padStart(3, '0')}; Destination: ${cf}`);
+      if (!quiet) console.log(`[SplitChapters] Chapter ${String(k + 1).padStart(3, '0')}; Destination: ${cf}`);
     });
   }
-  console.log(`MUSICANTE_MAIN ${file}`);
+  if (!url.includes('noprint')) console.log(`MUSICANTE_MAIN ${file}`);
   i += 1;
   setTimeout(next, slow ? 5000 : 10);
 };

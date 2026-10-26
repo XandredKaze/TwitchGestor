@@ -39,7 +39,8 @@ export const MAIN_MARK = 'MUSICANTE_MAIN '; // file completo nella cartella di l
  */
 export function downloadArgs({ url, playlist = false, work, archive, split = false }) {
   return [
-    '--newline', '--color', 'never', '--ignore-config',
+    // --print rende yt-dlp "silenzioso": --progress fa vedere lo stesso l'avanzamento
+    '--newline', '--progress', '--color', 'never', '--ignore-config',
     '-x', '--audio-format', 'mp3', '--audio-quality', '0', '--embed-metadata',
     playlist ? '--yes-playlist' : '--no-playlist',
     '--ignore-errors', '--no-overwrites',

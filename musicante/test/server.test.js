@@ -103,3 +103,20 @@ test('TwitchGestor chiede se Musicante è occupato prima di aggiornarsi', async 
   await waitDone(slow.job.id);
   assert.equal((await (await fetch(`${base}/api/busy`, { headers: h })).json()).busy, false);
 });
+
+test('già scaricato: nessun file nuovo, avviso e "Scarica di nuovo"; file non segnalati recuperati lo stesso', async () => {
+  const url = 'https://www.youtube.com/watch?v=unavolta';
+  const first = await waitDone((await (await post('/api/downloads', { url, folder: 'Prove' })).json()).job.id);
+  assert.deepEqual([first.files.length, first.already], [1, undefined]);
+  const second = await waitDone((await (await post('/api/downloads', { url, folder: 'Prove' })).json()).job.id);
+  assert.deepEqual([second.status, second.files.length, second.already], ['done', 0, true]);
+  const again = await waitDone((await (await post('/api/downloads', { url, folder: 'Prove', force: true })).json()).job.id);
+  assert.deepEqual(again.files, ['Brano singolo (2).mp3']);
+  // yt-dlp non dice dove ha salvato: Musicante trova lo stesso il file finito
+  const silent = await waitDone((await (await post('/api/downloads', { url: 'https://www.youtube.com/watch?v=noprint', folder: 'Prove' })).json()).job.id);
+  assert.equal(silent.files.length, 1);
+  // capitoli anche se il video era già stato scaricato intero
+  await waitDone((await (await post('/api/downloads', { url: 'https://www.youtube.com/watch?v=mix&y=1', folder: 'Mix2' })).json()).job.id);
+  const ch = await waitDone((await (await post('/api/downloads', { url: 'https://www.youtube.com/watch?v=mix&y=1', split: true, folder: 'Mix2' })).json()).job.id);
+  assert.deepEqual(ch.files.sort(), ['Intro.mp3', 'Pioggia sul vetro.mp3']);
+});

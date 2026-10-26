@@ -25,12 +25,12 @@ export class Downloads {
 
   list() { return this.jobs; }
 
-  add({ url, playlist = false, folder = '', title = '', count = 0, split = false } = {}) {
+  add({ url, playlist = false, folder = '', title = '', count = 0, split = false, force = false } = {}) {
     const u = cleanUrl(url);
     if (!u) throw Object.assign(new Error('Incolla un link valido (https://…)'), { status: 400 });
     const job = {
-      id: newId(), url: u, playlist: playlist === true, split: split === true, folder: cleanFolder(folder), title: String(title ?? '').slice(0, 200), count: Number(count) || 0,
-      status: 'queued', percent: 0, index: null, total: null, current: '', files: [], skipped: 0, errors: [], createdAt: this.now(), startedAt: null, endedAt: null,
+      id: newId(), url: u, playlist: playlist === true, split: split === true, force: force === true, folder: cleanFolder(folder), title: String(title ?? '').slice(0, 200), count: Number(count) || 0,
+      status: 'queued', percent: 0, index: null, total: null, current: '', files: [], skipped: 0, errors: [], log: [], createdAt: this.now(), startedAt: null, endedAt: null,
     };
     this.jobs = [job, ...this.jobs].slice(0, KEEP);
     this.#changed();
@@ -81,6 +81,8 @@ export class Downloads {
         signal: abort.signal,
         onLine: (raw) => {
           const r = parseLine(raw);
+          // ultime righe di yt-dlp (non l'avanzamento): si vedono in "Dettagli" se qualcosa non va
+          if (r?.type !== 'progress' && String(raw).trim()) job.log = [...(job.log ?? []), String(raw).trim().slice(0, 300)].slice(-15);
           if (!r) return;
           if (r.type === 'progress') {
             if (r.percent !== null) job.percent = r.percent;
@@ -105,7 +107,11 @@ export class Downloads {
     }
     job.endedAt = this.now();
     if (abort.signal.aborted) job.status = 'cancelled';
-    else if (job.files.length || job.skipped || code === 0) job.status = 'done';
+    else if (job.files.length || job.skipped || code === 0) {
+      job.status = 'done';
+      // finito senza file: yt-dlp l'ha saltato perché era già stato scaricato
+      if (!job.files.length && !job.force) job.already = true;
+    }
     else {
       job.status = 'error';
       if (!job.errors.length) job.errors = [`yt-dlp si è fermato (codice ${code})`];
