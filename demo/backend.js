@@ -25,6 +25,7 @@ import { Schedule, generateWeeks } from '../src/core/schedule.js';
 import { ChatFeed, shouldShow } from '../src/core/chatOverlay.js';
 import { MusicPlayer } from '../src/core/music.js';
 import { Goals } from '../src/core/goals.js';
+import { classifySources, cleanRelPath, cleanFileName, overlayType, targetPath, linkSettings, OVERLAY_EXTS } from '../src/core/overlayFiles.js';
 
 const CHANNEL = { id: '0', login: 'canale_demo' };
 const DEMO_SCENES = ['Inizio', 'Gioco', 'Chiacchiere', 'Pausa', 'Fine'];
@@ -752,6 +753,7 @@ class DemoBackend {
         break;
     }
 
+    if (url.pathname === '/api/overlay' || url.pathname.startsWith('/api/overlay/')) return this.#overlayApi(route, url, body, headers, ok, fail);
     if (method === 'POST' && url.pathname.startsWith('/api/actions/')) {
       try {
         return ok(await this.quickActions.run(decodeURIComponent(url.pathname.slice('/api/actions/'.length)), body ?? {}));
@@ -781,6 +783,114 @@ class DemoBackend {
       return this.#upload('music', decodeURIComponent(url.pathname.slice('/api/credits/upload/'.length)), body, (p) => ok({ name: p }));
     }
     return fail(404, 'Non trovato');
+  }
+
+  // ---------- scheda Overlay: cartella e sorgenti di OBS simulate ----------
+  #overlayDemo() {
+    if (this.ov) return this.ov;
+    const art = (w, h, a, b, label) => URL.createObjectURL(new Blob([`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><text x="50%" y="54%" font-family="sans-serif" font-size="${Math.round(h / 6)}" font-weight="700" fill="#fff" text-anchor="middle">${label}</text></svg>`], { type: 'image/svg+xml' }));
+    const file = (p, size, url) => ({ path: p, name: p.split('/').pop(), folder: p.split('/').slice(0, -1).join('/'), size, mtime: Date.now(), type: overlayType(p), url });
+    const ROOT = '\\\\twitchgestor\\TwitchGestor\\overlay';
+    const PC = 'C:\\Users\\Xandred\\Documents\\Stream';
+    this.ov = {
+      root: ROOT,
+      folders: ['Fine', 'Gioco', 'Inizio'],
+      files: [
+        file('Gioco/cornice webcam.png', 182_400, art(640, 360, '#8a3ffc', '#c03ffc', 'Cornice webcam')),
+        file('Inizio/sfondo.png', 1_240_000, art(1920, 1080, '#1b1530', '#8a3ffc', 'Sto arrivando…')),
+        file('Fine/grazie.png', 860_000, art(1920, 1080, '#c03ffc', '#ff7a59', 'Grazie a tutti!')),
+      ],
+      links: { 'Cornice webcam': { previous: `${PC}\\cornice webcam.png`, kind: 'image_source' } },
+      inputs: [
+        { name: 'Logo', kind: 'image_source', settings: { file: `${PC}\\logo.png` }, scenes: ['Gioco', 'Chiacchiere'] },
+        { name: 'Sfondo inizio', kind: 'image_source', settings: { file: `${PC}\\Inizio\\sfondo.png` }, scenes: ['Inizio'] },
+        { name: 'Intro', kind: 'ffmpeg_source', settings: { local_file: 'D:\\Video\\intro.webm' }, scenes: ['Inizio'] },
+        { name: 'Schermata pausa', kind: 'image_source', settings: { file: `${PC}\\pausa.png` }, scenes: ['Pausa'] },
+        { name: 'Cornice webcam', kind: 'image_source', settings: { file: `${ROOT}\\Gioco\\cornice webcam.png` }, scenes: ['Gioco'] },
+        { name: 'Chat', kind: 'browser_source', settings: { url: 'http://localhost:3000/chat' }, scenes: ['Gioco'] },
+      ],
+    };
+    return this.ov;
+  }
+
+  #overlayApi(route, url, body, headers, ok, fail) {
+    const ov = this.#overlayDemo();
+    const sources = () => ({
+      connected: true, root: ov.root,
+      sources: classifySources(ov.inputs, { root: ov.root, files: ov.files }).map((s) => ({ ...s, previous: ov.links[s.name]?.previous ?? null })),
+    });
+    const setFile = (name, p) => { const i = ov.inputs.find((x) => x.name === name); Object.assign(i.settings, linkSettings(i.kind, p)); };
+    switch (route) {
+      case 'GET /api/overlay':
+        return ok({ files: ov.files, folders: ov.folders, root: ov.root, limit: 500 * 1024 * 1024, exts: OVERLAY_EXTS, share: { path: '\\\\twitchgestor\\TwitchGestor', host: 'twitchgestor', user: 'pi', password: '(la password della dashboard)' } });
+      case 'GET /api/overlay/obs': return ok(sources());
+      case 'POST /api/overlay/upload': {
+        const name = cleanFileName(decodeURIComponent(headers['x-filename'] ?? ''));
+        if (!name) return fail(400, `Formato non supportato. Usa: ${OVERLAY_EXTS.join(', ')}`);
+        if (!body || typeof body.size !== 'number' || !body.size) return fail(400, 'File vuoto');
+        const folder = cleanRelPath(url.searchParams.get('folder') ?? '');
+        let p = [folder, name].filter(Boolean).join('/');
+        for (let n = 2; ov.files.some((f) => f.path === p); n++) p = [folder, name.replace(/(\.[^.]+)$/, ` (${n})$1`)].filter(Boolean).join('/');
+        ov.files.push({ path: p, name: p.split('/').pop(), folder, size: body.size, mtime: Date.now(), type: overlayType(name), url: URL.createObjectURL(body) });
+        folder.split('/').filter(Boolean).forEach((_, i, a) => { const d = a.slice(0, i + 1).join('/'); if (!ov.folders.includes(d)) ov.folders.push(d); });
+        ov.folders.sort();
+        this.log.info(`Overlay caricato nella demo: ${p} (resta finché non ricarichi la pagina)`);
+        return ok({ path: p });
+      }
+      case 'POST /api/overlay/folder': {
+        const p = cleanRelPath(body?.path);
+        if (!p) return fail(400, 'Nome non valido');
+        if (!ov.folders.includes(p)) ov.folders.push(p);
+        ov.folders.sort();
+        return ok({ path: p });
+      }
+      case 'POST /api/overlay/rename': {
+        const from = cleanRelPath(body?.from);
+        const to = cleanRelPath(body?.to);
+        if (!from || !to) return fail(400, 'Percorso non valido');
+        const isDir = ov.folders.includes(from);
+        if (!isDir && !OVERLAY_EXTS.includes((/\.[^.]+$/.exec(to)?.[0] ?? '').toLowerCase())) return fail(400, 'Mantieni l\'estensione del file (es. .png, .mp4)');
+        if (ov.files.some((f) => f.path === to) || ov.folders.includes(to)) return fail(409, 'Esiste già un file o una cartella con quel nome');
+        const move = (p) => (p === from ? to : p.startsWith(`${from}/`) ? to + p.slice(from.length) : p);
+        for (const f of ov.files) { f.path = move(f.path); f.name = f.path.split('/').pop(); f.folder = f.path.split('/').slice(0, -1).join('/'); }
+        ov.folders = ov.folders.map(move);
+        const dir = to.split('/').slice(0, -1).join('/');
+        if (dir && !ov.folders.includes(dir)) ov.folders.push(dir);
+        ov.folders.sort();
+        let relinked = 0;
+        for (const s of sources().sources) if (s.onGestor && s.rel && move(s.rel) !== s.rel) { setFile(s.name, targetPath(ov.root, move(s.rel))); relinked += 1; }
+        return ok({ from, to, relinked });
+      }
+      case 'POST /api/overlay/delete': {
+        const p = cleanRelPath(body?.path);
+        ov.files = ov.files.filter((f) => f.path !== p && !f.path.startsWith(`${p}/`));
+        ov.folders = ov.folders.filter((d) => d !== p && !d.startsWith(`${p}/`));
+        return ok();
+      }
+      case 'POST /api/overlay/link': {
+        const s = sources().sources.find((x) => x.name === body?.name);
+        if (!s) return fail(404, 'Sorgente non trovata in OBS');
+        const target = cleanRelPath(body?.path) || s.match;
+        if (!target || !ov.files.some((f) => f.path === target)) return fail(400, 'Nella cartella overlay non c\'è quel file: caricalo prima');
+        if (!s.onGestor) ov.links[s.name] = { previous: s.file, kind: s.kind };
+        setFile(s.name, targetPath(ov.root, target));
+        this.log.info(`OBS (simulato): "${s.name}" ora legge ${target} da Gestor`);
+        return ok({ name: s.name, path: target });
+      }
+      case 'POST /api/overlay/link-all': {
+        const todo = sources().sources.filter((s) => !s.onGestor && s.match);
+        for (const s of todo) { ov.links[s.name] = { previous: s.file, kind: s.kind }; setFile(s.name, targetPath(ov.root, s.match)); }
+        return ok({ linked: todo.length, failed: [] });
+      }
+      case 'POST /api/overlay/restore': {
+        const prev = ov.links[body?.name];
+        if (!prev) return fail(404, 'Non ricordo il file di prima per questa sorgente');
+        setFile(body.name, prev.previous);
+        delete ov.links[body.name];
+        return ok({ name: body.name, path: prev.previous });
+      }
+      default: return fail(404, 'Non trovato');
+    }
   }
 
   /** I file caricati restano nella memoria della pagina (spariscono ricaricandola). */
@@ -860,6 +970,7 @@ window.WebSocket = function WebSocket(url, protocols) {
   return new URL(String(url), location.href).pathname.endsWith('/ws') ? new DemoSocket(url) : new realWebSocket(url, protocols);
 };
 
+window.TG_DEMO = true; // es. la scheda Overlay carica i file con fetch (la demo non intercetta XMLHttpRequest)
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input, init = {}) => {
   const url = new URL(typeof input === 'string' ? input : input.url, location.href);

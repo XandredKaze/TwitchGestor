@@ -15,6 +15,7 @@ import { recapText } from './core/livestats.js';
 import { API_LEVEL, APP_VERSION, BUILD_ID } from './version.js';
 import { parseKofi, parseGenericDonation } from './sources/webhooks.js';
 import { createLogger } from './logger.js';
+import { createOverlayFolder } from './overlayFolder.js';
 
 const log = createLogger('server');
 const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
@@ -46,6 +47,15 @@ const MIME = {
   '.opus': 'audio/ogg',
   '.webm': 'video/webm',
   '.mp4': 'video/mp4',
+  '.mov': 'video/quicktime',
+  '.mkv': 'video/x-matroska',
+  '.m4v': 'video/mp4',
+  '.bmp': 'image/bmp',
+  '.apng': 'image/apng',
+  '.htm': 'text/html; charset=utf-8',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.woff': 'font/woff',
 };
 
 /**
@@ -123,6 +133,8 @@ function serveStatic(res, urlPath, baseDir = PUBLIC_DIR) {
   }
   const type = MIME[path.extname(file).toLowerCase()] ?? 'application/octet-stream';
   const size = fs.statSync(file).size;
+  // pagine e svg caricati nella cartella dei media: aperti "a parte", senza accesso alla dashboard
+  const sandbox = baseDir === MEDIA_DIR && /^(text\/html|image\/svg)/.test(type) ? { 'Content-Security-Policy': 'sandbox allow-scripts' } : {};
   // richieste a pezzi (Range): le usano audio e video per sapere la durata e per saltare avanti
   const m = /^bytes=(\d*)-(\d*)$/.exec(String(res.req?.headers.range ?? ''));
   if (m && (m[1] || m[2])) {
@@ -132,10 +144,10 @@ function serveStatic(res, urlPath, baseDir = PUBLIC_DIR) {
       res.writeHead(416, { 'Content-Range': `bytes */${size}` });
       return res.end();
     }
-    res.writeHead(206, { 'Content-Type': type, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': end - start + 1, 'Accept-Ranges': 'bytes' });
+    res.writeHead(206, { ...sandbox, 'Content-Type': type, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': end - start + 1, 'Accept-Ranges': 'bytes' });
     return fs.createReadStream(file, { start, end }).pipe(res);
   }
-  res.writeHead(200, { 'Content-Type': type, 'Content-Length': size, 'Accept-Ranges': 'bytes' });
+  res.writeHead(200, { ...sandbox, 'Content-Type': type, 'Content-Length': size, 'Accept-Ranges': 'bytes' });
   fs.createReadStream(file).pipe(res);
 }
 
@@ -228,6 +240,18 @@ export function createServer(app) {
       return { ok: true };
     },
   };
+  // scheda Overlay: OBS (sul PC) vede la cartella dalla rete se c'è la cartella condivisa del Raspberry,
+  // oppure direttamente sul disco se TwitchGestor gira sullo stesso PC di OBS
+  const overlay = app.overlay ?? createOverlayFolder({
+    dir: path.join(MEDIA_DIR, 'overlay'),
+    linksFile: path.join(DATA_DIR, 'overlay-collegamenti.json'),
+    obs: app.obs,
+    root: () => {
+      const share = shareInfo();
+      if (share) return `${share.path}\\overlay`;
+      return updates.isManaged() ? '' : path.join(MEDIA_DIR, 'overlay');
+    },
+  });
   const draft = (body) => (body?.config ? sanitizeConfig(body.config, app.config.defaults()) : null);
 
   const server = http.createServer(async (req, res) => {
@@ -624,6 +648,23 @@ export function createServer(app) {
         if (req.method === 'PUT' && url.pathname.startsWith('/api/credits/upload/')) {
           const saved = await saveUpload(req, 'music', decodeURIComponent(url.pathname.slice('/api/credits/upload/'.length)));
           return send(res, 200, { name: saved });
+        }
+        // --- scheda Overlay ---
+        if (url.pathname === '/api/overlay' || url.pathname.startsWith('/api/overlay/')) {
+          if (route === 'GET /api/overlay') return send(res, 200, { ...overlay.list(), share: shareInfo() });
+          if (route === 'POST /api/overlay/upload') {
+            const saved = await overlay.save(req, url.searchParams.get('folder') ?? '', req.headers['x-filename'] && decodeURIComponent(req.headers['x-filename']));
+            return send(res, 200, { path: saved });
+          }
+          if (route === 'GET /api/overlay/obs') return send(res, 200, await overlay.sources());
+          const body = req.method === 'POST' ? await readBody(req) : {};
+          if (route === 'POST /api/overlay/folder') return send(res, 200, { path: overlay.mkdir(body.path) });
+          if (route === 'POST /api/overlay/rename') return send(res, 200, await overlay.rename(body.from, body.to));
+          if (route === 'POST /api/overlay/delete') { overlay.remove(body.path); return send(res, 200, { ok: true }); }
+          if (route === 'POST /api/overlay/link') return send(res, 200, await overlay.link(String(body.name ?? ''), body.path));
+          if (route === 'POST /api/overlay/link-all') return send(res, 200, await overlay.linkAll());
+          if (route === 'POST /api/overlay/restore') return send(res, 200, await overlay.restore(String(body.name ?? '')));
+          return send(res, 404, { error: 'Non trovato' });
         }
         if (route === 'POST /api/upload') {
           const saved = await saveUpload(req, url.searchParams.get('kind'), req.headers['x-filename'] && decodeURIComponent(req.headers['x-filename']));

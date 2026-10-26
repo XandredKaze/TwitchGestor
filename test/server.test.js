@@ -136,3 +136,38 @@ test('configurazione per la dashboard: c\'è l\'elenco dei file caricati', async
   assert.ok(Array.isArray(body.media.music) && Array.isArray(body.media.sounds));
   web.server.close();
 });
+
+test('overlay: elenco, caricamento e azioni dalla dashboard', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const { createOverlayFolder } = await import('../src/overlayFolder.js');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tg-ov-'));
+  const app = fakeApp();
+  app.overlay = createOverlayFolder({ dir: path.join(tmp, 'overlay'), linksFile: path.join(tmp, 'l.json'), obs: null });
+  const web = createServer(app);
+  web.server.listen(0, '127.0.0.1');
+  await once(web.server, 'listening');
+  const base = `http://127.0.0.1:${web.server.address().port}`;
+  const post = (p, body, headers = {}) => fetch(`${base}${p}`, { method: 'POST', headers: { 'x-twitchgestor': '1', ...headers }, body });
+  try {
+    const up = await post('/api/overlay/upload?folder=Inizio', 'video', { 'x-filename': encodeURIComponent('intro clip.mp4') });
+    assert.equal(up.status, 200);
+    assert.equal((await up.json()).path, 'Inizio/intro clip.mp4');
+    const list = await (await fetch(`${base}/api/overlay`)).json();
+    assert.deepEqual(list.folders, ['Inizio']);
+    assert.equal(list.files[0].url, '/media/overlay/Inizio/intro%20clip.mp4');
+    assert.equal(list.files[0].type, 'video');
+    const ren = await post('/api/overlay/rename', JSON.stringify({ from: 'Inizio/intro clip.mp4', to: 'Inizio/intro.mp4' }), { 'content-type': 'application/json' });
+    assert.equal((await ren.json()).to, 'Inizio/intro.mp4');
+    const obs = await (await fetch(`${base}/api/overlay/obs`)).json();
+    assert.equal(obs.connected, false);
+    const del = await post('/api/overlay/delete', JSON.stringify({ path: 'Inizio' }), { 'content-type': 'application/json' });
+    assert.equal(del.status, 200);
+    await del.text();
+    assert.deepEqual((await (await fetch(`${base}/api/overlay`)).json()).files, []);
+  } finally {
+    web.server.close();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

@@ -124,7 +124,7 @@ setup_musicante() {
 setup_musicante || true
 
 # --- cartella condivisa in rete (Samba): da Windows \\twitchgestor\TwitchGestor ---
-# dentro: music (musica, una sottocartella per playlist), images e sounds (alert).
+# dentro: music (musica, una sottocartella per playlist), images e sounds (alert), overlay (grafiche delle scene di OBS).
 # Utente = quello del Raspberry, password = la stessa della dashboard. Se qualcosa va storto non blocca nulla.
 setup_share() {
   set +e
@@ -136,17 +136,17 @@ setup_share() {
       || { DEBIAN_FRONTEND=noninteractive timeout 600 apt-get update -q >/dev/null 2>&1 && DEBIAN_FRONTEND=noninteractive timeout 900 apt-get install -y -q samba >/dev/null 2>&1; } \
       || { echo "Samba non installato (riprovo al prossimo aggiornamento)"; return 0; }
   fi
-  for d in music images sounds; do
+  for d in music images sounds overlay; do
     mkdir -p "$DIR/data/media/$d"
   done
-  chown "$ME" "$DIR/data/media" "$DIR/data/media/music" "$DIR/data/media/images" "$DIR/data/media/sounds"
+  chown "$ME" "$DIR/data/media" "$DIR/data/media/music" "$DIR/data/media/images" "$DIR/data/media/sounds" "$DIR/data/media/overlay"
 
   local CONF=/etc/samba/smb.conf
   local SECTION
   SECTION="$(cat <<SMB
 # --- TwitchGestor (scritto da system-setup.sh, non modificare) ---
 [TwitchGestor]
-   comment = Musica, immagini e suoni di TwitchGestor
+   comment = Musica, immagini, suoni e overlay di TwitchGestor
    path = $DIR/data/media
    valid users = $ME
    force user = $ME

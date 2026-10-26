@@ -24,6 +24,7 @@
       <button class="tab" data-tab="schedule" role="tab">📅 Programmazione</button>
       <button class="tab" data-tab="music" role="tab">🎵 Musica</button>
       <button class="tab" data-tab="goals" role="tab">🎯 Goal</button>
+      <button class="tab" data-tab="overlays" role="tab">🖼 Overlay</button>
       <button class="tab" data-tab="theme" role="tab">🖌 Tema</button>
     </nav>
     <div id="statuses" class="statuses"></div>
@@ -474,6 +475,22 @@
     </div>
   </main>
 
+  <main id="tab-overlays" class="ov-tab" hidden>
+    <div class="page-head">
+      <div><h2>🖼 Overlay</h2><p>Le grafiche, i video e i suoni delle scene di OBS tenuti su Gestor, nella cartella condivisa, invece che sul PC.</p></div>
+    </div>
+    <div class="ov-layout">
+      <section class="panel ov-files-panel">
+        <div class="ov-files-head"><h2>File</h2><input type="search" id="ov-search" placeholder="Cerca un file…"></div>
+        <div id="ov-files"></div>
+      </section>
+      <div class="ov-side">
+        <section class="panel" id="ov-obs"></section>
+        <section class="panel" id="ov-share"></section>
+      </div>
+    </div>
+  </main>
+
   <main id="tab-theme" class="theme-tab" hidden>
     <div class="page-head">
       <div><h2>🖌 Tema</h2><p>L'aspetto di TwitchGestor, degli alert e dei titoli di coda.</p></div>
@@ -522,6 +539,7 @@
   <script src="/schedule.js"></script>
   <script src="/music-tab.js"></script>
   <script src="/goals-tab.js"></script>
+  <script src="/overlay-tab.js"></script>
   <script src="/chatoverlay.js"></script>
 </body>
 </html>
