@@ -88,6 +88,9 @@ as_user tar -czf "$BACKUP" --exclude=data/backups --exclude=data/media/music --e
   --exclude=data/tts --exclude=data/piper --exclude=data/musicante/bin --exclude=data/musicante/lavoro \
   -C "$DIR" config data .env 2>/dev/null
 ls -1t "$BACKUPS"/prima-di-aggiornare-*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
+# copie fatte dalle versioni 1.41–1.42 con dentro le grafiche degli overlay (gigabyte): quelle grafiche
+# restano nella loro cartella, la copia non serve (le copie normali pesano pochi MB)
+find "$BACKUPS" -maxdepth 1 -name 'prima-di-aggiornare-*.tar.gz' -size +300M ! -newer "$BACKUP" ! -samefile "$BACKUP" -delete 2>/dev/null
 
 # reinstalla i pacchetti solo se sono cambiati (non basta il numero di versione in package.json)
 deps_of() {

@@ -88,11 +88,13 @@ export async function buildReport({ state = {} } = {}) {
     section('Cartella condivisa', `${JSON.stringify(readJson(path.join(DATA_DIR, 'condivisa-stato.json')), null, 2)}\n${smb}`);
   }
 
-  section('Registro di TwitchGestor (ultime righe)', recentLogs().slice(-150).join('\n'));
+  section('Registro di TwitchGestor (ultime righe)', recentLogs().slice(-150).map((r) => r.line ?? String(r)).join('\n'));
   if (managed) {
     for (const [unit, n] of [['twitchgestor-update', 80], ['howlup', 40], ['musicante', 40], ['smbd', 20]]) {
-      const r = await run('journalctl', ['-u', unit, '-n', String(n), '--no-pager', '-o', 'short-iso'], 15000);
-      section(`Registro di ${unit}`, r.out && !/No journal files|insufficient permissions/i.test(r.out) ? r.out : `non leggibile${r.err ? ` (${r.err.split('\n')[0]})` : ''}`);
+      // senza le righe di servizio (apertura e chiusura delle sessioni), che coprirebbero quelle utili
+      const r = await run('journalctl', ['-u', unit, '-n', String(n * 4), '--no-pager', '-o', 'short-iso'], 15000);
+      const lines = r.out.split('\n').filter((l) => !/pam_unix\(|: Deactivated successfully\.|Consumed .* CPU time/.test(l)).slice(-n).join('\n');
+      section(`Registro di ${unit}`, r.out && !/No journal files|insufficient permissions/i.test(r.out) ? lines : `non leggibile${r.err ? ` (${r.err.split('\n')[0]})` : ''}`);
     }
   }
 
