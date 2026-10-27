@@ -242,6 +242,39 @@
   $('sys-close').onclick = () => { dialog.close(); clearInterval(poll); clearInterval(remotePoll); };
   dialog.addEventListener('click', (e) => { if (e.target === dialog) { dialog.close(); clearInterval(poll); clearInterval(remotePoll); } });
 
+  // rapporto per l'assistenza: da copiare in chat o scaricare
+  $('sys-report').onclick = async () => {
+    const out = $('sys-report-out');
+    const btn = $('sys-report');
+    btn.disabled = true;
+    out.replaceChildren(el('p', { className: 'muted small' }, 'Raccolgo le informazioni (qualche secondo)…'));
+    const token = window.TG.token();
+    const res = await fetch('/api/system/report', { headers: token ? { 'x-dashboard-token': token } : {} }).catch(() => null);
+    btn.disabled = false;
+    if (!res?.ok) { out.replaceChildren(el('p', { className: 'cmd-warn' }, (await res?.json().catch(() => null))?.error ?? 'Rapporto non riuscito: il programma non risponde.')); return; }
+    const text = await res.text();
+    const area = el('textarea', { className: 'sys-report-text', readonly: true, rows: '8', 'aria-label': 'Rapporto' });
+    area.value = text;
+    const copy = el('button', {
+      type: 'button', className: 'primary',
+      onclick: async () => {
+        try { await navigator.clipboard.writeText(text); } catch { area.select(); document.execCommand('copy'); }
+        copy.textContent = '✓ Copiato: incollalo in chat';
+        setTimeout(() => { copy.textContent = '📋 Copia'; }, 2500);
+      },
+    }, '📋 Copia');
+    const save = el('button', {
+      type: 'button',
+      onclick: () => {
+        const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: 'text/plain' })), download: `rapporto-twitchgestor-${new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-')}.txt` });
+        document.body.append(a);
+        a.click();
+        a.remove();
+      },
+    }, '⬇ Scarica .txt');
+    out.replaceChildren(el('div', { className: 'row' }, copy, save), area);
+  };
+
   $('sys-export').onclick = async () => {
     const out = $('sys-backup-out');
     out.textContent = 'Preparo il file…';

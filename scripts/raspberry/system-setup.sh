@@ -123,6 +123,9 @@ setup_musicante() {
 }
 setup_musicante || true
 
+# registri di sistema leggibili da TwitchGestor (solo lettura): servono al "Rapporto per l'assistenza" in ⚙ Sistema
+id -nG "$ME" | grep -qw systemd-journal || usermod -aG systemd-journal "$ME" 2>/dev/null || true
+
 # --- cartella condivisa in rete (Samba): scripts/raspberry/share-setup.sh ---
 bash "$(dirname "$0")/share-setup.sh" "$DIR" "$ME" || true
 

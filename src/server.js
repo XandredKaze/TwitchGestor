@@ -350,6 +350,11 @@ export function createServer(app) {
           return send(res, 200, { alert: builder.buildAlert(sampleNotification(body.type, body.sample)) });
         }
         // --- Aggiornamenti (Raspberry) e copia di sicurezza ---
+        if (route === 'GET /api/system/report') {
+          // rapporto per l'assistenza (senza password né chiavi)
+          const { buildReport } = await import('./report.js');
+          return send(res, 200, await buildReport({ state: app.getState() }));
+        }
         if (route === 'GET /api/system') {
           // usato anche dallo script di aggiornamento: non aggiorna durante la live
           return send(res, 200, { version: APP_VERSION, commit: await updates.installedCommit(), busy: Boolean(await app.isBusy?.()) });
