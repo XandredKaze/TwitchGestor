@@ -42,11 +42,19 @@
     });
   }
 
+  // il riquadro si vede solo mentre la musica suona: in pausa, ferma o senza collegamento sparisce
+  // (con un attimo di ritardo, così non lampeggia tra un brano e l'altro)
+  let hideTimer = 0;
+  function setVisible(on) {
+    clearTimeout(hideTimer);
+    if (on) box.classList.remove('off');
+    else hideTimer = setTimeout(() => box.classList.add('off'), 1500);
+  }
+
   function showWidget(state) {
     box.hidden = false;
     box.classList.toggle('brutal', params.get('style') === 'brutal');
-    box.classList.toggle('off', !state.track);
-    box.classList.toggle('paused', !state.playing);
+    setVisible(Boolean(state.track && state.playing));
     if (state.track) {
       document.getElementById('np-title').textContent = state.track.title;
       document.getElementById('np-artist').textContent = state.track.artist || '';
@@ -97,7 +105,10 @@
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     ws = new WebSocket(`${proto}://${location.host}/ws?role=music${widget ? '&widget' : ''}`);
     ws.onmessage = (e) => { try { onMessage(JSON.parse(e.data)); } catch { /* messaggio non valido */ } };
-    ws.onclose = () => setTimeout(connect, 2000);
+    ws.onclose = () => {
+      if (widget) setVisible(false); // TwitchGestor spento o non raggiungibile: niente riquadro fermo in live
+      setTimeout(connect, 2000);
+    };
   }
   connect();
 })();

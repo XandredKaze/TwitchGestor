@@ -1258,9 +1258,47 @@ html:root[data-ui="brutal"] {
 /* ===== Musica ===== */
 .music-tab { max-width: 1480px; margin: 0 auto; padding: 12px 16px 80px; display: grid; gap: 12px; }
 .music-tab[hidden] { display: none; }
-.music-layout { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1fr); gap: 12px; align-items: start; }
-@media (max-width: 1000px) { .music-layout { grid-template-columns: minmax(0, 1fr); } }
-.music-main, .music-side { display: grid; gap: 12px; min-width: 0; }
+.mu-view { display: grid; gap: 12px; min-width: 0; }
+.mu-view[hidden] { display: none; }
+.mu-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.mu-col { display: grid; gap: 12px; min-width: 0; }
+.mu-col > [hidden] { display: none; }
+@media (max-width: 1000px) { .mu-cols { grid-template-columns: minmax(0, 1fr); } }
+/* lettore: brano | comandi | volume, in una riga sola */
+.mu-player { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 16px; align-items: center; }
+.mu-side-opts { display: grid; gap: 6px; justify-items: end; }
+.mu-side-opts .mu-vol { width: min(240px, 100%); }
+.mu-side-opts .check { margin: 0; }
+@media (max-width: 900px) {
+  .mu-player { grid-template-columns: minmax(0, 1fr); }
+  .mu-side-opts { justify-items: stretch; }
+  .mu-side-opts .mu-vol { width: 100%; }
+}
+.mu-warn-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.mu-next { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* playlist a sinistra, brani a destra */
+.mu-lib-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 12px; align-items: start; }
+@media (max-width: 800px) { .mu-lib-layout { grid-template-columns: minmax(0, 1fr); } }
+.mu-playlists h2 { margin: 0 0 8px; }
+.mu-pl-list { display: grid; gap: 2px; }
+@media (max-width: 800px) { .mu-pl-list { display: flex; flex-wrap: wrap; gap: 6px; } }
+.mu-pl { display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; padding: 7px 10px; border-radius: 9px; border: 1px solid transparent; background: transparent; font: inherit; color: inherit; }
+.mu-pl:hover { background: var(--inset); border-color: var(--border); }
+.mu-pl.active { background: var(--inset); border-color: var(--accent); font-weight: 600; }
+.mu-pl-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mu-pl-on { color: var(--accent); }
+.mu-pl-count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mu-pl-new { margin-top: 10px; }
+#mu-lib-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.mu-empty { display: grid; justify-items: start; gap: 8px; padding: 12px 0; }
+.mu-empty p { margin: 0; }
+.mu-rescan { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.mu-steps { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+.mu-extra { margin-top: 12px; }
+.mu-extra summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+#mu-obs > p, #mu-musicante > p { margin: 10px 0; }
+[data-ui="brutal"] .mu-pl { border-radius: 0; }
+[data-ui="brutal"] .mu-pl.active { border-color: var(--lilac); }
 .mu-now { display: grid; gap: 12px; }
 .mu-warn { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--danger); font-size: 14px; }
 .mu-track { display: flex; align-items: center; gap: 16px; min-width: 0; }

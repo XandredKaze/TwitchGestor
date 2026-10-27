@@ -445,22 +445,33 @@
 
   <main id="tab-music" class="music-tab" hidden>
     <div class="page-head">
-      <div><h2>🎵 Musica</h2><p>La musica di sottofondo della live: la suona OBS (così va in diretta e la regoli dal mixer), tu la comandi da qui. Ogni sottocartella della cartella "music" è una playlist.</p></div>
+      <div><h2>🎵 Musica</h2><p>La musica di sottofondo della live: la suona OBS, tu la comandi da qui. Ogni sottocartella della cartella "music" è una playlist.</p></div>
+      <nav class="subtabs" id="mu-subtabs" role="tablist" aria-label="Sezioni della musica">
+        <button type="button" role="tab" data-view="player">🎵 Lettore</button>
+        <button type="button" role="tab" data-view="add">➕ Aggiungi brani</button>
+        <button type="button" role="tab" data-view="settings">⚙ Impostazioni</button>
+      </nav>
     </div>
-    <div class="music-layout">
-      <div class="music-main">
-        <section class="panel mu-now" id="mu-now"></section>
-        <section class="panel">
-          <div class="mu-lib-head"><h2>Libreria</h2><input type="search" id="mu-search" placeholder="Cerca un brano o un artista…"></div>
+    <div class="mu-view" data-view="player">
+      <section class="panel mu-now" id="mu-now"></section>
+      <div class="mu-lib-layout">
+        <aside class="panel mu-playlists" id="mu-playlists" aria-label="Playlist"></aside>
+        <section class="panel mu-lib-panel">
+          <div class="mu-lib-head"><div id="mu-lib-title"></div><input type="search" id="mu-search" placeholder="Cerca un brano o un artista…"></div>
           <div id="mu-library" class="mu-library"></div>
         </section>
       </div>
-      <div class="music-side">
-        <section class="panel" id="mu-obs"></section>
-        <section class="panel" id="mu-upload"></section>
+    </div>
+    <div class="mu-view mu-cols" data-view="add" hidden>
+      <section class="panel" id="mu-upload"></section>
+      <div class="mu-col">
+        <section class="panel" id="mu-musicante"></section>
         <section class="panel" id="mu-share"></section>
-        <section class="panel" id="mu-duck"></section>
       </div>
+    </div>
+    <div class="mu-view mu-cols" data-view="settings" hidden>
+      <section class="panel" id="mu-obs"></section>
+      <section class="panel" id="mu-duck"></section>
     </div>
   </main>
 
