@@ -31,8 +31,13 @@
     const live = Boolean(state?.obs?.stream?.active);
     const last = info.last;
     const lines = [version];
-    if (info.pending || last?.result === 'running') {
-      lines.push(el('p', { className: 'cmd-ok' }, '⏳ Aggiornamento in corso: TwitchGestor si riavvia da solo (circa un minuto) e questa pagina si ricarica.'));
+    // un aggiornamento "in corso" da più di 20 minuti si è fermato a metà (es. Raspberry spento durante l'aggiornamento)
+    const stuck = last?.result === 'running' && Date.now() - Date.parse(last.at) > 20 * 60000;
+    if (stuck && !info.pending) {
+      lines.push(el('p', { className: 'cmd-warn' }, `⚠ L'aggiornamento iniziato alle ${new Date(last.at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} si è fermato a metà. TwitchGestor funziona con la versione installata${c.available ? ': riprova con "Aggiorna ora"' : ''}.`));
+    }
+    if (info.pending || (last?.result === 'running' && !stuck)) {
+      lines.push(el('p', { className: 'cmd-ok' }, '⏳ Aggiornamento in corso: TwitchGestor si riavvia da solo (di solito 1–3 minuti) e questa pagina si ricarica.'));
     } else if (c.error) {
       lines.push(el('p', { className: 'cmd-warn' }, c.error));
     } else if (c.available) {

@@ -27,7 +27,11 @@ TOKEN="$(grep -E '^DASHBOARD_TOKEN=' .env 2>/dev/null | cut -d= -f2-)"
 system_info() { curl -fsS -m 8 -H "x-dashboard-token: $TOKEN" "http://127.0.0.1:$PORT/api/system" 2>/dev/null; }
 
 # stato per la dashboard (data/update-status.json)
+# se lo script si ferma a metà (errore, spegnimento) lo stato non resta "in corso" per sempre
+RUNNING=0
+trap '[ "$RUNNING" = 1 ] && status error "aggiornamento interrotto a metà: riprova con Aggiorna ora"' EXIT
 status() {
+  [ "$1" = running ] && RUNNING=1 || RUNNING=0
   as_user node -e '
     const [file, result, message, mode, version] = process.argv.slice(1);
     require("fs").writeFileSync(file, JSON.stringify({ at: new Date().toISOString(), result, message, mode, version }, null, 2));
@@ -42,7 +46,7 @@ if [ -f scripts/raspberry/system-setup.sh ] && ! grep -q CAP_NET_BIND_SERVICE /e
 fi
 
 # cartella condivisa: gli indirizzi della rete di casa possono cambiare (IPv6 del fornitore): si ricontrolla ogni volta
-[ -f scripts/raspberry/share-setup.sh ] && timeout 120 bash scripts/raspberry/share-setup.sh "$DIR" "$OWNER" quick
+[ -f scripts/raspberry/share-setup.sh ] && timeout 60 bash scripts/raspberry/share-setup.sh "$DIR" "$OWNER" quick
 
 if [ "$MODE" = auto ]; then
   read -r AUTO WHEN HOUR < <(as_user node -e '
@@ -78,7 +82,11 @@ status running
 BACKUPS="$DIR/data/backups"
 as_user mkdir -p "$BACKUPS"
 BACKUP="$BACKUPS/prima-di-aggiornare-$(date +%Y%m%d-%H%M%S).tar.gz"
-as_user tar -czf "$BACKUP" --exclude=data/backups --exclude=data/media/music -C "$DIR" config data .env 2>/dev/null
+# senza i file grandi che restano comunque al loro posto: musica, grafiche degli overlay, voci della sintesi vocale,
+# programmi e download in corso di Musicante (con loro la copia richiedeva minuti e riempiva la scheda SD)
+as_user tar -czf "$BACKUP" --exclude=data/backups --exclude=data/media/music --exclude=data/media/overlay \
+  --exclude=data/tts --exclude=data/piper --exclude=data/musicante/bin --exclude=data/musicante/lavoro \
+  -C "$DIR" config data .env 2>/dev/null
 ls -1t "$BACKUPS"/prima-di-aggiornare-*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
 
 # reinstalla i pacchetti solo se sono cambiati (non basta il numero di versione in package.json)

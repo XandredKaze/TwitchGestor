@@ -80,7 +80,11 @@ PY
     fi
     exit 0
   fi
+  # solo gli indirizzi ammessi: niente installazioni né controlli (quelli si fanno con gli aggiornamenti)
   echo "cartella condivisa: indirizzi della rete cambiati, aggiorno"
+  printf '%s\n' "$NEW_CONF" > "$CONF"
+  systemctl reload smbd >/dev/null 2>&1 || systemctl restart smbd >/dev/null 2>&1
+  exit 0
 fi
 
 # --- installazione completa ---

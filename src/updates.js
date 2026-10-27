@@ -117,7 +117,8 @@ export async function updateState() {
 
 // Cosa entra nella copia: impostazioni, dati (accessi a Twitch, storico, immagini e suoni, titoli di coda...) e .env.
 // La musica no: può pesare gigabyte e resta comunque nella cartella (o sul tuo PC).
-const MUSIC_IN_DATA = path.join('media', 'music');
+// Neanche le grafiche degli overlay (anche video grandi) e i programmi e download in corso di Musicante.
+const BIG_IN_DATA = [path.join('media', 'music'), path.join('media', 'overlay'), path.join('musicante', 'bin'), path.join('musicante', 'lavoro')];
 const SKIP_IN_DATA = new Set(['backups', 'twitchgestor.pid', 'twitchgestor.log', 'update-request', 'update-status.json', 'update-bad-commit', 'system-setup-requested', 'remote-access-request', 'remote-access-status.json', 'tts', 'piper']);
 
 /** Crea un file .tar.gz con tutto quello che serve per ripartire su un altro computer. Ritorna il percorso. */
@@ -133,7 +134,7 @@ export async function createBackup() {
       if (SKIP_IN_DATA.has(entry)) continue;
       fs.cpSync(path.join(DATA_DIR, entry), path.join(stage, 'data', entry), {
         recursive: true,
-        filter: (from) => path.relative(DATA_DIR, from) !== MUSIC_IN_DATA,
+        filter: (from) => !BIG_IN_DATA.includes(path.relative(DATA_DIR, from)),
       });
     }
   }
