@@ -147,16 +147,18 @@ const announcements = new Announcements({
   async send(draft, { text, image, targets }) {
     const s = cleanAnnounceSettings(announceSettings);
     const want = (k) => (targets ? targets.includes(k) : s[k]);
+    // image: un'immagine per tutti, oppure { telegram, discord }
+    const imageFor = (k) => (image && !Buffer.isBuffer(image) && typeof image === 'object' ? image[k] ?? null : image);
     const results = {};
     if (want('telegram')) {
       try {
         const t = await telegramTarget();
-        await announceTelegram({ token: t?.token, chatId: t?.channelId }, text, image);
+        await announceTelegram({ token: t?.token, chatId: t?.channelId }, text, imageFor('telegram'));
         results.telegram = 'ok';
       } catch (err) { results.telegram = err.message; }
     }
     if (want('discord')) {
-      try { await announceDiscord(s.discordWebhook, text, image); results.discord = 'ok'; } catch (err) { results.discord = err.message; }
+      try { await announceDiscord(s.discordWebhook, text, imageFor('discord')); results.discord = 'ok'; } catch (err) { results.discord = err.message; }
     }
     for (const [k, v] of Object.entries(results)) if (v !== 'ok') log(`Annuncio (${k}): ${v}`);
     return results;
@@ -315,7 +317,9 @@ const server = http.createServer(async (req, res) => {
         if (a[2] === 'hold') return send(res, 200, { rev, draft: announcements.hold(a[1]) });
         if (a[2] === 'dismiss') return send(res, 200, { rev, draft: announcements.dismiss(a[1]) });
         if (typeof body.text === 'string') announcements.update(a[1], { text: body.text });
-        const image = /^data:image\/png;base64,/.test(body.image ?? '') ? Buffer.from(body.image.split(',')[1], 'base64') : null;
+        const png = (v) => (/^data:image\/png;base64,/.test(v ?? '') ? Buffer.from(v.split(',')[1], 'base64') : null);
+        // storia verticale per Telegram, banner orizzontale per Discord (se c'è)
+        const image = body.imageDiscord ? { telegram: png(body.image), discord: png(body.imageDiscord) } : png(body.image);
         const targets = Array.isArray(body.targets) ? body.targets.filter((x) => ['telegram', 'discord'].includes(x)) : undefined;
         return send(res, 200, { rev, draft: await announcements.sendNow(a[1], { image, targets }) });
       }

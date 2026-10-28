@@ -1,5 +1,5 @@
 // Howl-UP: la pagina (telefono e PC). I dati stanno sul Raspberry; qui si mostrano e si modificano.
-import { drawStory } from './story.js';
+import { drawStory, drawBanner } from './story.js';
 import { occurrences, repeatText, today, addDays, parseDate, dateKey, weekday, WEEKDAYS, FREQS, livesToEvents, findOverlaps } from './core/agenda.js';
 
 const $ = (id) => document.getElementById(id);
@@ -483,15 +483,23 @@ async function loadAnnounce() {
 }
 const STATUS = { draft: 'Da inviare', sent: 'Inviato', dismissed: 'Ignorato' };
 function draftCard(d) {
+  // due immagini: storia verticale (Instagram e Telegram) e banner orizzontale (Discord)
   const canvas = el('canvas', { className: 'story', 'aria-label': 'Storia Instagram' });
-  loadMascot().then((m) => drawStory(canvas, d, { login: ann?.login, mascot: m }));
+  const banner = el('canvas', { className: 'banner', 'aria-label': 'Immagine per Discord' });
+  loadMascot().then((m) => { drawStory(canvas, d, { login: ann?.login, mascot: m }); drawBanner(banner, d, { login: ann?.login, mascot: m }); });
+  let showing = 'story';
+  const pick = (which) => { showing = which; canvas.hidden = which !== 'story'; banner.hidden = which !== 'banner'; for (const b of formatBtns.children) b.classList.toggle('active', b.dataset.f === which); };
+  const formatBtns = el('div', { className: 'seg' },
+    el('button', { type: 'button', className: 'active', 'data-f': 'story', onclick: () => pick('story') }, 'Storia'),
+    el('button', { type: 'button', 'data-f': 'banner', onclick: () => pick('banner') }, 'Discord'));
+  banner.hidden = true;
   const text = el('textarea', { rows: '7', maxlength: '3500', disabled: d.status !== 'draft' });
   text.value = d.text;
   text.onchange = () => api(`/api/announce/${d.id}/text`, { method: 'POST', body: { text: text.value } });
   const mins = d.sendAt ? Math.max(0, Math.ceil((d.sendAt - Date.now()) / 60000)) : null;
   const res = Object.entries(d.results ?? {}).map(([k, v]) => `${k === 'telegram' ? 'Telegram' : 'Discord'}: ${v === 'ok' ? '✓ inviato' : `✕ ${v}`}`).join(' · ');
-  const download = () => canvas.toBlob((b) => {
-    const a = el('a', { href: URL.createObjectURL(b), download: `storia-${d.kind}-${(d.lives?.[0]?.start ?? '').slice(0, 10)}.png` });
+  const download = (c, prefix) => c.toBlob((b) => {
+    const a = el('a', { href: URL.createObjectURL(b), download: `${prefix}-${d.kind}-${(d.lives?.[0]?.start ?? '').slice(0, 10)}.png` });
     document.body.append(a); a.click(); a.remove();
   }, 'image/png');
   return el('section', { className: `card draft ${d.status}` },
@@ -502,7 +510,7 @@ function draftCard(d) {
     mins !== null && d.status === 'draft' ? el('div', { className: 'card warn auto' }, `⏳ Si invia da solo tra ${mins} min (solo testo).`,
       el('button', { type: 'button', className: 'btn small', onclick: async () => { if (await api(`/api/announce/${d.id}/hold`, { method: 'POST' })) loadAnnounce(); } }, 'Ferma')) : null,
     el('div', { className: 'draft-body' },
-      el('div', { className: 'story-box' }, canvas),
+      el('div', { className: 'story-col' }, formatBtns, el('div', { className: 'story-box' }, canvas, banner)),
       el('div', { className: 'col' },
         el('label', { className: 'field' }, el('span', {}, 'Messaggio per Telegram e Discord'), text),
         res ? el('p', { className: 'hint' }, res) : null,
@@ -512,12 +520,14 @@ function draftCard(d) {
             onclick: async (e) => {
               e.target.disabled = true;
               const image = canvas.toDataURL('image/png');
-              const r = await api(`/api/announce/${d.id}/send`, { method: 'POST', body: { text: text.value, image } });
+              const imageDiscord = banner.toDataURL('image/png');
+              const r = await api(`/api/announce/${d.id}/send`, { method: 'POST', body: { text: text.value, image, imageDiscord } });
               e.target.disabled = false;
               if (r) { toast(r.draft.status === 'sent' ? 'Inviato 📣' : 'Non inviato: guarda il messaggio sotto'); loadAnnounce(); }
             },
-          }, '📤 Invia con la storia') : null,
-          el('button', { type: 'button', className: 'btn', onclick: download }, '⬇ Storia Instagram'),
+          }, '📤 Invia con le immagini') : null,
+          el('button', { type: 'button', className: 'btn', onclick: () => download(canvas, 'storia') }, '⬇ Storia Instagram'),
+          el('button', { type: 'button', className: 'btn', onclick: () => download(banner, 'discord') }, '⬇ Immagine Discord'),
           el('button', { type: 'button', className: 'btn', onclick: async () => { try { await navigator.clipboard.writeText(text.value); toast('Testo copiato'); } catch { toast('Selezionalo e copialo'); } } }, 'Copia testo'),
           d.status === 'draft' ? el('button', { type: 'button', className: 'btn danger', onclick: async () => { if (await api(`/api/announce/${d.id}/dismiss`, { method: 'POST' })) loadAnnounce(); } }, 'Ignora') : null))));
 }
