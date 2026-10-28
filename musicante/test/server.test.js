@@ -133,3 +133,12 @@ test('YouTube chiede "non sei un bot": errore spiegato; con i cookie caricati fu
   const del = await (await fetch(`${base}/api/cookies`, { method: 'DELETE', headers: h })).json();
   assert.equal(del.tool.cookies, false);
 });
+
+test('download "per artista": senza artista il brano va in Varie', async () => {
+  const r = await (await post('/api/downloads', { url: 'https://www.youtube.com/watch?v=perartista', byArtist: true, folder: 'ignorata' })).json();
+  assert.equal(r.job.byArtist, true);
+  assert.equal(r.job.folder, '');
+  const done = await waitDone(r.job.id);
+  assert.equal(done.status, 'done');
+  assert.ok(fs.readdirSync(path.join(music, 'Varie')).length >= 1);
+});

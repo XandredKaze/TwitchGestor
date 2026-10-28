@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { Downloads } from './core/downloads.js';
 import { cleanUrl, cleanFolder } from './core/ytdlp.js';
 import { createTool } from './tool.js';
+import { placeNewTrack } from '../../src/musicFolder.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..', '..'); // cartella di TwitchGestor
@@ -59,7 +60,8 @@ const downloads = new Downloads({
   store: { load: () => readJson(JOBS_FILE, []), save: (list) => writeJson(JOBS_FILE, list) },
   onChange: () => { rev = Date.now(); },
   log,
-  run: (job, opts) => tool.run(job, { ...opts, dir: folderPath(job.folder) }).finally(() => { if (!env.MUSICANTE_TEST) rescanTwitchGestor(); }),
+  // "per artista": ogni brano nella playlist del suo artista (o in "Varie"), come il riordino di TwitchGestor
+  run: (job, opts) => tool.run(job, { ...opts, dir: job.byArtist ? (file) => placeNewTrack(MUSIC, file) : folderPath(job.folder) }).finally(() => { if (!env.MUSICANTE_TEST) rescanTwitchGestor(); }),
 });
 
 /** Sottocartelle della musica (le playlist di TwitchGestor). */

@@ -31,6 +31,7 @@ import { Schedule, fromLocal, segmentsToEntries } from './core/schedule.js';
 import { isIngameScene } from './core/errore.js';
 import { MusicPlayer } from './core/music.js';
 import { scanLibrary } from './musiclib.js';
+import { createMusicFolder } from './musicFolder.js';
 import { sanitizeConfig } from './core/schema.js';
 import { createLogger } from './logger.js';
 
@@ -468,6 +469,20 @@ async function liveEnded(at = Date.now()) {
 // --- Musica: libreria in data/media/music, riprodotta dalla pagina /music in OBS ---
 const MUSIC_DIR = path.join(DATA_DIR, 'media', 'music');
 const MUSIC_FILE = path.join(DATA_DIR, 'music.json');
+// una volta sola: i brani scaricati finora da Musicante (tutti nella cartella "Musicante") divisi per artista
+const MUSICANTE_SORTED = path.join(DATA_DIR, 'musica-riordinata');
+if (!fs.existsSync(MUSICANTE_SORTED)) {
+  try {
+    const old = fs.existsSync(MUSIC_DIR) ? fs.readdirSync(MUSIC_DIR).find((f) => f.toLowerCase() === 'musicante') : null;
+    if (old) {
+      const r = createMusicFolder({ dir: MUSIC_DIR }).organize(old);
+      log.info(`Musica: ${r.moved} brani della cartella "${old}" divisi per artista`);
+    }
+    fs.writeFileSync(MUSICANTE_SORTED, new Date().toISOString());
+  } catch (err) {
+    log.warn(`Riordino della musica non riuscito: ${err.message}`);
+  }
+}
 let musicLibrary = scanLibrary(MUSIC_DIR);
 const musicPlayer = new MusicPlayer({
   getLibrary: () => musicLibrary,

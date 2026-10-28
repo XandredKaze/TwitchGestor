@@ -25,11 +25,11 @@ export class Downloads {
 
   list() { return this.jobs; }
 
-  add({ url, playlist = false, folder = '', title = '', count = 0, split = false, force = false } = {}) {
+  add({ url, playlist = false, folder = '', title = '', count = 0, split = false, force = false, byArtist = false } = {}) {
     const u = cleanUrl(url);
     if (!u) throw Object.assign(new Error('Incolla un link valido (https://…)'), { status: 400 });
     const job = {
-      id: newId(), url: u, playlist: playlist === true, split: split === true, force: force === true, folder: cleanFolder(folder), title: String(title ?? '').slice(0, 200), count: Number(count) || 0,
+      id: newId(), url: u, playlist: playlist === true, split: split === true, force: force === true, byArtist: byArtist === true, folder: byArtist === true ? '' : cleanFolder(folder), title: String(title ?? '').slice(0, 200), count: Number(count) || 0,
       status: 'queued', percent: 0, index: null, total: null, current: '', files: [], skipped: 0, errors: [], log: [], createdAt: this.now(), startedAt: null, endedAt: null,
     };
     this.jobs = [job, ...this.jobs].slice(0, KEEP);

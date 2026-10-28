@@ -12,6 +12,14 @@
   let uploadFolder = '';
   let view = 'player';
   let shown = null; // playlist che stai guardando nella libreria (null = quella che suona)
+  // ✏ Organizza: selezione di più brani, spostare, rinominare, eliminare, riordinare per artista
+  let organizing = false;
+  const selected = new Set();
+  let moveTo = '';
+  let newPlaylist = '';
+  let renaming = false;
+  let plan = null; // anteprima del riordino per artista
+  let working = false;
 
   const info = (name) => {
     const base = String(name).replace(/\.[a-z0-9]+$/i, '').replace(/_/g, ' ').trim();
@@ -166,28 +174,132 @@
     const inList = data.tracks.filter((t) => !pl || pl.id === '*' || t.folder === pl.id);
     const list = inList.filter((t) => !q || `${t.name} ${t.folder}`.toLowerCase().includes(q));
     fill($('mu-lib-title'),
-      el('h2', {}, pl?.name ?? 'Libreria'),
-      pl && pl.id !== playing && pl.count ? el('button', { type: 'button', className: 'small-btn primary', onclick: () => { shown = null; cmd('play', { playlist: pl.id }); } }, '▶ Suona questa playlist') : null);
+      renaming && pl && pl.id !== '*'
+        ? renameForm(pl)
+        : el('h2', {}, pl?.name ?? 'Libreria'),
+      !organizing && pl && pl.id !== playing && pl.count ? el('button', { type: 'button', className: 'small-btn primary', onclick: () => { shown = null; cmd('play', { playlist: pl.id }); } }, '▶ Suona questa playlist') : null,
+      data.tracks.length ? el('button', {
+        type: 'button', className: `small-btn${organizing ? ' primary' : ''}`, 'aria-pressed': organizing ? 'true' : 'false',
+        onclick: () => { organizing = !organizing; selected.clear(); plan = null; renaming = false; renderLibrary(); },
+      }, organizing ? '✓ Fine' : '✏ Organizza') : null);
     if (!data.tracks.length) {
       fill($('mu-library'), el('div', { className: 'mu-empty' },
         el('p', {}, 'Ancora nessun brano.'),
         el('button', { type: 'button', className: 'primary', onclick: () => showView('add') }, '➕ Aggiungi brani')));
       return;
     }
+    const shownIds = list.slice(0, 300).map((t) => t.id);
+    for (const id of [...selected]) if (!data.tracks.some((t) => t.id === id)) selected.delete(id);
     fill($('mu-library'),
-      el('p', { className: 'muted small' }, `${list.length} ${list.length === 1 ? 'brano' : 'brani'}${q ? ` trovati su ${inList.length}` : ''} · clicca un brano per farlo partire`),
+      organizing ? organizeBar(pl, shownIds) : null,
+      organizing && plan ? planBox(pl) : null,
+      el('p', { className: 'muted small' }, `${list.length} ${list.length === 1 ? 'brano' : 'brani'}${q ? ` trovati su ${inList.length}` : ''} · ${organizing ? 'clicca i brani per selezionarli' : 'clicca un brano per farlo partire'}`),
       ...list.slice(0, 300).map((t) => {
         const i = info(t.name);
+        const badge = pl?.id === '*' && t.folder ? el('span', { className: 'sc-badge' }, t.folder) : null;
+        const text = el('span', { className: 'mu-item-text' }, el('b', {}, i.title), i.artist ? el('small', {}, i.artist) : null);
+        if (organizing) {
+          const box = el('input', { type: 'checkbox', checked: selected.has(t.id), onchange: () => { if (box.checked) selected.add(t.id); else selected.delete(t.id); renderLibrary(); } });
+          return el('label', { className: `mu-item mu-pick${selected.has(t.id) ? ' picked' : ''}${t.id === current ? ' current' : ''}` }, box, text, badge);
+        }
         return el('button', {
           type: 'button', className: `mu-item${t.id === current ? ' current' : ''}`,
           onclick: () => cmd('play', { trackId: t.id }),
         },
         el('span', { className: 'mu-item-icon', 'aria-hidden': 'true' }, t.id === current ? '♪' : '▶'),
-        el('span', { className: 'mu-item-text' }, el('b', {}, i.title), i.artist ? el('small', {}, i.artist) : null),
-        pl?.id === '*' && t.folder ? el('span', { className: 'sc-badge' }, t.folder) : null);
+        text, badge);
       }),
       list.length > 300 ? el('p', { className: 'muted small' }, 'Ne mostro 300: usa la ricerca per trovare gli altri.') : null,
     );
+  }
+
+  // ---------- organizza ----------
+  async function organizeCall(action, body) {
+    working = true;
+    renderLibrary();
+    const r = await api(`/api/music/${action}`, { body });
+    working = false;
+    if (r?.skipped?.length) alert(`Il brano che sta suonando è rimasto dov'era (OBS lo sta leggendo): spostalo quando è finito.`);
+    return r;
+  }
+  function renameForm(pl) {
+    const input = el('input', { type: 'text', maxlength: '60', value: pl.name, 'aria-label': 'Nuovo nome della playlist' });
+    setTimeout(() => { input.focus(); input.select(); }, 0);
+    return el('form', {
+      className: 'mu-inline',
+      onsubmit: async (e) => {
+        e.preventDefault();
+        const to = input.value.trim();
+        if (!to || to === pl.name) { renaming = false; renderLibrary(); return; }
+        const r = await organizeCall('rename-playlist', { from: pl.id, to });
+        renaming = false;
+        if (r) { shown = to; await load(); } else renderLibrary();
+      },
+    }, input,
+    el('button', { type: 'submit', className: 'small-btn primary' }, 'Rinomina'),
+    el('button', { type: 'button', className: 'small-btn', 'aria-label': 'Annulla', onclick: () => { renaming = false; renderLibrary(); } }, '✕'));
+  }
+  function organizeBar(pl, shownIds) {
+    const folders = data.playlists.filter((p) => p.id !== '*').map((p) => p.id);
+    const all = shownIds.length && shownIds.every((id) => selected.has(id));
+    const allBox = el('input', { type: 'checkbox', checked: all, onchange: () => { for (const id of shownIds) { if (allBox.checked) selected.add(id); else selected.delete(id); } renderLibrary(); } });
+    const target = el('select', { 'aria-label': 'Sposta nella playlist' },
+      el('option', { value: '' }, 'Sposta in…'),
+      ...folders.filter((f) => f !== pl?.id).map((f) => el('option', { value: f, selected: f === moveTo }, f)),
+      el('option', { value: '__new', selected: moveTo === '__new' }, '➕ Nuova playlist…'));
+    target.onchange = () => { moveTo = target.value; renderLibrary(); if (moveTo === '__new') $('mu-library').querySelector('.mu-org input[type=text]')?.focus(); };
+    const n = selected.size;
+    const canMove = () => !working && n && moveTo && (moveTo !== '__new' || newPlaylist.trim());
+    const newName = moveTo === '__new' ? el('input', { type: 'text', maxlength: '60', placeholder: 'Nome (es. Chill)', value: newPlaylist, oninput: (e) => { newPlaylist = e.target.value; moveBtn.disabled = !canMove(); }, 'aria-label': 'Nome della nuova playlist' }) : null;
+    const moveBtn = el('button', {
+      type: 'button', className: 'small-btn primary', disabled: !canMove(),
+      onclick: async () => {
+        const folder = moveTo === '__new' ? newPlaylist.trim() : moveTo;
+        const r = await organizeCall('move', { ids: [...selected], folder });
+        if (r) { selected.clear(); moveTo = ''; newPlaylist = ''; await load(); }
+      },
+    }, 'Sposta');
+    return el('div', { className: 'mu-org' },
+      el('div', { className: 'mu-org-row' },
+        el('label', { className: 'check' }, allBox, ` Seleziona tutti (${shownIds.length})`),
+        el('b', { className: 'small' }, n ? `${n} ${n === 1 ? 'selezionato' : 'selezionati'}` : 'Nessuno selezionato')),
+      el('div', { className: 'mu-org-row' },
+        target, newName, moveBtn,
+        el('button', {
+          type: 'button', className: 'small-btn danger', disabled: working || !n,
+          onclick: async () => {
+            if (!confirm(`Eliminare ${n === 1 ? 'il brano selezionato' : `${n} brani`}? I file vengono cancellati dal Raspberry.`)) return;
+            const r = await organizeCall('delete', { ids: [...selected] });
+            if (r) { selected.clear(); await load(); }
+          },
+        }, '🗑 Elimina')),
+      el('div', { className: 'mu-org-row' },
+        el('button', {
+          type: 'button', className: 'small-btn', disabled: working,
+          onclick: async () => { plan = await organizeCall('organize-preview', { folder: pl?.id ?? '*' }); renderLibrary(); },
+        }, `🪄 Riordina per artista${pl && pl.id !== '*' ? ` (solo "${pl.name}")` : ''}`),
+        pl && pl.id !== '*' ? el('button', { type: 'button', className: 'small-btn', disabled: working, onclick: () => { renaming = true; renderLibrary(); } }, '✏ Rinomina playlist') : null));
+  }
+  function planBox(pl) {
+    const moving = plan.groups.reduce((s, g) => s + g.count, 0);
+    if (!moving) {
+      return el('div', { className: 'mu-plan' }, el('p', { className: 'small' }, '✓ Già in ordine: ogni brano è nella playlist del suo artista.'),
+        el('button', { type: 'button', className: 'small-btn', onclick: () => { plan = null; renderLibrary(); } }, 'OK'));
+    }
+    return el('div', { className: 'mu-plan' },
+      el('p', { className: 'small' }, el('b', {}, `Sposto ${moving} ${moving === 1 ? 'brano' : 'brani'} in ${plan.groups.length} ${plan.groups.length === 1 ? 'playlist' : 'playlist'}:`),
+        ' ogni artista con almeno 2 brani ha la sua playlist, gli altri vanno in "Varie". L\'artista si legge dai dati del file o dal nome "Artista - Titolo".'),
+      el('div', { className: 'mu-plan-groups' }, ...plan.groups.map((g) => el('span', { className: 'sc-badge' }, `${g.folder} · ${g.count}`))),
+      el('div', { className: 'mu-org-row' },
+        el('button', {
+          type: 'button', className: 'small-btn primary', disabled: working,
+          onclick: async () => {
+            const r = await organizeCall('organize', { folder: pl?.id ?? '*' });
+            plan = null;
+            if (r) { shown = '*'; await load(); alert(`Fatto: ${r.moved} ${r.moved === 1 ? 'brano spostato' : 'brani spostati'}. Ora puoi spostare a mano quelli che vuoi in altre playlist.`); }
+          },
+        }, 'Riordina'),
+        el('button', { type: 'button', className: 'small-btn', onclick: () => { plan = null; renderLibrary(); } }, 'Annulla')));
   }
 
   // ---------- aggiungi brani ----------

@@ -60,7 +60,8 @@ function showLogin(wrong) {
 
 // ---------- stato ----------
 let data = null;
-const form = { url: '', playlist: false, split: false, folder: 'Musicante', newFolder: '', info: null, probing: false };
+const ARTIST = '__artista__'; // ogni brano nella playlist del suo artista (o in "Varie")
+const form = { url: '', playlist: false, split: false, folder: ARTIST, newFolder: '', info: null, probing: false };
 const NEW = '__new__';
 
 async function load(force = false) {
@@ -103,10 +104,10 @@ function downloadCard() {
   }, '📋');
 
   const folders = data.folders;
-  if (form.folder !== NEW && form.folder && !folders.includes(form.folder)) folders.unshift(form.folder);
+  if (form.folder !== NEW && form.folder !== ARTIST && form.folder && !folders.includes(form.folder)) folders.unshift(form.folder);
   const sel = el('select', {
     onchange: () => { form.folder = sel.value; newName.hidden = sel.value !== NEW; if (sel.value === NEW) newName.focus(); },
-  }, el('option', { value: '' }, '📁 Cartella principale della musica'), ...folders.map((f) => el('option', { value: f }, `📁 ${f}`)), el('option', { value: NEW }, '＋ Nuova cartella…'));
+  }, el('option', { value: ARTIST }, '🎤 Per artista (automatico)'), el('option', { value: '' }, '📁 Cartella principale della musica'), ...folders.map((f) => el('option', { value: f }, `📁 ${f}`)), el('option', { value: NEW }, '＋ Nuova cartella…'));
   sel.value = form.folder;
   const newName = el('input', { type: 'text', placeholder: 'Nome della nuova cartella (= playlist in TwitchGestor)', maxlength: '60', value: form.newFolder, oninput: (e) => { form.newFolder = e.target.value; } });
   newName.hidden = form.folder !== NEW;
@@ -138,7 +139,8 @@ function downloadCard() {
       if (!cleanUrl(form.url)) { toast('Incolla un link valido'); url.focus(); return; }
       if (form.folder === NEW && !target()) { toast('Scrivi il nome della cartella'); newName.focus(); return; }
       if (form.info?.isPlaylist && form.info.count > 50 && !confirm(`La playlist ha ${form.info.count} brani: scaricarli tutti?`)) return;
-      const r = await api('/api/downloads', { method: 'POST', body: { url: form.url, playlist: form.playlist, split: form.split, folder: target(), title: form.info?.title ?? '', count: form.info?.count ?? 0 } });
+      const byArtist = form.folder === ARTIST;
+      const r = await api('/api/downloads', { method: 'POST', body: { url: form.url, playlist: form.playlist, split: form.split, folder: byArtist ? '' : target(), byArtist, title: form.info?.title ?? '', count: form.info?.count ?? 0 } });
       if (!r) return;
       toast('Download aggiunto ⬇');
       if (form.folder === NEW) form.folder = target();
@@ -173,7 +175,7 @@ function previewView(info) {
 const STATUS = { queued: '⏳ In attesa', running: '⬇ In corso', done: '✓ Fatto', error: '⚠️ Errore', cancelled: 'Annullato' };
 
 function jobView(j) {
-  const folder = j.folder ? `📁 ${j.folder}` : '📁 cartella principale';
+  const folder = j.byArtist ? '🎤 per artista' : j.folder ? `📁 ${j.folder}` : '📁 cartella principale';
   const how = j.split ? ' · ✂️ per capitoli' : '';
   const progress = j.status === 'running'
     ? [j.total ? `${j.index ?? 1} di ${j.total}` : '', j.current].filter(Boolean).join(' · ')
@@ -197,12 +199,12 @@ function jobView(j) {
         ? el('button', { type: 'button', className: 'btn small danger', onclick: async () => { const r = await api(`/api/downloads/${j.id}/cancel`, { method: 'POST' }); if (r) { data = r; render(); } } }, 'Annulla')
         : el('button', { type: 'button', className: 'btn small', onclick: async () => { const r = await api(`/api/downloads/${j.id}`, { method: 'DELETE' }); if (r) { data = r; render(); } } }, 'Togli dall\'elenco'),
       j.status === 'error' || j.status === 'cancelled'
-        ? el('button', { type: 'button', className: 'btn small', onclick: () => { Object.assign(form, { url: j.url, playlist: j.playlist, split: Boolean(j.split), folder: j.folder, info: null }); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); } }, '↻ Riprova')
+        ? el('button', { type: 'button', className: 'btn small', onclick: () => { Object.assign(form, { url: j.url, playlist: j.playlist, split: Boolean(j.split), folder: j.byArtist ? ARTIST : j.folder, info: null }); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); } }, '↻ Riprova')
         : null,
       j.already
         ? el('button', {
           type: 'button', className: 'btn small',
-          onclick: async () => { const r = await api('/api/downloads', { method: 'POST', body: { url: j.url, playlist: j.playlist, split: j.split, folder: j.folder, title: j.title, count: j.count, force: true } }); if (r) { toast('Download aggiunto ⬇'); data = { ...data, ...r }; render(); } },
+          onclick: async () => { const r = await api('/api/downloads', { method: 'POST', body: { url: j.url, playlist: j.playlist, split: j.split, folder: j.folder, byArtist: Boolean(j.byArtist), title: j.title, count: j.count, force: true } }); if (r) { toast('Download aggiunto ⬇'); data = { ...data, ...r }; render(); } },
         }, '⬇ Scarica di nuovo')
         : null));
 }
@@ -245,7 +247,7 @@ function cookiesCard() {
 function infoCard() {
   const t = data.tool;
   return el('section', { className: `card${!t.ffmpeg || t.error ? ' warn' : ''}` }, el('h2', {}, 'Come funziona'),
-    el('p', { className: 'hint' }, 'I brani diventano MP3 e finiscono nella musica di TwitchGestor: ogni cartella è una playlist del lettore della live (scheda 🎵 Musica). Si vedono anche nella cartella condivisa in rete (\\\\twitchgestor\\TwitchGestor\\music). I brani già scaricati una volta non si riscaricano.'),
+    el('p', { className: 'hint' }, 'I brani diventano MP3 e finiscono nella musica di TwitchGestor: ogni cartella è una playlist del lettore della live (scheda 🎵 Musica). Con "🎤 Per artista" ogni brano va nella playlist del suo artista (dal secondo brano dello stesso artista in poi; i primi stanno in "Varie"). Si vedono anche nella cartella condivisa in rete (\\\\twitchgestor\\TwitchGestor\\music). I brani già scaricati una volta non si riscaricano.'),
     el('p', { className: 'hint' }, '⚠️ In live usa solo musica che puoi trasmettere (senza copyright o con licenza per lo streaming): Twitch può segnalare o silenziare i video con musica protetta.'),
     !t.ffmpeg ? el('p', { className: 'hint', style: { color: 'var(--warn)' } }, 'Manca ffmpeg (serve per gli MP3): si installa da solo con il prossimo aggiornamento di TwitchGestor.') : null,
     t.error ? el('p', { className: 'hint', style: { color: 'var(--danger)' } }, t.error) : null,

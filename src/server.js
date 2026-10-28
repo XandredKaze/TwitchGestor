@@ -16,6 +16,7 @@ import { API_LEVEL, APP_VERSION, BUILD_ID } from './version.js';
 import { parseKofi, parseGenericDonation } from './sources/webhooks.js';
 import { createLogger } from './logger.js';
 import { createOverlayFolder } from './overlayFolder.js';
+import { createMusicFolder } from './musicFolder.js';
 
 const log = createLogger('server');
 const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
@@ -256,6 +257,7 @@ export function createServer(app) {
       return updates.isManaged() ? '' : path.join(MEDIA_DIR, 'overlay');
     },
   });
+  const musicFolder = createMusicFolder({ dir: path.join(MEDIA_DIR, 'music') });
   const draft = (body) => (body?.config ? sanitizeConfig(body.config, app.config.defaults()) : null);
 
   const server = http.createServer(async (req, res) => {
@@ -520,6 +522,20 @@ export function createServer(app) {
             return send(res, 200, { path: saved });
           }
           const body = await readBody(req);
+          // Organizza: spostare, rinominare, eliminare, riordinare per artista.
+          // Il brano che sta suonando non si tocca (OBS lo sta leggendo): resta dov'è e lo si sposta dopo.
+          if (['move', 'delete', 'rename-playlist', 'organize-preview', 'organize'].includes(action)) {
+            const skip = p.state.playing && p.current ? [p.current.id] : [];
+            let result;
+            if (action === 'move') result = musicFolder.move(body.ids, body.folder ?? '', { skip });
+            else if (action === 'delete') result = musicFolder.remove(body.ids, { skip });
+            else if (action === 'rename-playlist') result = musicFolder.renameFolder(body.from, body.to, { skip });
+            else if (action === 'organize-preview') return send(res, 200, musicFolder.preview(body.folder ?? null));
+            else result = musicFolder.organize(body.folder ?? null, { skip });
+            app.music.rescan();
+            p.libraryChanged?.();
+            return send(res, 200, result);
+          }
           if (action === 'play') p.play({ playlist: body.playlist, trackId: body.trackId });
           else if (action === 'toggle') p.toggle();
           else if (action === 'next') p.next();

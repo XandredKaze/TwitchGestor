@@ -27,6 +27,7 @@ export function createTool({ dataDir, binPath = process.env.MUSICANTE_YTDLP, log
   function moveInto(file, dir) {
     const ext = path.extname(file);
     const base = path.basename(file, ext);
+    fs.mkdirSync(dir, { recursive: true });
     let dest = path.join(dir, `${base}${ext}`);
     for (let n = 2; fs.existsSync(dest); n++) dest = path.join(dir, `${base} (${n})${ext}`);
     try { fs.renameSync(file, dest); } catch { fs.copyFileSync(file, dest); fs.rmSync(file, { force: true }); }
@@ -108,7 +109,9 @@ export function createTool({ dataDir, binPath = process.env.MUSICANTE_YTDLP, log
   function run(job, { onLine, signal, dir }) {
     return new Promise((resolve, reject) => {
       if (!state.ytdlp) { reject(new Error('yt-dlp non è pronto')); return; }
-      fs.mkdirSync(dir, { recursive: true });
+      // dir: cartella fissa, oppure funzione (file) => cartella (download "per artista")
+      const dirFor = typeof dir === 'function' ? dir : () => dir;
+      if (typeof dir !== 'function') fs.mkdirSync(dir, { recursive: true });
       const work = path.join(workRoot, job.id);
       fs.mkdirSync(work, { recursive: true });
       const audio = (d) => { try { return fs.readdirSync(d).filter((f) => /\.(mp3|m4a|opus|ogg|webm|flac|wav)$/i.test(f) && !/\.(part|ytdl|temp)\./i.test(f)).map((f) => path.join(d, f)); } catch { return []; } };
@@ -119,10 +122,10 @@ export function createTool({ dataDir, binPath = process.env.MUSICANTE_YTDLP, log
         try {
           const chapters = job.split ? audio(chapDir) : [];
           if (chapters.length) {
-            for (const c of chapters) { onLine(`${FILE_MARK}${moveInto(c, dir)}`); moved += 1; }
+            for (const c of chapters) { onLine(`${FILE_MARK}${moveInto(c, dirFor(c))}`); moved += 1; }
             if (main) fs.rmSync(main, { force: true });
           } else if (main && fs.existsSync(main)) {
-            onLine(`${FILE_MARK}${moveInto(main, dir)}`);
+            onLine(`${FILE_MARK}${moveInto(main, dirFor(main))}`);
             moved += 1;
           }
         } catch (err) {

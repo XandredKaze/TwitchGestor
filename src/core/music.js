@@ -107,6 +107,20 @@ export class MusicPlayer {
     this.#push(true);
   }
 
+  /**
+   * Dopo che dei brani sono stati spostati, rinominati o tolti: la playlist sparita diventa "Tutta la musica"
+   * e dall'ordine escono i brani che non ci sono più. Quello che sta suonando non si interrompe.
+   */
+  libraryChanged() {
+    if (this.state.playlist !== ALL && !this.playlists().some((p) => p.id === this.state.playlist)) this.state.playlist = ALL;
+    const ids = new Set(this.library.map((t) => t.id));
+    const cur = this.state.order[this.state.index];
+    const before = this.state.order.slice(0, Math.max(0, this.state.index)).filter((id) => ids.has(id)).length;
+    this.state.order = this.state.order.filter((id) => ids.has(id));
+    this.state.index = ids.has(cur) ? this.state.order.indexOf(cur) : Math.min(before, this.state.order.length) - 1;
+    this.onChange?.(false);
+  }
+
   setVolume(v) {
     const n = Number(v);
     if (!Number.isFinite(n)) return;

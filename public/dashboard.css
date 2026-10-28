@@ -1475,3 +1475,17 @@ html:root[data-ui="brutal"] {
 .ov-drop .ov-inline { max-width: 420px; margin: 0 auto; }
 .share-ok { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--ok); }
 .sys-report-text { width: 100%; box-sizing: border-box; margin-top: 8px; font: 12px/1.4 ui-monospace, Consolas, monospace; padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--inset); color: var(--text); resize: vertical; }
+/* Musica → ✏ Organizza */
+.mu-org { position: sticky; top: 0; z-index: 2; display: grid; gap: 8px; padding: 10px; margin-bottom: 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
+.mu-org-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mu-org-row select, .mu-org-row input[type=text] { width: auto; flex: 1 1 160px; }
+.mu-org .check { margin: 0; }
+.mu-pick { grid-template-columns: 24px minmax(0, 1fr) auto; cursor: pointer; }
+.mu-pick input { margin: 0; justify-self: center; }
+.mu-pick.picked { background: color-mix(in srgb, var(--accent) 10%, transparent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.mu-plan { display: grid; gap: 8px; padding: 10px; margin-bottom: 8px; border-radius: 10px; border: 1px solid var(--accent); }
+.mu-plan p { margin: 0; }
+.mu-plan-groups { display: flex; flex-wrap: wrap; gap: 6px; max-height: 120px; overflow-y: auto; }
+.mu-inline { display: flex; gap: 6px; align-items: center; flex: 1 1 240px; }
+.mu-inline input { flex: 1; min-width: 0; }
+[data-ui="brutal"] .mu-org, [data-ui="brutal"] .mu-plan { border-radius: 0; }
