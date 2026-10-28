@@ -4,7 +4,57 @@
   const { el } = window.TG;
   const $ = (id) => document.getElementById(id);
   const fill = (node, ...children) => node.replaceChildren(...children.flat().filter((c) => c !== null && c !== undefined && c !== false));
-  const audio = $('mp-audio');
+  // Dentro il programma per Windows la musica la suona il programma (così Windows e Wave Link la vedono come
+  // "Musicante Player"): NativeAudio si comporta come un <audio> e passa i comandi al programma.
+  class NativeAudio extends EventTarget {
+    constructor() {
+      super();
+      this._src = '';
+      this._t = 0;
+      this._d = NaN;
+      this._v = 1;
+      this._ready = false;
+      this._failed = '';
+      this.paused = true;
+      setInterval(() => this._poll(), 250);
+    }
+    _emit(type) { this.dispatchEvent(new Event(type)); }
+    get src() { return this._src; }
+    set src(u) {
+      this._src = u ? new URL(u, location.href).href : '';
+      this._t = 0; this._d = NaN; this._ready = false; this._failed = '';
+      if (this._src) window.musicanteAudioLoad(this._src);
+    }
+    get currentTime() { return this._t; }
+    set currentTime(sec) { this._t = Number(sec) || 0; window.musicanteAudioSeek(this._t); }
+    get duration() { return this._d; }
+    get volume() { return this._v; }
+    set volume(v) { this._v = v; window.musicanteAudioVolume(v); }
+    play() {
+      this.paused = false;
+      window.musicanteAudioPlay();
+      this._emit('play');
+      return Promise.resolve();
+    }
+    pause() {
+      if (this.paused) return;
+      this.paused = true;
+      window.musicanteAudioPause();
+      this._emit('pause');
+    }
+    async _poll() {
+      if (!this._src) return;
+      let st;
+      try { st = await window.musicanteAudioState(); } catch { return; }
+      if (st.error && st.error !== this._failed) { this._failed = st.error; this.lastError = st.error; this._emit('error'); return; }
+      if (st.ready && !this._ready) { this._ready = true; this._d = st.duration; this._emit('loadedmetadata'); if (!this.paused) this._emit('playing'); }
+      if (!st.ready) return;
+      if (Math.abs(st.position - this._t) > 0.01) { this._t = st.position; this._emit('timeupdate'); }
+      if (st.ended && !this.paused) { this.paused = true; this._emit('ended'); }
+    }
+  }
+  const native = typeof window.musicanteAudioLoad === 'function';
+  const audio = native ? new NativeAudio() : $('mp-audio');
   const ALL = '*';
   const KEY = 'musicante-player';
 
@@ -106,7 +156,8 @@
   audio.addEventListener('error', () => {
     if (!audio.src || !current()) return;
     failures += 1;
-    error = `Non riesco ad aprire "${infoOf(current()).title}"${failures < queue.length ? ': passo al successivo.' : '. Nessun brano di questa playlist si apre: controlla che il Raspberry sia acceso.'}`;
+    const why = audio.lastError ? ` (${audio.lastError})` : '';
+    error = `Non riesco ad aprire "${infoOf(current()).title}"${why}${failures < queue.length ? ': passo al successivo.' : '. Nessun brano di questa playlist si apre: controlla che il Raspberry sia acceso.'}`;
     renderList();
     if (failures < queue.length) setTimeout(() => next(false), 1200);
   });

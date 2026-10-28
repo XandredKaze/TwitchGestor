@@ -1,3 +1,5 @@
+//go:build windows
+
 // Musicante Player: programma per Windows che riproduce la musica del Raspberry (quella scaricata con Musicante
 // e le playlist di TwitchGestor). È una finestra con il motore di Edge (WebView2, già presente in Windows 10/11)
 // che apre il lettore servito da TwitchGestor (http://<raspberry>:3000/player): il lettore si aggiorna con
@@ -137,6 +139,16 @@ func main() {
 	})
 	// dal lettore: "⚙ Cambia indirizzo"
 	_ = w.Bind("musicanteSettings", func() { setup("") })
+
+	// audio suonato dal programma (audio.go): il lettore usa queste funzioni al posto dell'audio di Edge,
+	// così Windows e Wave Link vedono "Musicante Player"
+	audio := newEngine()
+	_ = w.Bind("musicanteAudioLoad", func(u string) { audio.Load(u) })
+	_ = w.Bind("musicanteAudioPlay", func() { audio.Play() })
+	_ = w.Bind("musicanteAudioPause", func() { audio.Pause() })
+	_ = w.Bind("musicanteAudioSeek", func(sec float64) { audio.Seek(sec) })
+	_ = w.Bind("musicanteAudioVolume", func(v float64) { audio.SetVolume(v) })
+	_ = w.Bind("musicanteAudioState", func() audioState { return audio.State() })
 
 	w.SetHtml(loadingPage())
 	go func() {
