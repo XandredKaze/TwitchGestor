@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Musicante Player</title>
+  <link rel="icon" type="image/png" href="/images/musicante-player.png">
+  <link rel="stylesheet" href="/player.css">
+</head>
+<body>
+  <div class="mp">
+    <header class="mp-head">
+      <div class="mp-brand"><img src="/images/musicante-player.png" alt="" width="34" height="34"><b>Musicante <span>Player</span></b></div>
+      <input type="search" id="mp-search" placeholder="Cerca un brano, un artista o una playlist…" aria-label="Cerca">
+      <button type="button" class="mp-icon-btn" id="mp-settings" title="Cambia l'indirizzo del Raspberry" aria-label="Impostazioni" hidden>⚙</button>
+    </header>
+    <nav class="mp-side" id="mp-playlists" aria-label="Playlist"></nav>
+    <main class="mp-main">
+      <div class="mp-list-head" id="mp-list-head"></div>
+      <div class="mp-list" id="mp-list" role="list"></div>
+    </main>
+    <footer class="mp-bar" id="mp-bar">
+      <div class="mp-now">
+        <div class="mp-cover" id="mp-cover" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <div class="mp-now-text"><b id="mp-title">Scegli un brano</b><span id="mp-artist"></span></div>
+      </div>
+      <div class="mp-center">
+        <div class="mp-controls">
+          <button type="button" class="mp-ctl" id="mp-shuffle" title="Ordine casuale" aria-label="Ordine casuale" aria-pressed="false">⇄</button>
+          <button type="button" class="mp-ctl" id="mp-prev" title="Precedente" aria-label="Precedente">⏮</button>
+          <button type="button" class="mp-ctl mp-play" id="mp-play" title="Suona" aria-label="Suona">▶</button>
+          <button type="button" class="mp-ctl" id="mp-next" title="Successivo" aria-label="Successivo">⏭</button>
+          <button type="button" class="mp-ctl" id="mp-repeat" title="Ripeti" aria-label="Ripeti" aria-pressed="false">↻</button>
+        </div>
+        <div class="mp-seek"><span id="mp-pos">0:00</span><input type="range" id="mp-progress" min="0" max="1000" value="0" aria-label="Posizione nel brano"><span id="mp-dur">0:00</span></div>
+      </div>
+      <div class="mp-vol"><span class="mp-vol-label" aria-hidden="true">VOL</span><input type="range" id="mp-volume" min="0" max="100" value="80" aria-label="Volume"></div>
+    </footer>
+  </div>
+  <audio id="mp-audio" preload="auto"></audio>
+  <script src="/common.js"></script>
+  <script src="/player.js"></script>
+</body>
+</html>

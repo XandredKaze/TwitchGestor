@@ -268,6 +268,15 @@ export function createServer(app) {
       if (route === 'GET /overlay') return serveStatic(res, '/overlay.html');
       // il lupo caricato in Howl-UP (Annunci): lo usa anche l'immagine della settimana nello stile del canale
       if (route === 'GET /howlup-mascot.png') return serveStatic(res, '/mascot.png', path.join(DATA_DIR, 'howlup'));
+      // Musicante Player: lettore per ascoltare la musica sul PC (pagina, e programma per Windows da scaricare)
+      if (route === 'GET /player') return serveStatic(res, '/player.html');
+      if (route === 'GET /player/ping') return send(res, 200, 'musicante-player', { 'Access-Control-Allow-Origin': '*' });
+      if (route === 'GET /scarica/MusicantePlayer.exe') {
+        const exe = path.join(ROOT_DIR, 'windows', 'MusicantePlayer.exe');
+        if (!fs.existsSync(exe)) return send(res, 404, 'Programma non ancora disponibile');
+        res.writeHead(200, { 'Content-Type': 'application/vnd.microsoft.portable-executable', 'Content-Length': fs.statSync(exe).size, 'Content-Disposition': 'attachment; filename="MusicantePlayer.exe"' });
+        return fs.createReadStream(exe).pipe(res);
+      }
       if (route === 'GET /favicon.ico') return serveStatic(res, '/images/twitchgestor.png'); // icona di TwitchGestor
       if (route === 'GET /dashboard') return serveStatic(res, '/dashboard.html');
       if (route === 'GET /credits') return serveStatic(res, '/credits.html');
@@ -505,7 +514,7 @@ export function createServer(app) {
           const lib = app.music?.library() ?? [];
           return send(res, 200, {
             playlists: app.music?.player.playlists() ?? [],
-            tracks: lib.map((t) => ({ id: t.id, folder: t.folder, name: t.name, url: t.url })),
+            tracks: lib.map((t) => ({ id: t.id, folder: t.folder, name: t.name, url: t.url, artist: t.artist ?? '', title: t.title ?? '' })),
             player: app.music?.player.snapshot() ?? null,
             pages: musicPages(),
             settings: app.config.get().music ?? {},

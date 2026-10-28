@@ -195,7 +195,7 @@
       organizing && plan ? planBox(pl) : null,
       el('p', { className: 'muted small' }, `${list.length} ${list.length === 1 ? 'brano' : 'brani'}${q ? ` trovati su ${inList.length}` : ''} · ${organizing ? 'clicca i brani per selezionarli' : 'clicca un brano per farlo partire'}`),
       ...list.slice(0, 300).map((t) => {
-        const i = info(t.name);
+        const i = { ...info(t.name), ...(t.title ? { title: t.title } : {}), ...(t.artist ? { artist: t.artist } : {}) };
         const badge = pl?.id === '*' && t.folder ? el('span', { className: 'sc-badge' }, t.folder) : null;
         const text = el('span', { className: 'mu-item-text' }, el('b', {}, i.title), i.artist ? el('small', {}, i.artist) : null);
         if (organizing) {
@@ -396,12 +396,29 @@
     );
   }
 
+  // Musicante Player: ascoltare la musica del Raspberry sul PC (programma per Windows o pagina nel browser)
+  function renderPc() {
+    const host = location.hostname;
+    fill($('mu-pc'),
+      el('h2', {}, '💻 Ascolta sul PC'),
+      el('p', { className: 'small' }, 'Musicante Player: un programma per Windows per ascoltare (solo tu, non va in live) la musica del Raspberry, con le stesse playlist. I brani nuovi compaiono da soli; funzionano i tasti multimediali della tastiera.'),
+      el('div', { className: 'row' },
+        el('a', { className: 'btn primary', href: '/scarica/MusicantePlayer.exe', download: 'MusicantePlayer.exe' }, '⬇ Scarica per Windows'),
+        el('a', { className: 'btn', href: `/player${window.TG.token() ? `?token=${encodeURIComponent(window.TG.token())}` : ''}`, target: '_blank', rel: 'noopener' }, 'Apri nel browser ↗')),
+      el('ol', { className: 'mu-steps small' },
+        el('li', {}, 'Apri il file scaricato. La prima volta Windows avvisa che è un programma "non riconosciuto" (non è firmato da un\'azienda): clicca ', el('b', {}, 'Ulteriori informazioni → Esegui comunque'), '.'),
+        el('li', {}, 'Trova da solo il Raspberry sulla rete di casa e chiede la password della dashboard una volta sola.'),
+        el('li', {}, 'Consiglio: spostalo in Documenti, poi clic destro → "Aggiungi a Start" o "Aggiungi alla barra delle applicazioni".')),
+      el('p', { className: 'muted small' }, `Se non trova il Raspberry da solo, scrivi l'indirizzo: ${host}`));
+  }
+
   function render() {
     if (!data || !open) return;
     renderNow();
     renderLibrary();
     renderAdd();
     renderSettings();
+    renderPc();
   }
 
   $('mu-search').oninput = (e) => { search = e.target.value; if (data) renderLibrary(); };

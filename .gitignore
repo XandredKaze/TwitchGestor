@@ -5,3 +5,4 @@ config/config.json
 dist-demo/
 dist-howlup/
 dist-musicante/
+windows/player/*.syso

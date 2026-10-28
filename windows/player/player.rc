@@ -1,0 +1,25 @@
+// Risorse di MusicantePlayer.exe: icona, descrizione e manifest (stile moderno di Windows, schermi ad alta risoluzione).
+// Si trasformano in rsrc_windows_amd64.syso con build.sh.
+1 ICON "icon.ico"
+1 24 "player.manifest"
+1 VERSIONINFO
+FILEVERSION 1,0,0,0
+PRODUCTVERSION 1,0,0,0
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "041004B0"
+    BEGIN
+      VALUE "CompanyName", "Xandred Kaze"
+      VALUE "FileDescription", "Musicante Player"
+      VALUE "FileVersion", "1.0.0"
+      VALUE "OriginalFilename", "MusicantePlayer.exe"
+      VALUE "ProductName", "Musicante Player"
+      VALUE "ProductVersion", "1.0.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0410, 1200
+  END
+END

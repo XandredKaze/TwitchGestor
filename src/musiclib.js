@@ -5,6 +5,20 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { readTags } from './musicFolder.js';
+
+// artista e titolo letti dentro i file, ricordati finché il file non cambia (si rilegge la cartella ogni minuto)
+const tagCache = new Map();
+function tagsOf(file) {
+  let st;
+  try { st = fs.statSync(file); } catch { return {}; }
+  const key = `${st.size}:${st.mtimeMs}`;
+  const hit = tagCache.get(file);
+  if (hit?.key === key) return hit.tags;
+  const tags = readTags(file);
+  tagCache.set(file, { key, tags });
+  return tags;
+}
 
 const AUDIO = new Set(['.mp3', '.ogg', '.wav', '.m4a', '.flac', '.opus']);
 
@@ -19,7 +33,8 @@ export function scanLibrary(dir) {
       const r = rel ? `${rel}/${e.name}` : e.name;
       if (e.isDirectory() && depth < 2) walk(r, depth + 1);
       else if (e.isFile() && AUDIO.has(path.extname(e.name).toLowerCase())) {
-        out.push({ id: r, url: `/media/music/${r.split('/').map(encodeURIComponent).join('/')}`, folder: rel.split('/')[0] ?? '', name: e.name });
+        const tags = tagsOf(path.join(dir, r));
+        out.push({ id: r, url: `/media/music/${r.split('/').map(encodeURIComponent).join('/')}`, folder: rel.split('/')[0] ?? '', name: e.name, artist: tags.artist || tags.albumArtist || '', title: tags.title || '' });
       }
     }
   };

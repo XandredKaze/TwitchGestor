@@ -19,6 +19,12 @@ export function trackInfo(name) {
   return m ? { artist: m[1].trim(), title: m[2].trim() } : { artist: '', title: base };
 }
 
+/** Artista e titolo di un brano: quelli scritti dentro il file se ci sono, altrimenti dal nome del file. */
+export function infoOf(t) {
+  const fromName = trackInfo(t.name);
+  return { artist: t.artist || fromName.artist, title: t.title || fromName.title };
+}
+
 export class MusicPlayer {
   constructor({ getLibrary, send, store, onChange, random = Math.random } = {}) {
     Object.assign(this, { getLibrary, send, store, onChange, random });
@@ -149,7 +155,7 @@ export class MusicPlayer {
   /** Cosa deve fare la pagina /music. */
   pageState() {
     const t = this.current;
-    return { type: 'music', track: t ? { id: t.id, url: t.url, ...trackInfo(t.name) } : null, playing: this.state.playing, volume: this.state.volume };
+    return { type: 'music', track: t ? { id: t.id, url: t.url, ...infoOf(t) } : null, playing: this.state.playing, volume: this.state.volume };
   }
 
   /** Per la dashboard. */
@@ -158,10 +164,10 @@ export class MusicPlayer {
     const lib = this.library;
     const upNext = this.state.order.slice(this.state.index + 1, this.state.index + 6).map((id) => lib.find((x) => x.id === id)).filter(Boolean);
     return {
-      track: t ? { id: t.id, folder: t.folder, ...trackInfo(t.name) } : null,
+      track: t ? { id: t.id, folder: t.folder, ...infoOf(t) } : null,
       playing: this.state.playing, volume: this.state.volume, shuffle: this.state.shuffle, playlist: this.state.playlist,
       position: this.state.position, duration: this.state.duration,
-      upNext: upNext.map((x) => ({ id: x.id, ...trackInfo(x.name) })),
+      upNext: upNext.map((x) => ({ id: x.id, ...infoOf(x) })),
     };
   }
 
@@ -169,7 +175,7 @@ export class MusicPlayer {
   songText() {
     const t = this.current;
     if (!t || !this.state.playing) return 'nessuna canzone in riproduzione';
-    const i = trackInfo(t.name);
+    const i = infoOf(t);
     return i.artist ? `${i.artist} – ${i.title}` : i.title;
   }
 
