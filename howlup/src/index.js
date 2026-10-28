@@ -237,6 +237,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     // il lupo del canale per le storie (immagine pubblica come il logo)
+    // immagine della settimana: lo stesso disegno della Programmazione di TwitchGestor (stile del canale)
+    if (route === 'GET /channel-week.js') {
+      res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache' });
+      return fs.createReadStream(path.join(ROOT, 'public', 'channel-week.js')).pipe(res);
+    }
     if (route === 'GET /mascot.png') {
       if (!fs.existsSync(MASCOT_FILE)) return send(res, 404, 'Nessuna immagine');
       res.writeHead(200, { 'Content-Type': fs.readFileSync(MASCOT_FILE).subarray(0, 4).toString('latin1') === 'RIFF' ? 'image/webp' : 'image/png', 'Cache-Control': 'no-cache' });

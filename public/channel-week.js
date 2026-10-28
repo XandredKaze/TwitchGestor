@@ -23,14 +23,15 @@
   }
 
   // il lupo caricato in Howl-UP (Annunci → Il tuo lupo), se c'è
+  // (in TwitchGestor arriva da howlup-mascot.png, in Howl-UP da mascot.png)
   let mascot;
-  function loadMascot() {
+  function loadMascot(src = 'howlup-mascot.png') {
     if (mascot !== undefined) return Promise.resolve(mascot);
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => { mascot = img; resolve(img); };
       img.onerror = () => { mascot = null; resolve(null); };
-      img.src = `howlup-mascot.png?t=${Date.now()}`;
+      img.src = `${src}?t=${Date.now()}`;
     });
   }
 
@@ -101,16 +102,29 @@
 
   /**
    * entries: live { start: "2026-10-20T21:00", title, game } della settimana; weekStart: lunedì (ms);
-   * format: 'wide' (1920×1080), 'square' (1920×1920) o 'portrait' (1920×2400).
+   * format: 'wide' (1920×1080), 'square' (1920×1920), 'portrait' (1920×2400) o 'story' (storia Instagram, 1080×1920).
    */
-  async function drawChannelWeek(canvas, { weekStart, format = 'wide', entries = [], login = '' }) {
+  async function drawChannelWeek(canvas, opts) {
+    if (opts.format !== 'story') return drawAt(canvas, opts);
+    // storia: si disegna in 9:16 a 1920 di larghezza (stesse proporzioni dei formati alti) e si riduce a 1080×1920
+    const big = document.createElement('canvas');
+    await drawAt(big, opts);
+    canvas.width = 1080;
+    canvas.height = 1920;
+    const g = canvas.getContext('2d');
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(big, 0, 0, 1080, 1920);
+    return canvas;
+  }
+
+  async function drawAt(canvas, { weekStart, format = 'wide', entries = [], login = '', mascotSrc }) {
     const W = 1920;
-    const H = format === 'square' ? 1920 : format === 'portrait' ? 2400 : 1080;
+    const H = format === 'story' ? 3413 : format === 'square' ? 1920 : format === 'portrait' ? 2400 : 1080;
     const wide = H === 1080;
     canvas.width = W;
     canvas.height = H;
     const g = canvas.getContext('2d');
-    await Promise.all([loadFonts(), loadMascot()]);
+    await Promise.all([loadFonts(), loadMascot(mascotSrc)]);
     g.fillStyle = C.bg;
     g.fillRect(0, 0, W, H);
     topo(g, W, H, `${weekStart}-${format}`);

@@ -216,8 +216,16 @@
   async function drawWeek(canvas, { weekStart, style, format }) {
     // stile del canale: lo stesso delle storie degli annunci di Howl-UP (channel-week.js)
     if (style === 'canale' && window.drawChannelWeek) return window.drawChannelWeek(canvas, { weekStart, format, entries: state.entries, login: channelLogin });
+    if (format === 'story') {
+      // storia Instagram: disegnata in 9:16 a 1920 di larghezza e ridotta a 1080×1920
+      const big = document.createElement('canvas');
+      await drawWeek(big, { weekStart, style, format: 'story-big' });
+      canvas.width = 1080; canvas.height = 1920;
+      canvas.getContext('2d').drawImage(big, 0, 0, 1080, 1920);
+      return canvas;
+    }
     const W = 1920;
-    const H = format === 'square' ? 1920 : format === 'portrait' ? 2400 : 1080;
+    const H = format === 'story-big' ? 3413 : format === 'square' ? 1920 : format === 'portrait' ? 2400 : 1080;
     canvas.width = W; canvas.height = H;
     const g = canvas.getContext('2d');
     const brutal = style === 'brutal';
@@ -301,7 +309,7 @@
     const week = el('select', {}, el('option', { value: '0' }, 'Questa settimana'), el('option', { value: '1' }, 'Settimana prossima'), el('option', { value: '2' }, 'Tra due settimane'));
     const style = el('select', {}, el('option', { value: 'canale' }, 'Stile del canale (come gli annunci)'), el('option', { value: 'classic' }, 'Classico (viola)'), el('option', { value: 'brutal' }, 'Brutalism'));
     style.value = 'canale';
-    const format = el('select', {}, el('option', { value: 'wide' }, '16:9 (Discord, X, YouTube)'), el('option', { value: 'square' }, 'Quadrato (Instagram)'), el('option', { value: 'portrait' }, 'Verticale 4:5 (Instagram)'));
+    const format = el('select', {}, el('option', { value: 'wide' }, '16:9 (Discord, X, YouTube)'), el('option', { value: 'square' }, 'Quadrato (Instagram)'), el('option', { value: 'portrait' }, 'Verticale 4:5 (Instagram)'), el('option', { value: 'story' }, 'Storia Instagram (9:16)'));
     const canvas = el('canvas', { className: 'sc-canvas' });
     const draw = () => drawWeek(canvas, { weekStart: mondayOf(Date.now()) + Number(week.value) * 7 * 86400000, style: style.value, format: format.value });
     for (const s of [week, style, format]) s.onchange = draw;

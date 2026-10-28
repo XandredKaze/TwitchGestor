@@ -531,6 +531,59 @@ function draftCard(d) {
           el('button', { type: 'button', className: 'btn', onclick: async () => { try { await navigator.clipboard.writeText(text.value); toast('Testo copiato'); } catch { toast('Selezionalo e copialo'); } } }, 'Copia testo'),
           d.status === 'draft' ? el('button', { type: 'button', className: 'btn danger', onclick: async () => { if (await api(`/api/announce/${d.id}/dismiss`, { method: 'POST' })) loadAnnounce(); } }, 'Ignora') : null))));
 }
+// ---------- immagine della settimana (storia Instagram e Discord) ----------
+let weekScript = null;
+const loadWeekScript = () => (weekScript ??= new Promise((resolve) => {
+  if (window.drawChannelWeek) return resolve(true);
+  const s = document.createElement('script');
+  s.src = 'channel-week.js';
+  s.onload = () => resolve(Boolean(window.drawChannelWeek));
+  s.onerror = () => { weekScript = null; resolve(false); };
+  document.head.append(s);
+}));
+const mondayOf = (offsetWeeks = 0) => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + offsetWeeks * 7);
+  return d.getTime();
+};
+let weekOffset = 0;
+function weekCard() {
+  const preview = el('canvas', { className: 'banner', 'aria-label': 'Anteprima dell\'immagine della settimana' });
+  const status = el('p', { className: 'hint' });
+  const opts = (format) => ({ weekStart: mondayOf(weekOffset), format, entries: data.lives?.entries ?? [], login: ann?.login ?? '', mascotSrc: `mascot.png?v=${ann?.mascot ?? 0}` });
+  const draw = async () => {
+    if (!(await loadWeekScript())) { status.textContent = 'Immagine non disponibile: aggiorna TwitchGestor.'; return; }
+    const n = (data.lives?.entries ?? []).filter((e) => { const t = new Date(`${e.start}:00`).getTime(); return t >= mondayOf(weekOffset) && t < mondayOf(weekOffset + 1); }).length;
+    status.textContent = n ? `${n} ${n === 1 ? 'live' : 'live'} in questa settimana.` : 'Nessuna live in programma in questa settimana: l\'immagine mostra i giorni vuoti.';
+    await window.drawChannelWeek(preview, opts('wide'));
+  };
+  const download = async (format, name) => {
+    if (!(await loadWeekScript())) return toast('Immagine non disponibile');
+    const c = document.createElement('canvas');
+    await window.drawChannelWeek(c, opts(format));
+    c.toBlob((b) => {
+      const d = new Date(mondayOf(weekOffset));
+      const a = el('a', { href: URL.createObjectURL(b), download: `settimana-${name}-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.png` });
+      document.body.append(a); a.click(); a.remove();
+    }, 'image/png');
+  };
+  const week = el('div', { className: 'seg' }, ...[[0, 'Questa settimana'], [1, 'La prossima']].map(([v, label]) => el('button', {
+    type: 'button', className: weekOffset === v ? 'active' : '',
+    onclick: (e) => { weekOffset = v; for (const b of week.children) b.classList.toggle('active', b === e.currentTarget); draw(); },
+  }, label)));
+  draw();
+  return el('section', { className: 'card col' },
+    el('b', {}, '🗓 Immagine della settimana'),
+    el('p', { className: 'hint', style: { margin: '0' } }, 'Le live della settimana nello stile del canale, come nella Programmazione di TwitchGestor.'),
+    week,
+    el('div', { className: 'story-box', style: { maxWidth: '520px' } }, preview),
+    status,
+    el('div', { className: 'row' },
+      el('button', { type: 'button', className: 'btn', onclick: () => download('story', 'storia') }, '⬇ Storia Instagram'),
+      el('button', { type: 'button', className: 'btn', onclick: () => download('wide', 'discord') }, '⬇ Discord')));
+}
+
 function viewAnnounce() {
   if (!ann) { loadAnnounce(); return [el('div', { className: 'col' }, el('h1', {}, 'Annunci'), el('p', { className: 'muted' }, 'Carico…'))]; }
   const s = structuredClone(ann.settings);
@@ -545,6 +598,7 @@ function viewAnnounce() {
     el('h1', {}, 'Annunci'),
     el('p', { className: 'muted', style: { margin: '-8px 0 0' } }, 'Quando una live viene aggiunta, spostata, annullata o cambiata (da qui o da TwitchGestor), qui trovi l\'annuncio pronto per la community. Puoi crearne uno quando vuoi anche con il pulsante 📣 nella scheda di una live.'),
     open.length ? open.map(draftCard) : el('div', { className: 'empty' }, 'Nessun annuncio da inviare. Prova a spostare una live: l\'annuncio compare qui.'),
+    weekCard(),
     el('details', { className: 'card' }, el('summary', { className: 'sum' }, '⚙️ Dove inviare e invio automatico'),
       el('div', { className: 'notify' },
         el('div', { className: 'nsec' },
