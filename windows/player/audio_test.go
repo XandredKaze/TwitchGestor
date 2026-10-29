@@ -1,16 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
-	"io"
 	"math"
 	"testing"
 )
 
-// un WAV di prova: 0,5 secondi di La (440 Hz), mono, 22050 Hz
-func testWAV() []byte {
+// un WAV di prova: secondi di La (440 Hz), mono, 22050 Hz
+func testWAV(sec float64) []byte {
 	const rate = 22050
-	n := rate / 2
+	n := int(rate * sec)
 	data := make([]byte, n*2)
 	for i := 0; i < n; i++ {
 		binary.LittleEndian.PutUint16(data[i*2:], uint16(int16(10000*math.Sin(2*math.Pi*440*float64(i)/rate))))
@@ -31,33 +31,92 @@ func testWAV() []byte {
 	return append(h, data...)
 }
 
-func TestWAVeRicampionamento(t *testing.T) {
-	data, rate, err := decodeWAV(testWAV())
-	if err != nil || rate != 22050 || len(data) != 22050 { // mono → stereo: 11025 fotogrammi × 2
-		t.Fatalf("decodeWAV: %v %d %d", err, rate, len(data))
+func wavTrack(t *testing.T, url string, sec float64) *track {
+	data, rate, err := decodeWAV(testWAV(sec))
+	if err != nil {
+		t.Fatal(err)
 	}
-	s := newPCM(data, rate)
-	if s.outSize != 24000 { // 0,5 s a 48 kHz
-		t.Fatalf("durata in uscita: %d", s.outSize)
+	tr := &track{url: url, p: newPCM()}
+	tr.p.add(data, rate)
+	tr.p.finish(nil)
+	return tr
+}
+
+func TestRicampionamentoSenzaSalti(t *testing.T) {
+	tr := wavTrack(t, "a", 0.5)
+	if tot := tr.p.total(); tot != 24000 { // 0,5 s a 48 kHz
+		t.Fatalf("durata: %d", tot)
 	}
-	out, err := io.ReadAll(s)
-	if err != nil || len(out) != 24000*4 {
-		t.Fatalf("letti %d byte, %v", len(out), err)
+	out := make([]byte, 24000*4)
+	if n := tr.p.readInto(out); n != len(out) {
+		t.Fatalf("letti %d", n)
 	}
-	// la sinusoide resta una sinusoide: nessun salto enorme tra un campione e il successivo
 	prev := int16(0)
 	for i := 0; i < 24000; i++ {
 		v := int16(binary.LittleEndian.Uint16(out[i*4:]))
 		if d := int(v) - int(prev); i > 0 && (d > 2000 || d < -2000) {
-			t.Fatalf("salto al campione %d: %d → %d", i, prev, v)
+			t.Fatalf("salto al campione %d", i)
 		}
 		prev = v
 	}
-	// spostarsi a metà brano
-	if _, err := s.Seek(12000*4, io.SeekStart); err != nil || s.delivered() != 12000 {
-		t.Fatalf("seek: %v %d", err, s.delivered())
+	if !tr.p.ended() {
+		t.Fatal("dovrebbe essere finito")
 	}
-	if _, _, err := decodeWAV([]byte("niente")); err == nil {
-		t.Fatal("un file non WAV deve dare errore")
+}
+
+// il flusso: il brano successivo parte senza pause e la fine si conta su quello che si è sentito
+func TestFlussoSenzaPauseEFineGiusta(t *testing.T) {
+	s := &stream{}
+	a := wavTrack(t, "a", 0.5) // 24000 fotogrammi
+	b := wavTrack(t, "b", 0.5)
+	s.setCurrent(a)
+	s.setNext(b)
+	buf := make([]byte, 30000*4) // più di un brano: deve continuare con b
+	s.Read(buf)
+	if s.cur != b || s.next != nil {
+		t.Fatal("doveva passare al brano b")
+	}
+	// con 10000 fotogrammi ancora nel buffer dell'uscita si sente ancora a, verso la fine
+	tr, pos, _ := s.heard(10000)
+	if tr != a || pos != 20000 {
+		t.Fatalf("si sente %s a %d", tr.url, pos)
+	}
+	// buffer vuoto: si sente b, a 6000 fotogrammi dall'inizio (nessun silenzio in mezzo)
+	tr, pos, last := s.heard(0)
+	if tr != b || pos != 6000 || !last {
+		t.Fatalf("si sente %s a %d (ultimo %v)", tr.url, pos, last)
+	}
+	// fine di b: silenzio, poi "finito" solo quando è stato sentito tutto
+	s.Read(make([]byte, 20000*4))
+	tr, pos, _ = s.heard(2000)
+	if pos != 24000 || !b.p.ended() {
+		t.Fatalf("fine: %d", pos)
+	}
+}
+
+func TestBranoInArrivoNonContaIlSilenzio(t *testing.T) {
+	s := &stream{}
+	tr := &track{url: "x", p: newPCM()} // ancora niente audio (si sta scaricando)
+	s.setCurrent(tr)
+	s.Read(make([]byte, 4800*4)) // 0,1 s di silenzio
+	data, rate, _ := decodeWAV(testWAV(0.5))
+	tr.p.add(data, rate)
+	tr.p.finish(nil)
+	s.Read(make([]byte, 4800*4))
+	if _, pos, _ := s.heard(0); pos != 4800 {
+		t.Fatalf("posizione %d: il silenzio iniziale non deve contare", pos)
+	}
+	// spostarsi nel brano
+	s.seekCurrent(12000)
+	if _, pos, _ := s.heard(0); pos != 12000 {
+		t.Fatalf("dopo lo spostamento: %d", pos)
+	}
+}
+
+func TestMP3NonValido(t *testing.T) {
+	p := newPCM()
+	decodeMP3(bytes.NewReader([]byte("non è un mp3")), 0, p)
+	if p.failed() == "" || !p.ended() {
+		t.Fatal("un file non MP3 deve dare errore")
 	}
 }

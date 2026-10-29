@@ -1,11 +1,9 @@
 package main
 
-// Audio suonato dal programma stesso (e non dal motore di Edge): così in Windows, nel mixer e in programmi come
-// Elgato Wave Link, la musica compare come "Musicante Player" e si può regolare a parte.
-// Il brano si scarica dal Raspberry, si decodifica tutto in memoria (MP3 o WAV) e si suona a 48 kHz.
+// Audio dei brani in memoria (16 bit stereo), riempito mentre si scarica e si decodifica: così un brano parte
+// subito, senza aspettare il file intero. In uscita si legge sempre a 48 kHz (con l'interpolazione se serve).
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -16,38 +14,94 @@ import (
 
 const outRate = 48000
 
-// pcm: audio a 16 bit stereo (in memoria) letto alla frequenza di uscita, con l'interpolazione se serve.
 type pcm struct {
-	mu      sync.Mutex
-	data    []int16 // campioni L,R,L,R…
-	rate    int
-	outPos  int64 // fotogrammi già consegnati (alla frequenza di uscita)
-	frames  int64
-	outSize int64 // durata in fotogrammi di uscita
+	mu     sync.Mutex
+	data   []int16 // campioni L,R,L,R… alla frequenza del file
+	rate   int
+	done   bool  // decodifica finita
+	err    string
+	outPos int64 // prossimo fotogramma (a 48 kHz) da consegnare
+	est    int64 // durata stimata in fotogrammi a 48 kHz (finché la decodifica non è finita)
 }
 
-func newPCM(data []int16, rate int) *pcm {
-	f := int64(len(data) / 2)
-	return &pcm{data: data, rate: rate, frames: f, outSize: f * outRate / int64(rate)}
+func newPCM() *pcm { return &pcm{} }
+
+// aggiunta di audio decodificato (dal goroutine che scarica)
+func (s *pcm) add(samples []int16, rate int) {
+	s.mu.Lock()
+	s.rate = rate
+	s.data = append(s.data, samples...)
+	s.mu.Unlock()
 }
 
-func (s *pcm) Read(p []byte) (int, error) {
+func (s *pcm) finish(err error) {
+	s.mu.Lock()
+	s.done = true
+	if err != nil && len(s.data) < 4 {
+		s.err = err.Error()
+	}
+	s.mu.Unlock()
+}
+
+func (s *pcm) setEstimate(frames int64) {
+	s.mu.Lock()
+	s.est = frames
+	s.mu.Unlock()
+}
+
+// fotogrammi in uscita già disponibili (serve anche il fotogramma dopo, per l'interpolazione)
+func (s *pcm) availLocked() int64 {
+	if s.rate == 0 {
+		return 0
+	}
+	frames := int64(len(s.data) / 2)
+	if s.done {
+		return frames * outRate / int64(s.rate)
+	}
+	if frames < 2 {
+		return 0
+	}
+	return (frames - 1) * outRate / int64(s.rate)
+}
+
+// durata in fotogrammi a 48 kHz: esatta a decodifica finita, altrimenti stimata
+func (s *pcm) total() int64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	a := s.availLocked()
+	if s.done || s.est < a {
+		return a
+	}
+	return s.est
+}
+
+func (s *pcm) ready() bool { s.mu.Lock(); defer s.mu.Unlock(); return s.availLocked() > 0 || s.err != "" }
+
+// finito: tutto decodificato e tutto consegnato
+func (s *pcm) ended() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return (s.done || s.err != "") && s.outPos >= s.availLocked()
+}
+
+func (s *pcm) position() int64 { s.mu.Lock(); defer s.mu.Unlock(); return s.outPos }
+
+func (s *pcm) failed() string { s.mu.Lock(); defer s.mu.Unlock(); return s.err }
+
+// readInto riempie p con l'audio disponibile; ritorna i byte scritti (0 se non c'è ancora niente o è finito)
+func (s *pcm) readInto(p []byte) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	avail := s.availLocked()
+	frames := int64(len(s.data) / 2)
 	n := 0
-	for n+4 <= len(p) {
-		if s.outPos >= s.outSize {
-			if n == 0 {
-				return 0, io.EOF
-			}
-			break
-		}
+	for n+4 <= len(p) && s.outPos < avail {
 		pos := float64(s.outPos) * float64(s.rate) / outRate
 		i := int64(pos)
 		frac := pos - float64(i)
 		j := i + 1
-		if j >= s.frames {
-			j = s.frames - 1
+		if j >= frames {
+			j = frames - 1
 		}
 		for ch := int64(0); ch < 2; ch++ {
 			a := float64(s.data[i*2+ch])
@@ -57,56 +111,73 @@ func (s *pcm) Read(p []byte) (int, error) {
 		n += 4
 		s.outPos++
 	}
-	return n, nil
+	return n
 }
 
-func (s *pcm) Seek(offset int64, whence int) (int64, error) {
+// seek a un fotogramma (a 48 kHz); oltre la parte già decodificata si ferma lì
+func (s *pcm) seek(frame int64) int64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var pos int64
-	switch whence {
-	case io.SeekStart:
-		pos = offset / 4
-	case io.SeekCurrent:
-		pos = s.outPos + offset/4
-	case io.SeekEnd:
-		pos = s.outSize + offset/4
+	if frame < 0 {
+		frame = 0
 	}
-	if pos < 0 {
-		pos = 0
+	if a := s.availLocked(); frame > a {
+		frame = a
 	}
-	if pos > s.outSize {
-		pos = s.outSize
-	}
-	s.outPos = pos
-	return pos * 4, nil
-}
-
-func (s *pcm) delivered() int64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.outPos
+	s.outPos = frame
+	return frame
 }
 
 // ---------- decodifica ----------
 
-func decodeMP3(b []byte) ([]int16, int, error) {
-	d, err := mp3.NewDecoder(bytes.NewReader(b))
-	if err != nil {
-		return nil, 0, err
-	}
-	raw, err := io.ReadAll(d)
-	if err != nil && len(raw) == 0 {
-		return nil, 0, err
-	}
-	out := make([]int16, len(raw)/2)
-	for i := range out {
-		out[i] = int16(binary.LittleEndian.Uint16(raw[i*2:]))
-	}
-	return out, d.SampleRate(), nil
+// conta i byte letti (per stimare la durata finché la decodifica non è finita)
+type counter struct {
+	r io.Reader
+	n int64
 }
 
-// WAV PCM a 16 bit (mono o stereo)
+func (c *counter) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n += int64(n)
+	return n, err
+}
+
+// decodeMP3 decodifica a pezzi da r (anche mentre si scarica) dentro s. size: byte del file (0 se non noto).
+func decodeMP3(r io.Reader, size int64, s *pcm) {
+	c := &counter{r: r}
+	d, err := mp3.NewDecoder(c)
+	if err != nil {
+		s.finish(errors.New("MP3 non leggibile"))
+		return
+	}
+	rate := d.SampleRate()
+	buf := make([]byte, 64*1024)
+	var got int64 // fotogrammi decodificati
+	for {
+		n, err := d.Read(buf)
+		if n > 0 {
+			n -= n % 4
+			samples := make([]int16, n/2)
+			for i := range samples {
+				samples[i] = int16(binary.LittleEndian.Uint16(buf[i*2:]))
+			}
+			s.add(samples, rate)
+			got += int64(n / 4)
+			if size > 0 && c.n > 0 {
+				s.setEstimate(got * size / c.n * outRate / int64(rate))
+			}
+		}
+		if err != nil {
+			if err == io.EOF {
+				err = nil
+			}
+			s.finish(err)
+			return
+		}
+	}
+}
+
+// decodeWAV legge un WAV PCM a 16 bit (mono o stereo) intero
 func decodeWAV(b []byte) ([]int16, int, error) {
 	if len(b) < 12 || string(b[0:4]) != "RIFF" || string(b[8:12]) != "WAVE" {
 		return nil, 0, errors.New("WAV non valido")
@@ -147,4 +218,3 @@ func decodeWAV(b []byte) ([]int16, int, error) {
 	}
 	return nil, 0, errors.New("WAV senza audio")
 }
-

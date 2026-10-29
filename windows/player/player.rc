@@ -3,8 +3,8 @@
 1 ICON "icon.ico"
 1 24 "player.manifest"
 1 VERSIONINFO
-FILEVERSION 1,1,0,0
-PRODUCTVERSION 1,1,0,0
+FILEVERSION 1,2,0,0
+PRODUCTVERSION 1,2,0,0
 BEGIN
   BLOCK "StringFileInfo"
   BEGIN
@@ -12,10 +12,10 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "Xandred Kaze"
       VALUE "FileDescription", "Musicante Player"
-      VALUE "FileVersion", "1.1.0"
+      VALUE "FileVersion", "1.2.0"
       VALUE "OriginalFilename", "MusicantePlayer.exe"
       VALUE "ProductName", "Musicante Player"
-      VALUE "ProductVersion", "1.1.0"
+      VALUE "ProductVersion", "1.2.0"
     END
   END
   BLOCK "VarFileInfo"

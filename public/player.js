@@ -15,21 +15,41 @@
       this._v = 1;
       this._ready = false;
       this._failed = '';
+      this._heard = ''; // il brano che il programma sta suonando davvero
+      this._next = ''; // il brano preparato per dopo
+      this._adopt = false;
+      this._endedFor = '';
       this.paused = true;
-      setInterval(() => this._poll(), 250);
+      setInterval(() => this._poll(), 200);
     }
     _emit(type) { this.dispatchEvent(new Event(type)); }
     get src() { return this._src; }
     set src(u) {
-      this._src = u ? new URL(u, location.href).href : '';
-      this._t = 0; this._d = NaN; this._ready = false; this._failed = '';
-      if (this._src) window.musicanteAudioLoad(this._src);
+      const url = u ? new URL(u, location.href).href : '';
+      this._src = url;
+      this._t = 0; this._d = NaN; this._ready = false; this._failed = ''; this._endedFor = '';
+      // il programma è già passato da solo a questo brano (senza pause): non si ricomincia
+      if (url && url === this._heard) { this._adopt = true; return; }
+      this._adopt = false;
+      if (url) window.musicanteAudioLoad(url);
     }
     get currentTime() { return this._t; }
-    set currentTime(sec) { this._t = Number(sec) || 0; window.musicanteAudioSeek(this._t); }
+    set currentTime(sec) {
+      const t = Number(sec) || 0;
+      if (this._adopt && t === 0) { this._adopt = false; return; }
+      this._t = t;
+      window.musicanteAudioSeek(t);
+    }
     get duration() { return this._d; }
     get volume() { return this._v; }
     set volume(v) { this._v = v; window.musicanteAudioVolume(v); }
+    // il brano successivo: il programma lo prepara e lo fa partire senza pause alla fine di questo
+    preloadNext(u) {
+      const url = u ? new URL(u, location.href).href : '';
+      if (url === this._next) return;
+      this._next = url;
+      window.musicanteAudioPreload(url); // '' = nessun brano dopo
+    }
     play() {
       this.paused = false;
       window.musicanteAudioPlay();
@@ -46,11 +66,18 @@
       if (!this._src) return;
       let st;
       try { st = await window.musicanteAudioState(); } catch { return; }
+      if (st.url) this._heard = st.url;
+      // passato da solo al brano preparato: per la pagina il brano di prima è finito
+      if (st.url && st.url !== this._src) {
+        if (st.url === this._next && this._endedFor !== this._src) { this._endedFor = this._src; this._emit('ended'); }
+        return;
+      }
       if (st.error && st.error !== this._failed) { this._failed = st.error; this.lastError = st.error; this._emit('error'); return; }
-      if (st.ready && !this._ready) { this._ready = true; this._d = st.duration; this._emit('loadedmetadata'); if (!this.paused) this._emit('playing'); }
+      if (st.ready && !this._ready) { this._ready = true; this._emit('loadedmetadata'); if (!this.paused) this._emit('playing'); }
       if (!st.ready) return;
+      if (st.duration && Math.abs(st.duration - (this._d || 0)) > 0.5) { this._d = st.duration; this._emit('loadedmetadata'); }
       if (Math.abs(st.position - this._t) > 0.01) { this._t = st.position; this._emit('timeupdate'); }
-      if (st.ended && !this.paused) { this.paused = true; this._emit('ended'); }
+      if (st.ended && !this.paused && this._endedFor !== this._src) { this._endedFor = this._src; this.paused = true; this._emit('ended'); }
     }
   }
   const native = typeof window.musicanteAudioLoad === 'function';
@@ -117,8 +144,16 @@
     prefs.last = t.id;
     savePrefs();
     if (autoplay) audio.play().catch(() => {});
+    preloadUpcoming();
     renderNow();
     renderList();
+  }
+  // nel programma per Windows: il brano dopo si prepara subito, così parte senza pause
+  // (non con "ripeti il brano": lì si ricomincia lo stesso)
+  function preloadUpcoming() {
+    if (typeof audio.preloadNext !== 'function') return;
+    const upcoming = prefs.repeat === 'one' ? null : byId(queue[index + 1]);
+    audio.preloadNext(upcoming ? upcoming.url || `/media/music/${upcoming.id.split('/').map(encodeURIComponent).join('/')}` : '');
   }
   function playTrack(id) {
     // un brano della lista: si ascolta la playlist che stai guardando, a partire da lì
@@ -188,10 +223,11 @@
     const id = current()?.id;
     if (queue.length) buildQueue(playlistOfQueue, id);
     savePrefs();
+    preloadUpcoming();
     renderNow();
   };
   // ripeti: no → tutta la playlist → il brano
-  $('mp-repeat').onclick = () => { prefs.repeat = !prefs.repeat ? 'all' : prefs.repeat === 'all' ? 'one' : false; savePrefs(); renderNow(); };
+  $('mp-repeat').onclick = () => { prefs.repeat = !prefs.repeat ? 'all' : prefs.repeat === 'all' ? 'one' : false; savePrefs(); preloadUpcoming(); renderNow(); };
 
   // tasti multimediali della tastiera e controlli di Windows (anche a finestra ridotta)
   if ('mediaSession' in navigator) {

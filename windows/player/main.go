@@ -144,6 +144,7 @@ func main() {
 	// così Windows e Wave Link vedono "Musicante Player"
 	audio := newEngine()
 	_ = w.Bind("musicanteAudioLoad", func(u string) { audio.Load(u) })
+	_ = w.Bind("musicanteAudioPreload", func(u string) { audio.Preload(u) })
 	_ = w.Bind("musicanteAudioPlay", func() { audio.Play() })
 	_ = w.Bind("musicanteAudioPause", func() { audio.Pause() })
 	_ = w.Bind("musicanteAudioSeek", func(sec float64) { audio.Seek(sec) })

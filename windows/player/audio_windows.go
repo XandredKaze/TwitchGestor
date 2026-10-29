@@ -2,12 +2,14 @@
 
 package main
 
-// Il lettore audio: suona (con l'audio di Windows) i brani decodificati da pcm.go.
+// Il lettore audio: un'unica uscita audio di Windows (WASAPI) che suona il flusso continuo di stream.go.
+// Suonando dal programma (e non dal motore di Edge) la musica compare in Windows e in Wave Link come
+// "Musicante Player". I brani si scaricano e si decodificano mentre suonano (pcm.go).
 
 import (
 	"errors"
-	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -16,177 +18,147 @@ import (
 	"github.com/ebitengine/oto/v3"
 )
 
-// ---------- il lettore ----------
-
 type engine struct {
-	mu       sync.Mutex
-	ctx      *oto.Context
-	ctxErr   error
-	gen      int
-	player   *oto.Player
-	src      *pcm
-	loading  bool
-	err      string
-	duration float64
-	wantPlay bool
-	seekTo   float64 // posizione da raggiungere appena il brano è pronto (-1 = nessuna)
-	volume   float64
-	ended    bool
+	mu      sync.Mutex
+	player  *oto.Player
+	initErr string
+	st      *stream
+	volume  float64
 }
 
-func newEngine() *engine { return &engine{volume: 1, seekTo: -1} }
+func newEngine() *engine { return &engine{st: &stream{}, volume: 1} }
 
-func (e *engine) context() (*oto.Context, error) {
+// l'uscita audio si crea alla prima canzone e resta aperta (così Windows la vede sempre come la stessa app)
+func (e *engine) out() *oto.Player {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.ctx != nil || e.ctxErr != nil {
-		return e.ctx, e.ctxErr
+	if e.player != nil || e.initErr != "" {
+		return e.player
 	}
-	ctx, ready, err := oto.NewContext(&oto.NewContextOptions{SampleRate: outRate, ChannelCount: 2, Format: oto.FormatSignedInt16LE, BufferSize: 150 * time.Millisecond})
+	ctx, ready, err := oto.NewContext(&oto.NewContextOptions{SampleRate: outRate, ChannelCount: 2, Format: oto.FormatSignedInt16LE, BufferSize: 100 * time.Millisecond})
 	if err != nil {
-		e.ctxErr = fmt.Errorf("audio di Windows non disponibile: %w", err)
-		return nil, e.ctxErr
+		e.initErr = "audio di Windows non disponibile: " + err.Error()
+		return nil
 	}
 	<-ready
-	e.ctx = ctx
-	return ctx, nil
+	e.player = ctx.NewPlayer(e.st)
+	e.player.SetBufferSize(outRate * 4 / 5) // 0,2 s: cambi di brano e spostamenti rapidi
+	e.player.SetVolume(e.volume)
+	return e.player
 }
 
-// Load scarica e prepara un brano; ritorna subito (la pagina segue lo stato con State).
-func (e *engine) Load(url string) {
-	e.mu.Lock()
-	e.gen++
-	gen := e.gen
-	if e.player != nil {
-		e.player.Pause()
-		_ = e.player.Close()
-		e.player = nil
+// svuota il buffer dell'uscita (dopo un cambio di brano scelto a mano o uno spostamento)
+func (e *engine) flush() {
+	if p := e.out(); p != nil {
+		_, _ = p.Seek(0, io.SeekCurrent)
 	}
-	e.src = nil
-	e.loading, e.err, e.duration, e.ended, e.seekTo = true, "", 0, false, -1
-	e.mu.Unlock()
+}
 
+var client = http.Client{Transport: &http.Transport{DialContext: (&net.Dialer{Timeout: 5 * time.Second}).DialContext, ResponseHeaderTimeout: 10 * time.Second}}
+
+// avvia lo scaricamento e la decodifica di un brano (in sottofondo)
+func startTrack(url string) *track {
+	t := &track{url: url, p: newPCM()}
 	go func() {
-		fail := func(msg string) {
-			e.mu.Lock()
-			if e.gen == gen {
-				e.loading, e.err = false, msg
-			}
-			e.mu.Unlock()
-		}
-		ctx, err := e.context()
-		if err != nil {
-			fail(err.Error())
-			return
-		}
-		client := http.Client{Timeout: 2 * time.Minute}
 		res, err := client.Get(url)
 		if err != nil {
-			fail("il Raspberry non risponde")
+			t.p.finish(errors.New("il Raspberry non risponde"))
 			return
 		}
 		defer res.Body.Close()
 		if res.StatusCode != 200 {
-			fail(fmt.Sprintf("file non trovato (%d)", res.StatusCode))
+			t.p.finish(errors.New("file non trovato"))
 			return
 		}
-		b, err := io.ReadAll(res.Body)
-		if err != nil {
-			fail("download interrotto")
-			return
-		}
-		var data []int16
-		var rate int
 		lower := strings.ToLower(strings.SplitN(url, "?", 2)[0])
 		switch {
 		case strings.HasSuffix(lower, ".mp3"):
-			data, rate, err = decodeMP3(b)
+			decodeMP3(res.Body, res.ContentLength, t.p)
 		case strings.HasSuffix(lower, ".wav"):
-			data, rate, err = decodeWAV(b)
+			b, err := io.ReadAll(res.Body)
+			if err != nil {
+				t.p.finish(errors.New("download interrotto"))
+				return
+			}
+			data, rate, err := decodeWAV(b)
+			if err == nil {
+				t.p.add(data, rate)
+			}
+			t.p.finish(err)
 		default:
-			err = errors.New("formato non supportato dal programma (solo MP3 e WAV): aprilo con \"Apri nel browser\"")
-		}
-		if err == nil && (rate <= 0 || len(data) < 4) {
-			err = errors.New("file audio vuoto")
-		}
-		if err != nil {
-			fail(err.Error())
-			return
-		}
-		src := newPCM(data, rate)
-		e.mu.Lock()
-		defer e.mu.Unlock()
-		if e.gen != gen {
-			return // nel frattempo è stato scelto un altro brano
-		}
-		e.src = src
-		e.duration = float64(src.outSize) / outRate
-		e.player = ctx.NewPlayer(src)
-		e.player.SetVolume(e.volume)
-		if e.seekTo > 0 {
-			_, _ = e.player.Seek(int64(e.seekTo*outRate)*4, io.SeekStart)
-		}
-		e.seekTo = -1
-		e.loading = false
-		if e.wantPlay {
-			e.player.Play()
+			t.p.finish(errors.New("formato non supportato dal programma (solo MP3 e WAV): aprilo con \"Apri nel browser\""))
 		}
 	}()
+	return t
+}
+
+// Load: suona questo brano adesso (scelto a mano). Se è già quello che sta suonando non fa niente.
+func (e *engine) Load(url string) {
+	if cur, _ := e.st.urls(); cur == url {
+		return
+	}
+	_, next := e.st.urls()
+	var t *track
+	if next == url {
+		e.st.mu.Lock()
+		t = e.st.next // già in preparazione: si usa quello
+		e.st.mu.Unlock()
+	}
+	if t == nil {
+		t = startTrack(url)
+	}
+	e.st.setCurrent(t)
+	e.flush()
+}
+
+// Preload: prepara il brano successivo, che partirà senza pause alla fine di quello attuale
+func (e *engine) Preload(url string) {
+	cur, next := e.st.urls()
+	if url == "" {
+		e.st.setNext(nil) // nessun brano dopo (es. "ripeti il brano")
+		return
+	}
+	if url == cur || url == next {
+		return
+	}
+	e.st.setNext(startTrack(url))
 }
 
 func (e *engine) Play() {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	e.wantPlay = true
-	e.ended = false
-	if e.player != nil {
-		e.player.Play()
+	if p := e.out(); p != nil {
+		p.Play()
 	}
 }
 
 func (e *engine) Pause() {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	e.wantPlay = false
-	if e.player != nil {
-		e.player.Pause()
+	if p := e.out(); p != nil {
+		p.Pause()
 	}
 }
 
 func (e *engine) Seek(sec float64) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if sec < 0 {
-		sec = 0
-	}
-	e.ended = false
-	if e.player == nil {
-		e.seekTo = sec
-		return
-	}
-	_, _ = e.player.Seek(int64(sec*outRate)*4, io.SeekStart)
-	if e.wantPlay && !e.player.IsPlaying() {
-		e.player.Play()
-	}
+	e.st.seekCurrent(int64(sec * outRate))
+	e.flush()
 }
 
 func (e *engine) SetVolume(v float64) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
 	if v < 0 {
 		v = 0
 	}
 	if v > 1 {
 		v = 1
 	}
+	e.mu.Lock()
 	e.volume = v
-	if e.player != nil {
-		e.player.SetVolume(v)
+	p := e.player
+	e.mu.Unlock()
+	if p != nil {
+		p.SetVolume(v)
 	}
 }
 
 type audioState struct {
-	Loading  bool    `json:"loading"`
+	URL      string  `json:"url"`
 	Ready    bool    `json:"ready"`
 	Playing  bool    `json:"playing"`
 	Ended    bool    `json:"ended"`
@@ -197,25 +169,29 @@ type audioState struct {
 
 func (e *engine) State() audioState {
 	e.mu.Lock()
-	defer e.mu.Unlock()
-	st := audioState{Loading: e.loading, Error: e.err, Duration: e.duration, Ready: e.player != nil}
-	if e.player == nil {
-		return st
+	p, initErr := e.player, e.initErr
+	e.mu.Unlock()
+	if initErr != "" {
+		return audioState{Error: initErr}
 	}
-	pos := float64(e.src.delivered()*4-int64(e.player.BufferedSize())) / 4 / outRate
-	if pos < 0 {
-		pos = 0
+	buffered := int64(0)
+	playing := false
+	if p != nil {
+		buffered = int64(p.BufferedSize() / 4)
+		playing = p.IsPlaying()
 	}
-	st.Position = pos
-	st.Playing = e.player.IsPlaying()
-	// finito: stava suonando, ora è fermo ed è arrivato in fondo
-	if e.wantPlay && !st.Playing && e.src.delivered() >= e.src.outSize {
-		e.ended = true
-		e.wantPlay = false
+	t, pos, last := e.st.heard(buffered)
+	if t == nil {
+		return audioState{}
 	}
-	st.Ended = e.ended
-	if st.Ended {
-		st.Position = e.duration
+	total := t.p.total()
+	return audioState{
+		URL:      t.url,
+		Ready:    t.p.ready(),
+		Playing:  playing,
+		Ended:    last && t.p.ended() && pos >= total,
+		Position: float64(pos) / outRate,
+		Duration: float64(total) / outRate,
+		Error:    t.p.failed(),
 	}
-	return st
 }
