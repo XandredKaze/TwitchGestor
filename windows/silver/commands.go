@@ -80,6 +80,8 @@ func ParseCommand(text string, now time.Time) Command {
 		return Command{Kind: "reminders"}
 	case low == "cancella promemoria" || low == "cancella i promemoria" || low == "togli i promemoria" || low == "ferma timer" || low == "ferma il timer" || low == "cancella timer":
 		return Command{Kind: "clear"}
+	case low == "diagnosi musica" || low == "diagnosi" || low == "controlla la musica" || low == "diagnosi player":
+		return Command{Kind: "diag"}
 	case low == "che ore sono" || low == "che ora è" || low == "ora":
 		return Command{Kind: "time"}
 	case strings.Contains(low, "prossima live") || strings.Contains(low, "quando vado in live") || low == "live":

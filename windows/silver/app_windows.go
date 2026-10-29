@@ -318,6 +318,8 @@ type app struct {
 	pairing       bool
 	listen        *listening // il microfono è acceso (listen_windows.go)
 	installingEar bool
+	wantPanel     bool
+	openPanel     func()    // = showPanel (messo all'avvio: evita un giro di inizializzazioni)
 	wake          wakeState // "Ehi Silver" (wake_windows.go)
 	wakeRetry     time.Time
 	lastRem       time.Time
@@ -357,6 +359,7 @@ func main() {
 	a.brain.lastSpoke = time.Now() // appena acceso saluta, niente commenti sovrapposti
 	a.brain.OnChoicesChanged = func() { a.cfg.Games = a.brain.GameChoices; a.cfg.save() }
 	a.brain.OnAction = func(c string) { a.onAction(c) }
+	a.openPanel = a.showPanel
 
 	var inst windows.Handle
 	_ = windows.GetModuleHandleEx(0, nil, &inst)
@@ -688,6 +691,10 @@ func (a *app) tick() {
 	if now.Sub(a.lastRem) > time.Second {
 		a.lastRem = now
 		a.checkReminders(now)
+	}
+	if a.wantPanel {
+		a.wantPanel = false
+		a.openPanel()
 	}
 	a.tickListening(now)
 	a.tickWake(now)

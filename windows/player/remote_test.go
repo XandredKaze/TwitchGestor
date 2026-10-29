@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -33,6 +35,14 @@ func TestTelecomando(t *testing.T) {
 	_ = json.NewDecoder(res.Body).Decode(&out)
 	if out.Text != "Playlist Rock." || !strings.Contains(got, `musicanteRemote({"action":"find","query":"rock"})`) {
 		t.Fatal(out, got)
+	}
+	// porta occupata: si passa alla successiva
+	busy, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(remotePort))
+	if err == nil {
+		defer busy.Close()
+	}
+	if p, err := listenRemote(r); err != nil || (busy != nil && p == remotePort) {
+		t.Fatal(p, err)
 	}
 	req, _ = http.NewRequest("POST", srv.URL+"/cmd", strings.NewReader(`alert(1)`))
 	req.Header.Set("x-silver", "1")

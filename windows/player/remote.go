@@ -9,13 +9,29 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 )
 
-const remoteAddr = "127.0.0.1:47321"
+const remotePort = 47321 // se Windows l'ha riservata se ne prova una delle successive (Silver legge quale)
+
+// listenRemote: apre il telecomando sulla prima porta libera (solo 127.0.0.1)
+func listenRemote(h http.Handler) (int, error) {
+	var last error
+	for p := remotePort; p < remotePort+10; p++ {
+		ln, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(p))
+		if err != nil {
+			last = err
+			continue
+		}
+		go func() { _ = http.Serve(ln, h) }()
+		return p, nil
+	}
+	return 0, last
+}
 
 type remote struct {
 	eval    func(js string) // esegue nella pagina del lettore

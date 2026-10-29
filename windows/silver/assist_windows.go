@@ -303,6 +303,8 @@ func (a *app) handleInput(text string) {
 			openURL("https://ollama.com/download")
 		}
 		a.reply("Aperto.")
+	case "diag":
+		a.diagnoseMusic()
 	case "music":
 		a.musicCmd(c)
 	case "note", "scene":
