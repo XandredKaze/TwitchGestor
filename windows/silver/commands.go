@@ -252,5 +252,5 @@ const helpText = `Posso:
 • "scena Gioco" (cambia scena in OBS)
 • "prossimo impegno" · "impegni di oggi" / "di domani" / "della settimana" · "cose da fare" (da Howl-UP)
 • "prossima live" · "apri Gestor" · "apri Howl-UP" · "apri Musicante"
-• Con la voce: tieni premuto Ctrl+Alt+V e parla (o premi il microfono qui sotto)
+• Con la voce: tieni premuto Ctrl+Alt+V e parla (o premi il microfono qui sotto), oppure chiamami con "Ehi Silver" (si attiva dal mio menu)
 • Qualsiasi altra cosa: ti rispondo io (con l'IA sul tuo PC).`

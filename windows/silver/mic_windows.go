@@ -136,6 +136,15 @@ func (r *recorder) close() {
 // Level: quanto è forte quello che senti adesso (0..1)
 func (r *recorder) Level() float64 { return math.Float64frombits(r.level.Load()) }
 
+// Drain: quello che ha sentito dall'ultima volta (per l'ascolto continuo di "Ehi Silver")
+func (r *recorder) Drain() []int16 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	p := r.pcm
+	r.pcm = nil
+	return p
+}
+
 // Stop: ferma e restituisce tutto quello che ha sentito
 func (r *recorder) Stop() []int16 {
 	close(r.quit)

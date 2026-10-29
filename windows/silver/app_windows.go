@@ -226,6 +226,7 @@ type config struct {
 	Reminders     []Reminder `json:"reminders"`
 	Model         string     `json:"model"`     // il modello dell'IA (Ollama)
 	BadModels     []string   `json:"badModels"` // modelli che su questo PC non partono
+	WakeWord      bool       `json:"wakeWord"`  // ascolta "Ehi Silver"
 }
 
 func dataDir() string {
@@ -317,6 +318,8 @@ type app struct {
 	pairing       bool
 	listen        *listening // il microfono è acceso (listen_windows.go)
 	installingEar bool
+	wake          wakeState // "Ehi Silver" (wake_windows.go)
+	wakeRetry     time.Time
 	lastRem       time.Time
 	quitAt        time.Time
 	hoverHand     bool
@@ -687,6 +690,7 @@ func (a *app) tick() {
 		a.checkReminders(now)
 	}
 	a.tickListening(now)
+	a.tickWake(now)
 	a.chat.Thinking, a.chat.Busy = a.brain.Thinking, a.aiBusy
 	a.paintPanel(now)
 	a.brain.Tick(now, a.userIdle())
@@ -750,6 +754,7 @@ func (a *app) menu() {
 		cmdQuit
 		cmdAsk
 		cmdListen
+		cmdWake
 		cmdPair
 		cmdOllama
 	)
@@ -770,6 +775,7 @@ func (a *app) menu() {
 	m, _, _ := pCreatePopupMenu.Call()
 	add(m, 0, cmdAsk, "Chiedi a Silver…\tCtrl+Alt+S")
 	add(m, 0, cmdListen, "Parla con Silver\tCtrl+Alt+V")
+	add(m, check(a.cfg.WakeWord), cmdWake, "Ascolta \"Ehi Silver\"")
 	if a.cfg.Key == "" {
 		add(m, 0, cmdPair, "Collega a TwitchGestor")
 	}
@@ -822,6 +828,8 @@ func (a *app) menu() {
 		a.showPanel()
 	case cmdListen:
 		a.startListening(false, false)
+	case cmdWake:
+		a.toggleWake()
 	case cmdPair:
 		a.cfg.PairDenied = false
 		a.pair(true)

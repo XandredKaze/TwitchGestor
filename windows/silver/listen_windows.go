@@ -43,6 +43,7 @@ func (a *app) startListening(hold, fromPanel bool) {
 		a.brain.Alert(now, askWhisper, []Action{{"Sì, scarica", "x:whisper"}, {"No", "x:nowhisper"}})
 		return
 	}
+	a.stopWake() // un microfono alla volta ("Ehi Silver" riparte dopo)
 	rec, err := startRecorder()
 	if err != nil {
 		a.reply(micHelp + " (" + err.Error() + ")")
