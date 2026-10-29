@@ -245,6 +245,50 @@
     else if (e.code === 'ArrowLeft' && e.ctrlKey) prev();
   });
 
+  // ---------- comandi da Silver (il compagno sul desktop): li passa il programma per Windows ----------
+  const remoteState = () => {
+    const t = current();
+    const i = t ? infoOf(t) : null;
+    return { playing: Boolean(t) && !audio.paused, title: i?.title ?? '', artist: i?.artist ?? '', playlist: t ? (playlistOfQueue === ALL ? '' : playlistOfQueue) : '', volume: Math.round(prefs.volume * 100), tracks: tracks.length };
+  };
+  const norm = (x) => String(x).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  function remoteFind(q) {
+    const want = norm(q);
+    if (!want) return { ok: false, text: 'Cosa metto?' };
+    // prima una playlist, poi brani per titolo o artista
+    const pl = playlists().find((p) => p.id !== ALL && norm(p.name) === want) ?? playlists().find((p) => p.id !== ALL && norm(p.name).includes(want));
+    if (pl) { shown = pl.id; playPlaylist(pl.id); renderPlaylists(); return { ok: true, text: `Playlist ${pl.name}.` }; }
+    const words = want.split(' ');
+    const hits = tracks.filter((t) => { const i = infoOf(t); const h = norm(`${i.title} ${i.artist} ${t.name}`); return words.every((w) => h.includes(w)); });
+    if (!hits.length) return { ok: false, text: `Non trovo "${q}" nella tua musica.` };
+    let ids = hits.map((t) => t.id);
+    if (prefs.shuffle) ids = shuffled(ids);
+    queue = ids; index = 0; playlistOfQueue = ALL;
+    load(current());
+    const i = infoOf(current());
+    return { ok: true, text: hits.length > 1 ? `${hits.length} brani: parto con ${i.title}${i.artist ? ` di ${i.artist}` : ''}.` : `${i.title}${i.artist ? ` di ${i.artist}` : ''}.` };
+  }
+  window.musicanteRemote = (cmd = {}) => {
+    let res = { ok: true, text: '' };
+    switch (cmd.action) {
+      case 'toggle': toggle(); break;
+      case 'play': if (!current() || audio.paused) toggle(); break;
+      case 'pause': audio.pause(); break;
+      case 'next': next(false); break;
+      case 'prev': prev(); break;
+      case 'volume': {
+        const v = Math.max(0, Math.min(100, Number(cmd.value)));
+        if (Number.isFinite(v)) { prefs.volume = v / 100; audio.volume = prefs.volume; $('mp-volume').value = String(v); savePrefs(); }
+        break;
+      }
+      case 'find': res = remoteFind(cmd.query ?? ''); break;
+      default: break;
+    }
+    return { ...res, state: remoteState() };
+  };
+  // il programma sa sempre cosa sta suonando (per Silver)
+  const report = () => { try { window.musicanteReport?.(remoteState()); } catch { /* niente */ } };
+
   // ---------- disegno ----------
   function renderNow() {
     const t = current();
@@ -260,6 +304,7 @@
     $('mp-repeat').textContent = prefs.repeat === 'one' ? '↻1' : '↻';
     $('mp-repeat').title = prefs.repeat === 'one' ? 'Ripete il brano' : prefs.repeat ? 'Ripete la playlist' : 'Ripeti';
     document.title = t && !audio.paused ? `${i.title} · Musicante Player` : 'Musicante Player';
+    report();
     if ('mediaSession' in navigator) {
       navigator.mediaSession.metadata = t ? new MediaMetadata({ title: i.title, artist: i.artist, album: t.folder || 'Musicante', artwork: [{ src: '/images/musicante-player.png', sizes: '256x256', type: 'image/png' }] }) : null;
       navigator.mediaSession.playbackState = t ? (audio.paused ? 'paused' : 'playing') : 'none';

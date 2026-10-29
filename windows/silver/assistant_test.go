@@ -88,7 +88,7 @@ func TestOllamaFinto(t *testing.T) {
 		t.Fatal(ok, models)
 	}
 	ai.Model = pickModel(models, "")
-	msgs := []chatMsg{{"system", systemPrompt(time.Now(), Context{ID: "obs", Name: "OBS Studio"}, false, "")}, {"user", "titolo?"}}
+	msgs := []chatMsg{{"system", systemPrompt(time.Now(), Context{ID: "obs", Name: "OBS Studio"}, false, "", "")}, {"user", "titolo?"}}
 	got, err := ai.Chat(context.Background(), msgs, func(string) {})
 	if err != nil || plain(got) != "Titolo: Notte horror" {
 		t.Fatalf("%q %v", got, err)
@@ -102,5 +102,33 @@ func TestOllamaFinto(t *testing.T) {
 func TestSenzaEmoji(t *testing.T) {
 	if s := noEmoji("⏰ bere\napri ⚙ Sistema → 🧰 Tools ❤️"); s != "bere\napri Sistema → Tools" {
 		t.Errorf("%q", s)
+	}
+}
+
+func TestAgenda(t *testing.T) {
+	now := time.Date(2026, 10, 29, 15, 50, 0, 0, time.Local)
+	var f Feed
+	_ = json.Unmarshal([]byte(`{"seq":0,"agenda":{"today":"2026-10-29","events":[
+		{"day":"2026-10-29","time":"10:00","title":"Colazione"},
+		{"day":"2026-10-29","time":"16:00","endTime":"17:00","title":"Dentista","category":"Personale"},
+		{"day":"2026-10-29","time":"21:00","title":"Live horror","category":"Live"},
+		{"day":"2026-10-30","time":"","title":"Compleanno di Ada"}],
+		"tasks":[{"title":"Microfono","due":"2026-10-30"},{"title":"Email"}]}}`), &f)
+	if s := agendaText(f.Agenda, now, "next"); s != "Prossimo impegno: oggi 16:00–17:00: Dentista." {
+		t.Error(s)
+	}
+	if s := agendaText(f.Agenda, now, "tomorrow"); s != "Domani:\n• (tutto il giorno): Compleanno di Ada" {
+		t.Errorf("%q", s)
+	}
+	if s := agendaText(f.Agenda, now, "tasks"); s != "Da fare:\n• Microfono (entro domani)\n• Email" {
+		t.Errorf("%q", s)
+	}
+	w := &Watch{}
+	_, al := w.Lines(f, now, rand.New(rand.NewSource(1)))
+	if len(al) != 1 || al[0] != "Tra 10 minuti: Dentista." {
+		t.Fatal(al)
+	}
+	if !strings.Contains(systemPrompt(now, Context{}, false, "", agendaBrief(f.Agenda, now)), "Dentista") {
+		t.Error("l'IA non vede l'agenda")
 	}
 }

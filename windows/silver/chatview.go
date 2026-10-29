@@ -45,7 +45,7 @@ type ChatHit struct {
 	R  rectF
 }
 
-var chatSuggestions = []string{"aiuto", "prossima live", "timer 10 minuti", "un titolo per la live"}
+var chatSuggestions = []string{"aiuto", "prossimo impegno", "che canzone è?", "timer 10 minuti", "un titolo per la live"}
 
 var (
 	cBg     = color.NRGBA{22, 26, 33, 255}

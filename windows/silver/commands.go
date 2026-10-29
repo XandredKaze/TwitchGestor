@@ -12,21 +12,26 @@ import (
 )
 
 type Command struct {
-	Kind string    // remind | reminders | clear | note | music | scene | open | nextlive | time | help | ask
-	At   time.Time // remind: quando
-	Text string    // remind: cosa; note: il testo; music: play|pause|toggle|next|prev; scene: nome; open: gestor|howlup|musicante; ask: la domanda
+	Kind  string    // remind | reminders | clear | note | music | scene | open | nextlive | agenda | time | help | ask
+	At    time.Time // remind: quando
+	Where string    // music: "live" = la musica della live (Gestor/OBS); "" = Musicante Player sul PC (se è aperto)
+	Arg   string    // music find: cosa cercare; music volume: 0-100
+	Text  string    // remind: cosa; note: il testo; music: play|pause|toggle|next|prev; scene: nome; open: gestor|howlup|musicante; ask: la domanda
 }
 
 var (
-	reRemind = regexp.MustCompile(`(?i)^(?:ricordami|ricordarmi|promemoria|avvisami|dimmi)\b\s*(.*)$`)
-	reIn     = regexp.MustCompile(`(?i)\btra\s+(?:(un|una|mezz|\d+(?:[.,]\d+)?)\s*'?\s*)(secondi|secondo|sec|s|minuti|minuto|min|m|ore|ora|h)\b`)
-	reInHalf = regexp.MustCompile(`(?i)\btra\s+mezz\s*'?\s*ora\b`)
-	reAt     = regexp.MustCompile(`(?i)\b(?:(domani)\s+)?(?:alle|all'|alle ore|a)\s*(\d{1,2})(?:[:.](\d{2}))?\b`)
-	reTimer  = regexp.MustCompile(`(?i)^(?:timer|countdown|conto alla rovescia)\s*(?:di\s+)?(\d+(?:[.,]\d+)?)?\s*(secondi|secondo|sec|s|minuti|minuto|min|m|ore|ora|h)?\s*(.*)$`)
-	reNote   = regexp.MustCompile(`(?i)^(?:nota|note|appunta|appuntati|annota|segna|segnati)\b\s*(?:che\s+)?:?\s*(.+)$`)
-	reScene  = regexp.MustCompile(`(?i)^(?:scena|passa alla scena|vai alla scena|metti la scena|cambia scena(?: in| a)?)\s+(.+)$`)
-	reOpen   = regexp.MustCompile(`(?i)^apri\s+(?:il\s+|la\s+)?(twitch\s*gestor|gestor|howl[\s-]?up|musicante|ollama)\b`)
-	reLead   = regexp.MustCompile(`(?i)^\s*(?:di|che|a|:|-)\s+`)
+	reRemind   = regexp.MustCompile(`(?i)^(?:ricordami|ricordarmi|promemoria|avvisami|dimmi)\b\s*(.*)$`)
+	reIn       = regexp.MustCompile(`(?i)\btra\s+(?:(un|una|mezz|\d+(?:[.,]\d+)?)\s*'?\s*)(secondi|secondo|sec|s|minuti|minuto|min|m|ore|ora|h)\b`)
+	reInHalf   = regexp.MustCompile(`(?i)\btra\s+mezz\s*'?\s*ora\b`)
+	reAt       = regexp.MustCompile(`(?i)\b(?:(domani)\s+)?(?:alle|all'|alle ore|a)\s*(\d{1,2})(?:[:.](\d{2}))?\b`)
+	reTimer    = regexp.MustCompile(`(?i)^(?:(?:metti|imposta|fai partire|avvia)\s+(?:un\s+)?)?(?:timer|countdown|conto alla rovescia)\s*(?:di\s+)?(\d+(?:[.,]\d+)?)?\s*(secondi|secondo|sec|s|minuti|minuto|min|m|ore|ora|h)?\s*(.*)$`)
+	reNote     = regexp.MustCompile(`(?i)^(?:nota|note|appunta|appuntati|annota|segna|segnati)\b\s*(?:che\s+)?:?\s*(.+)$`)
+	reScene    = regexp.MustCompile(`(?i)^(?:scena|passa alla scena|vai alla scena|metti la scena|cambia scena(?: in| a)?)\s+(.+)$`)
+	reOpen     = regexp.MustCompile(`(?i)^apri\s+(?:il\s+|la\s+)?(musicante\s*player|il player|player|twitch\s*gestor|gestor|howl[\s-]?up|musicante|ollama)\b`)
+	reVolume   = regexp.MustCompile(`^(?:musica\s+)?(?:volume|vol)\s*(?:a|al)?\s*(\d{1,3})\s*%?$`)
+	reFind     = regexp.MustCompile(`(?i)^(?:metti|suona|ascolta|riproduci|fammi sentire|voglio sentire|play)\s+(?:un po' di\s+|qualcosa di\s+|la playlist\s+|le canzoni di\s+|i brani di\s+|musica di\s+|la canzone\s+)?(.+)$`)
+	reNotMusic = regexp.MustCompile(`(?i)\b(timer|promemoria|sveglia|scena|nota)\b`)
+	reLead     = regexp.MustCompile(`(?i)^\s*(?:di|che|a|:|-)\s+`)
 )
 
 func unitDur(n float64, unit string) time.Duration {
@@ -72,14 +77,56 @@ func ParseCommand(text string, now time.Time) Command {
 	case strings.Contains(low, "prossima live") || strings.Contains(low, "quando vado in live") || low == "live":
 		return Command{Kind: "nextlive"}
 	}
-	// musica
-	music := map[string]string{"pausa": "pause", "stop": "pause", "ferma la musica": "pause", "metti in pausa": "pause", "play": "play", "riprendi": "play", "metti musica": "play", "metti la musica": "play", "avanti": "next", "prossima": "next", "salta": "next", "prossimo brano": "next", "brano successivo": "next", "indietro": "prev", "precedente": "prev", "brano precedente": "prev"}
-	m := strings.TrimPrefix(strings.TrimPrefix(low, "musica "), "musica: ")
+	// agenda di Howl-UP (fatti non domande lunghe: "impegni di domani", "cosa ho oggi", "cose da fare")
+	if len([]rune(low)) <= 45 {
+		has := func(w ...string) bool {
+			for _, x := range w {
+				if strings.Contains(low, x) {
+					return true
+				}
+			}
+			return false
+		}
+		when := "today"
+		if has("domani") {
+			when = "tomorrow"
+		} else if has("settimana", "prossimi giorni") {
+			when = "week"
+		}
+		switch {
+		case has("prossimo impegno", "prossimo appuntamento", "il prossimo evento"):
+			return Command{Kind: "agenda", Text: "next"}
+		case has("cose da fare", "cosa devo fare", "da fare", "lista delle cose", "to do", "todo") && !has("oggi", "domani", "settimana"):
+			return Command{Kind: "agenda", Text: "tasks"}
+		case has("impegni", "impegno", "agenda", "appuntamenti", "calendario", "cosa ho ", "che ho ", "cosa devo fare") || low == "cosa ho" || low == "che ho":
+			return Command{Kind: "agenda", Text: when}
+		}
+	}
+	// musica: Musicante Player sul PC, oppure quella della live se lo dici ("pausa la musica della live")
+	where := ""
+	m := low
+	for _, w := range []string{" della live", " in live", " della diretta", " su obs", " di gestor", " della stream", " live"} {
+		if strings.Contains(m, w) {
+			where, m = "live", strings.TrimSpace(strings.Replace(m, w, "", 1))
+		}
+	}
+	m = strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(m, "musica:"), "musica "), "player "))
+	m = strings.TrimSuffix(strings.TrimSuffix(m, " la musica"), " musica")
+	music := map[string]string{"pausa": "pause", "stop": "pause", "ferma": "pause", "ferma la musica": "pause", "metti in pausa": "pause", "play": "play", "riprendi": "play", "metti": "play", "suona": "play", "metti la musica": "play", "fai partire": "play", "avanti": "next", "prossima": "next", "salta": "next", "prossimo brano": "next", "prossima canzone": "next", "brano successivo": "next", "cambia canzone": "next", "indietro": "prev", "precedente": "prev", "brano precedente": "prev", "canzone precedente": "prev"}
 	if v, ok := music[m]; ok {
-		return Command{Kind: "music", Text: v}
+		return Command{Kind: "music", Text: v, Where: where}
 	}
 	if low == "musica" {
 		return Command{Kind: "music", Text: "toggle"}
+	}
+	if g := reVolume.FindStringSubmatch(low); g != nil {
+		return Command{Kind: "music", Text: "volume", Arg: g[1], Where: where}
+	}
+	if low == "che canzone è" || low == "che brano è" || low == "cosa sta suonando" || low == "cosa suona" || low == "che musica è" || low == "cosa stai suonando" || low == "che canzone sta suonando" {
+		return Command{Kind: "music", Text: "now", Where: where}
+	}
+	if g := reFind.FindStringSubmatch(t); g != nil && !reNotMusic.MatchString(g[1]) {
+		return Command{Kind: "music", Text: "find", Arg: strings.TrimSpace(g[1])}
 	}
 	if g := reScene.FindStringSubmatch(t); g != nil {
 		return Command{Kind: "scene", Text: strings.TrimSpace(g[1])}
@@ -87,6 +134,8 @@ func ParseCommand(text string, now time.Time) Command {
 	if g := reOpen.FindStringSubmatch(t); g != nil {
 		w := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(g[1], " ", ""), "-", ""))
 		switch {
+		case strings.Contains(w, "player"):
+			w = "player"
 		case strings.Contains(w, "gestor"):
 			w = "gestor"
 		case strings.HasPrefix(w, "howl"):
@@ -171,7 +220,9 @@ const helpText = `Posso:
 • "ricordami tra 20 minuti di bere" · "ricordami alle 18:30 la riunione" · "timer 10 minuti"
 • "promemoria" (li vedi) · "cancella promemoria"
 • "nota: idea per la live…" (finisce nelle note di Howl-UP)
-• "pausa" · "play" · "avanti" · "indietro" (la musica di Gestor)
+• Musicante Player: "pausa" · "play" · "avanti" · "indietro" · "metti Linkin Park" · "metti la playlist Chill" · "volume 40" · "che canzone è?" · "apri il player"
+• La musica della live: aggiungi "della live" (es. "pausa della live", "avanti in live")
 • "scena Gioco" (cambia scena in OBS)
+• "prossimo impegno" · "impegni di oggi" / "di domani" / "della settimana" · "cose da fare" (da Howl-UP)
 • "prossima live" · "apri Gestor" · "apri Howl-UP" · "apri Musicante"
 • Qualsiasi altra cosa: ti rispondo io (con l'IA sul tuo PC).`

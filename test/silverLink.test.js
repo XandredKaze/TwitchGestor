@@ -51,7 +51,11 @@ test('avvisi per Silver: testo in italiano, solo quelli nuovi, niente prove', as
 test('comandi di Silver: scena per nome parziale e nota in Howl-UP', async () => {
   let scene, sent;
   const obs = { state: () => ({ scenes: ['Inizio', 'Gioco', 'Pausa'], current: 'Inizio' }), setScene: async (n) => { scene = n; } };
-  const fetchFn = async (url, opts) => { sent = { url, body: JSON.parse(opts.body), h: opts.headers }; return { ok: true }; };
+  const fetchFn = async (url, opts) => {
+    if (url.endsWith('/api/upcoming?days=7')) return { ok: true, json: async () => ({ today: '2026-10-29', events: [{ day: '2026-10-29', time: '18:00', title: 'Palestra' }], tasks: [] }) };
+    sent = { url, body: JSON.parse(opts.body), h: opts.headers };
+    return { ok: true };
+  };
   const s = createSilverLink({ obs }, { file: tmp(), howlupPort: 3999, fetchFn });
   assert.equal((await s.run({ action: 'scene', scene: 'gio' })).text, 'Scena: Gioco.');
   assert.equal(scene, 'Gioco');
@@ -60,6 +64,7 @@ test('comandi di Silver: scena per nome parziale e nota in Howl-UP', async () =>
   assert.equal(sent.url, 'http://127.0.0.1:3999/api/notes');
   assert.equal(sent.body.note.title, 'comprare il microfono');
   assert.equal(sent.h['x-howlup'], '1');
+  assert.equal((await s.feed(0)).agenda.events[0].title, 'Palestra'); // l'agenda di Howl-UP arriva a Silver
 });
 
 test('immagine e voce di Silver: si riconoscono dal contenuto', () => {

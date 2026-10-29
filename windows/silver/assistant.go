@@ -24,9 +24,26 @@ type Feed struct {
 		Title string `json:"title"`
 		Game  string `json:"game"`
 	} `json:"nextLive"`
+	Agenda *Agenda  `json:"agenda"` // da Howl-UP
 	Scenes []string `json:"scenes"`
 	Scene  string   `json:"scene"`
 	Song   string   `json:"song"`
+}
+
+// Agenda: i prossimi giorni di Howl-UP (impegni, anche quelli che si ripetono, e cose da fare)
+type Agenda struct {
+	Today  string `json:"today"`
+	Events []struct {
+		Day      string `json:"day"`
+		Time     string `json:"time"` // "" = tutto il giorno
+		EndTime  string `json:"endTime"`
+		Title    string `json:"title"`
+		Category string `json:"category"`
+	} `json:"events"`
+	Tasks []struct {
+		Title string `json:"title"`
+		Due   string `json:"due"`
+	} `json:"tasks"`
 }
 
 type Reminder struct {
@@ -79,7 +96,133 @@ func (w *Watch) Lines(f Feed, now time.Time, rnd *rand.Rand) (events, alerts []s
 			alerts = append(alerts, fmt.Sprintf("Tra %d minuti vai in live%s.", int(left.Round(time.Minute).Minutes()), title))
 		}
 	}
+	// impegni dell'agenda: 15 minuti prima (le live le avvisa già la parte sopra)
+	if f.Agenda != nil {
+		for _, e := range f.Agenda.Events {
+			at, ok := eventTime(e.Day, e.Time)
+			if !ok || strings.EqualFold(e.Category, "live") {
+				continue
+			}
+			key := "ev:" + e.Day + e.Time + e.Title
+			if left := at.Sub(now); left > 0 && left <= 15*time.Minute && !w.announced[key] {
+				w.announced[key] = true
+				alerts = append(alerts, fmt.Sprintf("Tra %d minuti: %s.", max(1, int(left.Round(time.Minute).Minutes())), e.Title))
+			}
+		}
+	}
 	return events, alerts
+}
+
+// eventTime: giorno e ora dell'agenda (ora del PC); ok=false per gli impegni di tutto il giorno
+func eventTime(day, hm string) (time.Time, bool) {
+	if hm == "" {
+		return time.Time{}, false
+	}
+	t, err := time.ParseInLocation("2006-01-02 15:04", day+" "+hm, time.Local)
+	return t, err == nil
+}
+
+func dayName(day string, now time.Time) string {
+	d, err := time.ParseInLocation("2006-01-02", day, time.Local)
+	if err != nil {
+		return day
+	}
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+	switch int(d.Sub(today).Hours() / 24) {
+	case 0:
+		return "oggi"
+	case 1:
+		return "domani"
+	}
+	return weekdays[d.Weekday()] + " " + d.Format("02/01")
+}
+
+func eventLine(day, hm, end, title string, now time.Time, withDay bool) string {
+	s := ""
+	if withDay {
+		s = dayName(day, now) + " "
+	}
+	switch {
+	case hm == "":
+		s += "(tutto il giorno)"
+	case end != "":
+		s += hm + "–" + end
+	default:
+		s += "alle " + hm
+	}
+	return strings.TrimSpace(s) + ": " + title
+}
+
+// agendaText: risposta a "prossimo impegno", "impegni di oggi/domani/della settimana", "cose da fare"
+func agendaText(a *Agenda, now time.Time, what string) string {
+	if a == nil {
+		return "Non vedo la tua agenda: Howl-UP non risponde (o non sono collegato a TwitchGestor)."
+	}
+	if what == "tasks" {
+		if len(a.Tasks) == 0 {
+			return "Niente da fare in lista. Goditela finché dura."
+		}
+		var b strings.Builder
+		b.WriteString("Da fare:")
+		for i, t := range a.Tasks {
+			if i == 8 {
+				fmt.Fprintf(&b, "\n…e altre %d.", len(a.Tasks)-8)
+				break
+			}
+			b.WriteString("\n• " + t.Title)
+			if t.Due != "" {
+				b.WriteString(" (entro " + dayName(t.Due, now) + ")")
+			}
+		}
+		return b.String()
+	}
+	todayKey := now.Format("2006-01-02")
+	tomorrowKey := now.AddDate(0, 0, 1).Format("2006-01-02")
+	var lines []string
+	for _, e := range a.Events {
+		at, timed := eventTime(e.Day, e.Time)
+		switch what {
+		case "next":
+			if (timed && at.After(now)) || (!timed && e.Day > todayKey) {
+				return "Prossimo impegno: " + eventLine(e.Day, e.Time, e.EndTime, e.Title, now, true) + "."
+			}
+		case "today":
+			if e.Day == todayKey {
+				lines = append(lines, eventLine(e.Day, e.Time, e.EndTime, e.Title, now, false))
+			}
+		case "tomorrow":
+			if e.Day == tomorrowKey {
+				lines = append(lines, eventLine(e.Day, e.Time, e.EndTime, e.Title, now, false))
+			}
+		default: // la settimana
+			lines = append(lines, eventLine(e.Day, e.Time, e.EndTime, e.Title, now, true))
+		}
+	}
+	label := map[string]string{"today": "Oggi", "tomorrow": "Domani", "week": "Nei prossimi 7 giorni"}[what]
+	if what == "next" {
+		return "Nessun impegno in vista nei prossimi 7 giorni."
+	}
+	if len(lines) == 0 {
+		return label + " niente in agenda."
+	}
+	if len(lines) > 12 {
+		lines = append(lines[:12], fmt.Sprintf("…e altri %d.", len(lines)-12))
+	}
+	return label + ":\n• " + strings.Join(lines, "\n• ")
+}
+
+// agendaBrief: l'agenda in poche righe per l'IA (oggi, domani, cose da fare)
+func agendaBrief(a *Agenda, now time.Time) string {
+	if a == nil {
+		return ""
+	}
+	var b strings.Builder
+	for _, w := range []string{"today", "tomorrow"} {
+		b.WriteString(agendaText(a, now, w) + "\n")
+	}
+	b.WriteString(agendaText(a, now, "next") + "\n")
+	b.WriteString(agendaText(a, now, "tasks"))
+	return b.String()
 }
 
 // nextLiveText: "giovedì 30/10 alle 21:00 — Titolo (Gioco)" oppure ""

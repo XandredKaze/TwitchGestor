@@ -134,3 +134,19 @@ test('sovrapposizioni: avvisa se l\'impegno si accavalla con un altro (anche di 
   assert.deepEqual(findOverlaps({ ...ev[1] }, ev, { today: t }), []); // se stesso non conta
   assert.deepEqual(findOverlaps(c({ date: '2026-10-22', allDay: true }), ev, { today: t }), []);
 });
+
+test('i prossimi giorni per Silver: impegni ripetuti, live e cose da fare', async () => {
+  const { upcoming } = await import('../src/core/agenda.js');
+  const now = new Date(2026, 9, 29, 10, 0).getTime(); // giovedì 29 ottobre
+  const events = [
+    cleanEvent({ id: 'a', title: 'Dentista', date: '2026-10-30', time: '16:00', category: 'personal' }),
+    cleanEvent({ id: 'b', title: 'Palestra', date: '2026-10-01', time: '18:00', repeat: { freq: 'weekly', days: [4] } }),
+    cleanEvent({ id: 'c', title: 'Vecchio', date: '2026-10-01', time: '18:00' }),
+  ];
+  const tasks = [{ title: 'Fatta', done: true }, { title: 'Senza data', due: '' }, { title: 'Microfono', due: '2026-10-31' }];
+  const u = upcoming({ events, tasks }, { now, days: 7 });
+  assert.equal(u.today, '2026-10-29');
+  assert.deepEqual(u.events.map((e) => `${e.day} ${e.time} ${e.title}`), ['2026-10-29 18:00 Palestra', '2026-10-30 16:00 Dentista', '2026-11-05 18:00 Palestra']);
+  assert.equal(u.events[1].category, 'Personale');
+  assert.deepEqual(u.tasks.map((t) => t.title), ['Microfono', 'Senza data']);
+});

@@ -28,11 +28,24 @@ func TestComandi(t *testing.T) {
 		{"pausa", "music", "pause", time.Time{}},
 		{"musica avanti", "music", "next", time.Time{}},
 		{"Prossima", "music", "next", time.Time{}},
+		{"metti in pausa la musica", "music", "pause", time.Time{}},
+		{"metti Linkin Park", "music", "find", time.Time{}},
+		{"volume 40", "music", "volume", time.Time{}},
+		{"che canzone è?", "music", "now", time.Time{}},
+		{"apri musicante player", "open", "player", time.Time{}},
+		{"apri musicante", "open", "musicante", time.Time{}},
+		{"metti un timer di 10 minuti", "remind", "Tempo scaduto.", now.Add(10 * time.Minute)},
 		{"scena Gioco", "scene", "Gioco", time.Time{}},
 		{"apri Howl-UP", "open", "howlup", time.Time{}},
 		{"apri twitch gestor", "open", "gestor", time.Time{}},
 		{"quando è la prossima live?", "nextlive", "", time.Time{}},
 		{"promemoria", "reminders", "", time.Time{}},
+		{"qual è il mio prossimo impegno?", "agenda", "next", time.Time{}},
+		{"impegni di domani", "agenda", "tomorrow", time.Time{}},
+		{"cosa ho oggi", "agenda", "today", time.Time{}},
+		{"agenda della settimana", "agenda", "week", time.Time{}},
+		{"cose da fare", "agenda", "tasks", time.Time{}},
+		{"cosa devo fare domani?", "agenda", "tomorrow", time.Time{}},
 		{"cancella promemoria", "clear", "", time.Time{}},
 		{"cosa sai fare?", "help", "", time.Time{}},
 		{"scrivimi un titolo per la live di stasera", "ask", "scrivimi un titolo per la live di stasera", time.Time{}},
@@ -43,6 +56,18 @@ func TestComandi(t *testing.T) {
 		if got.Kind != c.kind || (c.text != "" && got.Text != c.text) || !got.At.Equal(c.at) {
 			t.Errorf("%q → %+v (volevo %s %q %v)", c.in, got, c.kind, c.text, c.at)
 		}
+	}
+	if c := ParseCommand("metti la playlist Chill", now); c.Arg != "Chill" || c.Where != "" {
+		t.Errorf("%+v", c)
+	}
+	if c := ParseCommand("pausa la musica della live", now); c.Text != "pause" || c.Where != "live" {
+		t.Errorf("%+v", c)
+	}
+	if c := ParseCommand("avanti in live", now); c.Text != "next" || c.Where != "live" {
+		t.Errorf("%+v", c)
+	}
+	if c := ParseCommand("volume al 30%", now); c.Arg != "30" {
+		t.Errorf("%+v", c)
 	}
 	if w := whenText(now.Add(20*time.Minute), now); w != "tra 20 minuti" {
 		t.Error(w)

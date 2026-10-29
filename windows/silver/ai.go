@@ -232,7 +232,7 @@ func readChat(r interface{ Read([]byte) (int, error) }, onToken func(string)) (s
 var weekdays = []string{"domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"}
 
 // systemPrompt: chi è Silver e cosa sa di adesso
-func systemPrompt(now time.Time, ctx Context, live bool, nextLive string) string {
+func systemPrompt(now time.Time, ctx Context, live bool, nextLive, agenda string) string {
 	var b strings.Builder
 	b.WriteString("Sei Silver, il compagno sul desktop di uno streamer italiano. Rispondi SEMPRE in italiano, in modo chiaro e utile. ")
 	b.WriteString("Carattere: un po' spigoloso ma elegante, mai volgare; una battuta ogni tanto, senza esagerare. ")
@@ -248,6 +248,11 @@ func systemPrompt(now time.Time, ctx Context, live bool, nextLive string) string
 	}
 	if nextLive != "" {
 		fmt.Fprintf(&b, " Prossima live in programma: %s.", nextLive)
+	}
+	if agenda != "" {
+		b.WriteString("\nLa sua agenda (da Howl-UP), usala per rispondere sugli impegni:\n" + agenda)
+	} else {
+		b.WriteString(" Non hai accesso alla sua agenda in questo momento.")
 	}
 	return b.String()
 }

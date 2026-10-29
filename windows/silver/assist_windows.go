@@ -271,12 +271,25 @@ func (a *app) handleInput(text string) {
 		} else {
 			a.reply("Nessuna live in programma. Aggiungine una in Programmazione (o in Howl-UP).")
 		}
+	case "agenda":
+		if a.feed == nil {
+			if a.cfg.Key == "" {
+				a.reply(needPair)
+			} else {
+				a.reply("Non ho ancora sentito TwitchGestor. Riprova tra poco.")
+			}
+			return
+		}
+		a.reply(agendaText(a.feed.Agenda, now, c.Text))
 	case "open":
 		host := "twitchgestor"
 		if u, err := url.Parse(a.gestorBase()); err == nil && u.Hostname() != "" {
 			host = u.Hostname()
 		}
 		switch c.Text {
+		case "player":
+			a.launchPlayer()
+			return
 		case "gestor":
 			openURL("http://" + host + ":3000/dashboard")
 		case "howlup":
@@ -287,7 +300,9 @@ func (a *app) handleInput(text string) {
 			openURL("https://ollama.com/download")
 		}
 		a.reply("Aperto.")
-	case "note", "music", "scene":
+	case "music":
+		a.musicCmd(c)
+	case "note", "scene":
 		a.gestorDo(c)
 	default:
 		a.askAI(text)
@@ -348,6 +363,10 @@ func (a *app) askAI(q string) {
 	a.aiBusy = true
 	a.brain.Thinking = "Ci penso…"
 	ctxInfo, live, next := a.brain.Ctx, a.brain.Live, nextLiveText(a.feed, time.Now())
+	agenda := ""
+	if a.feed != nil {
+		agenda = agendaBrief(a.feed.Agenda, time.Now())
+	}
 	history := append([]chatMsg(nil), a.history...)
 	go func() {
 		ok, models := a.ai.Detect(context.Background())
@@ -373,7 +392,7 @@ func (a *app) askAI(q string) {
 			return
 		}
 		a.ai.Model = model
-		msgs := append([]chatMsg{{"system", systemPrompt(time.Now(), ctxInfo, live, next)}}, history...)
+		msgs := append([]chatMsg{{"system", systemPrompt(time.Now(), ctxInfo, live, next, agenda)}}, history...)
 		msgs = append(msgs, chatMsg{"user", q})
 		a.post <- func() { a.chat.Add("silver", "") }
 		answer, err := a.ai.Chat(context.Background(), msgs, func(tok string) {

@@ -43,6 +43,21 @@ export function createSilverLink(app, { file = KEYS_FILE, howlupPort = Number(pr
     if (events.length > 30) events.shift();
   });
 
+  // l'agenda di Howl-UP (stesso Raspberry): impegni dei prossimi giorni e cose da fare (si richiede al massimo ogni 30 s)
+  const howlup = (p, opts = {}) => fetchFn(`http://127.0.0.1:${howlupPort}${p}`, {
+    ...opts,
+    headers: { 'x-howlup': '1', ...(process.env.DASHBOARD_TOKEN ? { 'x-dashboard-token': process.env.DASHBOARD_TOKEN } : {}), ...opts.headers },
+    signal: AbortSignal.timeout(5000),
+  }).catch(() => null);
+  let agendaCache = { at: 0, value: null };
+  async function agenda() {
+    if (Date.now() - agendaCache.at < 30000) return agendaCache.value;
+    const res = await howlup('/api/upcoming?days=7');
+    const value = res?.ok ? await res.json().catch(() => null) : null;
+    agendaCache = { at: Date.now(), value: value ?? agendaCache.value };
+    return agendaCache.value;
+  }
+
   const prune = () => { for (const [id, r] of requests) if (Date.now() - r.at > 10 * 60000) requests.delete(id); };
 
   return {
@@ -93,6 +108,7 @@ export function createSilverLink(app, { file = KEYS_FILE, howlupPort = Number(pr
         scene: app.obs?.state().current ?? '',
         song: t ? t.name.replace(/\.[a-z0-9]+$/i, '') : '',
         playing: Boolean(app.music?.player?.state?.playing),
+        agenda: await agenda(),
       };
     },
 
@@ -124,12 +140,8 @@ export function createSilverLink(app, { file = KEYS_FILE, howlupPort = Number(pr
           const text = String(body.text ?? '').trim().slice(0, 2000);
           if (!text) return { text: 'Cosa devo scrivere?' };
           const title = text.length > 60 ? `${text.slice(0, 57)}…` : text;
-          const res = await fetchFn(`http://127.0.0.1:${howlupPort}/api/notes`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'x-howlup': '1', ...(process.env.DASHBOARD_TOKEN ? { 'x-dashboard-token': process.env.DASHBOARD_TOKEN } : {}) },
-            body: JSON.stringify({ note: { title, subtitle: 'da Silver', body: text } }),
-            signal: AbortSignal.timeout(5000),
-          }).catch(() => null);
+          const res = await howlup('/api/notes', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ note: { title, subtitle: 'da Silver', body: text } }) });
+          agendaCache.at = 0;
           if (!res?.ok) return { text: 'Howl-UP non risponde: la nota non è salvata.' };
           return { text: 'Segnato nelle note di Howl-UP.' };
         }

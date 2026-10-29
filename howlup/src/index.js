@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { Agenda, toICS, livesToEvents } from './core/agenda.js';
+import { Agenda, toICS, livesToEvents, upcoming } from './core/agenda.js';
 import { createTwitchLink } from './twitchgestor.js';
 import { Notifier, cleanSettings } from './core/notifier.js';
 import { sendNtfy, sendTelegramMsg, announceTelegram, announceDiscord } from './channels.js';
@@ -253,6 +253,11 @@ const server = http.createServer(async (req, res) => {
       rememberHost(req);
       if (req.method !== 'GET' && (req.headers['x-howlup'] !== '1' || !sameOrigin(req))) return send(res, 403, { error: 'Richiesta non consentita' });
 
+      // i prossimi giorni in breve: li legge TwitchGestor per Silver (il compagno sul desktop del PC)
+      if (route === 'GET /api/upcoming') {
+        const st = agenda.state();
+        return send(res, 200, upcoming({ ...st, events: [...st.events, ...livesToEvents(twitch.state.entries)] }, { days: Number(url.searchParams.get('days')) || 7 }));
+      }
       if (route === 'GET /api/state') {
         if (url.searchParams.get('rev') === String(rev)) return send(res, 200, { rev, unchanged: true });
         return send(res, 200, { rev, ...agenda.state(), lives: lives(), pending: notifier.pending(), announce: announcements.drafts.filter((d) => d.status === 'draft').length, calendarPath: `/calendar/${calendarKey}.ics` });

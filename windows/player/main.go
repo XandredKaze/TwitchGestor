@@ -30,6 +30,7 @@ var defaults = []string{"http://twitchgestor:3000", "http://twitchgestor.local:3
 
 type config struct {
 	Server string `json:"server"`
+	Exe    string `json:"exe"` // dove sta il programma: Silver lo legge per aprirlo quando gli chiedi musica
 }
 
 func dataDir() string {
@@ -116,6 +117,20 @@ func main() {
 	w.SetSize(760, 520, webview2.HintMin)
 
 	cfg := loadConfig()
+	if exe, err := os.Executable(); err == nil && cfg.Exe != exe {
+		cfg.Exe = exe
+		saveConfig(cfg)
+	}
+
+	// telecomando per Silver (solo da questo PC, vedi remote.go)
+	rc := newRemote(func(js string) { w.Dispatch(func() { w.Eval(js) }) })
+	_ = w.Bind("musicanteReport", func(state any) {
+		if b, err := json.Marshal(state); err == nil {
+			rc.report(b)
+		}
+	})
+	_ = w.Bind("musicanteReply", func(id, res string) { rc.reply(id, json.RawMessage(res)) })
+	go func() { _ = http.ListenAndServe(remoteAddr, rc) }()
 	open := func(base string) {
 		w.Dispatch(func() { w.Navigate(base + "/player?app=windows") })
 	}

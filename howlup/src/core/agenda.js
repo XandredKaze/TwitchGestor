@@ -418,6 +418,22 @@ export class Agenda {
 }
 
 /**
+ * I prossimi giorni in breve (per Silver, il compagno sul desktop del PC): impegni (anche quelli che si ripetono
+ * e le live) da oggi per "days" giorni, e le cose da fare non ancora fatte.
+ */
+export function upcoming({ events = [], tasks = [], categories = DEFAULT_CATEGORIES }, { now = Date.now(), days = 7 } = {}) {
+  const from = today(now);
+  const cat = (id) => categories.find((c) => c.id === id)?.name ?? '';
+  return {
+    today: from,
+    events: occurrences(events, from, addDays(from, Math.min(Math.max(days, 1), 31))).slice(0, 60)
+      .map((o) => ({ day: o.day, time: o.allDay ? '' : o.time, endTime: o.endTime || '', title: o.title, category: cat(o.category), notes: String(o.notes ?? '').slice(0, 200) })),
+    tasks: tasks.filter((t) => !t.done).sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999')).slice(0, 30)
+      .map((t) => ({ title: t.title, due: t.due, category: cat(t.category) })),
+  };
+}
+
+/**
  * Le live della Programmazione di TwitchGestor come impegni di Howl-UP (si modificano da qui ma restano
  * salvate in TwitchGestor). entry: { id, start: "2026-10-20T21:00", durationMin, title, game, notes, autoTitle, twitchId }
  */
