@@ -86,6 +86,10 @@ func ParseCommand(text string, now time.Time) Command {
 		return Command{Kind: "clear"}
 	case low == "diagnosi musica" || low == "diagnosi" || low == "controlla la musica" || low == "diagnosi player":
 		return Command{Kind: "diag"}
+	case low == "diagnosi programmi" || low == "diagnosi app":
+		return Command{Kind: "appdiag"}
+	case low == "che programmi conosci" || low == "quali programmi conosci" || low == "che app conosci" || low == "elenco programmi" || low == "lista programmi" || low == "che giochi conosci" || low == "quali giochi ho":
+		return Command{Kind: "applist"}
 	case low == "che ore sono" || low == "che ora è" || low == "ora":
 		return Command{Kind: "time"}
 	case strings.Contains(low, "prossima live") || strings.Contains(low, "quando vado in live") || low == "live":

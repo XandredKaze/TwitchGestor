@@ -42,6 +42,17 @@ func TestTrovaProgrammi(t *testing.T) {
 			t.Errorf("%q → %v (volevo %s)", q, got, want)
 		}
 	}
+	// app dello Store (Get-StartApps)
+	store := parseStartApps([]byte(`[{"Name":"Spotify","AppID":"SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify"},{"Name":"WhatsApp","AppID":"5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App"},{"Name":"Disinstalla OBS","AppID":"x"}]`))
+	if len(store) != 2 || store[1].Target != `shell:AppsFolder\5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App` {
+		t.Fatal(store)
+	}
+	if got := FindApps(append(apps, store...), "whatsapp per favore"); len(got) == 0 || got[0].Name != "WhatsApp" {
+		t.Errorf("whatsapp per favore → %v", got)
+	}
+	if one := parseStartApps([]byte(`{"Name":"Discord","AppID":"com.squirrel.Discord.Discord"}`)); len(one) != 1 {
+		t.Fatal("un'app sola")
+	}
 	if got := FindApps(apps, "photoshop"); len(got) != 0 {
 		t.Errorf("photoshop non c'è: %v", got)
 	}

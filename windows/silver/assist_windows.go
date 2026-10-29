@@ -349,6 +349,8 @@ func (a *app) handleInput(text string) {
 		a.diagnoseMusic()
 	case "launch":
 		a.launchCmd(c.Text)
+	case "applist", "appdiag":
+		a.appsInfo(c.Kind == "appdiag")
 	case "music":
 		a.musicCmd(c)
 	case "note", "scene":

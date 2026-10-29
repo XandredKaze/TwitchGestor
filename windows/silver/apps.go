@@ -107,6 +107,41 @@ func scanEpic(manifestDir string) []AppEntry {
 	return out
 }
 
+// parseStartApps: l'elenco delle app del menu Start dato da Windows (PowerShell Get-StartApps in JSON),
+// comprese quelle dello Store che non hanno un collegamento (Spotify, WhatsApp, Xbox…)
+func parseStartApps(b []byte) []AppEntry {
+	type sa struct {
+		Name  string
+		AppID string
+	}
+	var list []sa
+	if json.Unmarshal(b, &list) != nil {
+		var one sa
+		if json.Unmarshal(b, &one) != nil {
+			return nil
+		}
+		list = []sa{one}
+	}
+	var out []AppEntry
+	for _, a := range list {
+		if a.Name == "" || a.AppID == "" || reNotApp.MatchString(a.Name) || strings.HasPrefix(strings.ToLower(a.AppID), "http") {
+			continue
+		}
+		out = append(out, AppEntry{Name: a.Name, Target: `shell:AppsFolder\` + a.AppID, Source: "startapps"})
+	}
+	return out
+}
+
+// le parole di cortesia non fanno parte del nome ("apri Discord per favore")
+var reAppPolite = regexp.MustCompile(`(?i)[\s,]+(?:per favore|perfavore|grazie|subito|adesso|ora|un attimo|veloce|please|sul pc|sul computer)[\s,.!?]*$`)
+
+func cleanAppQuery(q string) string {
+	for i := 0; i < 3; i++ {
+		q = reAppPolite.ReplaceAllString(q, "")
+	}
+	return strings.TrimSpace(strings.Trim(q, " .,!?\"'"))
+}
+
 func normName(s string) string {
 	s = plainLower(s)
 	s = regexp.MustCompile(`[®™©]`).ReplaceAllString(s, "")
@@ -166,7 +201,7 @@ func appScore(name, q string) int {
 
 // FindApps: i programmi che corrispondono a quello che hai detto, dal più probabile (al massimo 3)
 func FindApps(apps []AppEntry, query string) []AppEntry {
-	q := normName(query)
+	q := normName(cleanAppQuery(query))
 	if a, ok := appAliases[q]; ok {
 		q = a
 	}
