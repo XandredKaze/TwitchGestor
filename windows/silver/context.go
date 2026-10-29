@@ -11,7 +11,13 @@ import (
 var browsers = map[string]bool{"chrome.exe": true, "msedge.exe": true, "firefox.exe": true, "opera.exe": true, "opera_gx.exe": true, "brave.exe": true, "vivaldi.exe": true}
 
 // launcher e programmi che non sono giochi anche quando sono a schermo intero
-var notGames = map[string]bool{"steam.exe": true, "steamwebhelper.exe": true, "epicgameslauncher.exe": true, "battle.net.exe": true, "vlc.exe": true, "mpc-hc64.exe": true, "applicationframehost.exe": true, "powerpnt.exe": true}
+var notGames = map[string]bool{"steam.exe": true, "steamwebhelper.exe": true, "epicgameslauncher.exe": true, "battle.net.exe": true, "vlc.exe": true, "mpc-hc64.exe": true, "applicationframehost.exe": true, "powerpnt.exe": true,
+	// programmi di tutti i giorni (anche se ingranditi o a schermo intero)
+	"claude.exe": true, "chatgpt.exe": true, "slack.exe": true, "ms-teams.exe": true, "teams.exe": true, "notion.exe": true, "obsidian.exe": true,
+	"winword.exe": true, "excel.exe": true, "outlook.exe": true, "onenote.exe": true, "acrobat.exe": true, "acrord32.exe": true, "photoshop.exe": true,
+	"illustrator.exe": true, "afterfx.exe": true, "premiere pro.exe": true, "adobe premiere pro.exe": true, "resolve.exe": true, "figma.exe": true,
+	"whatsapp.exe": true, "telegram.exe": true, "streamlabs obs.exe": true, "musicanteplayer.exe": true, "silver.exe": true, "explorer.exe": true,
+	"mspaint.exe": true, "notepad.exe": true, "windowsterminal.exe": true, "cmd.exe": true, "powershell.exe": true, "wavelink.exe": true, "elgato wave link.exe": true}
 
 // (il titolo di Edge contiene uno spazio invisibile tra "Microsoft" e "Edge")
 var titleNoise = regexp.MustCompile(`\s*[-–—|]\s*(Google Chrome|Microsoft​? Edge|Mozilla Firefox|Opera|Brave|Vivaldi)\s*$`)

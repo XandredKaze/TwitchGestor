@@ -32,7 +32,10 @@ type Bubble struct {
 	RememberLabel string
 	Alert         bool // promemoria e avvisi importanti: si vedono anche se l'hai fatto sparire, e restano finché non clicchi
 
-	runes  []rune
+	runes  []rune   // la pagina che si sta scrivendo
+	pages  []string // risposte lunghe: a pagine, come i dialoghi dei videogiochi
+	page   int
+	nextAt time.Time // quando passa da sola alla pagina dopo
 	start  time.Time
 	typed  int
 	doneAt time.Time
@@ -43,8 +46,80 @@ type Bubble struct {
 const charEvery = 34 * time.Millisecond
 
 func (b *Bubble) Typed() string { return string(b.runes[:b.typed]) }
-func (b *Bubble) Done() bool    { return b.typed >= len(b.runes) }
-func (b *Bubble) Full() string  { return string(b.runes) }
+
+// More: dopo questa pagina ce n'è un'altra
+func (b *Bubble) More() bool { return b.page < len(b.pages)-1 }
+
+// Page: "2/3" (vuoto se c'è una sola pagina)
+func (b *Bubble) Page() string {
+	if len(b.pages) < 2 {
+		return ""
+	}
+	return itoaInt(b.page+1) + "/" + itoaInt(len(b.pages))
+}
+
+const pageRunes = 170 // quanto sta in una pagina del fumetto
+
+// newBubble: il fumetto con il testo diviso in pagine
+func newBubble(text string, now time.Time) *Bubble {
+	pages := paginate(text, pageRunes)
+	return &Bubble{Text: text, pages: pages, runes: []rune(pages[0]), start: now, shown: now}
+}
+
+// nextPage: si svuota e continua da dove era arrivato
+func (b *Bubble) nextPage(now time.Time) {
+	if !b.More() {
+		return
+	}
+	b.page++
+	b.runes, b.typed, b.start, b.doneAt, b.nextAt = []rune(b.pages[b.page]), 0, now, time.Time{}, time.Time{}
+}
+
+// paginate: divide il testo in pagine da circa n lettere (gli a capo contano come una riga intera),
+// tagliando alla fine di una frase quando si può, mai a metà parola
+func paginate(text string, n int) []string {
+	cost := func(s string) int { return len([]rune(s)) + strings.Count(s, "\n")*28 }
+	var pages []string
+	cur := ""
+	for _, line := range strings.SplitAfter(text, "\n") {
+		for i, w := range strings.Split(line, " ") {
+			if w == "" && i > 0 {
+				continue
+			}
+			next := w
+			if cur != "" && !strings.HasSuffix(cur, "\n") {
+				next = cur + " " + w
+			} else if cur != "" {
+				next = cur + w
+			}
+			if cost(next) <= n || cur == "" {
+				cur = next
+				continue
+			}
+			// troppo: si chiude la pagina, possibilmente a fine frase
+			cut := -1
+			for j := len(cur) - 1; j > len(cur)/2; j-- {
+				if c := cur[j]; c == '\n' || ((c == '.' || c == '!' || c == '?') && j+1 < len(cur) && cur[j+1] == ' ') {
+					cut = j + 1
+					break
+				}
+			}
+			if cut > 0 {
+				pages = append(pages, strings.TrimSpace(cur[:cut]))
+				cur = strings.TrimSpace(cur[cut:]) + " " + w
+			} else {
+				pages = append(pages, strings.TrimSpace(cur))
+				cur = w
+			}
+		}
+	}
+	if t := strings.TrimSpace(cur); t != "" || len(pages) == 0 {
+		pages = append(pages, t)
+	}
+	return pages
+}
+func (b *Bubble) Done() bool   { return b.typed >= len(b.runes) }
+func (b *Bubble) Full() string { return string(b.runes) }
 
 type Brain struct {
 	Enabled    bool
@@ -95,8 +170,8 @@ func (b *Brain) Visible() bool {
 // Alert: promemoria o avviso importante (passa sopra a tutto; actions: i pulsanti, es. Fatto / Tra 10 minuti)
 func (b *Brain) Alert(now time.Time, text string, actions []Action) {
 	b.exitIdle()
-	text = noEmoji(text)
-	b.Bubble = &Bubble{Text: text, Label: "promemoria", Actions: actions, Alert: true, runes: []rune(text), start: now, shown: now}
+	b.Bubble = newBubble(noEmoji(text), now)
+	b.Bubble.Label, b.Bubble.Actions, b.Bubble.Alert = "promemoria", actions, true
 	b.lastSpoke = now
 }
 
@@ -107,8 +182,8 @@ func (b *Brain) Reply(now time.Time, text string) {
 	if b.Live {
 		label = "live"
 	}
-	text = noEmoji(text)
-	b.Bubble = &Bubble{Text: text, Label: label, Alert: !b.Enabled || b.Hidden(), runes: []rune(text), start: now, shown: now}
+	b.Bubble = newBubble(noEmoji(text), now)
+	b.Bubble.Label, b.Bubble.Alert = label, !b.Enabled || b.Hidden()
 	b.lastSpoke = now
 }
 
@@ -135,8 +210,8 @@ func (b *Brain) Say(now time.Time, text, source, note string, actions []Action) 
 	} else if b.Ctx.ID != "desktop" {
 		label = b.Ctx.Name
 	}
-	full = noEmoji(full)
-	b.Bubble = &Bubble{Text: full, Source: source, Label: label, Actions: actions, runes: []rune(full), start: now, shown: now}
+	b.Bubble = newBubble(noEmoji(full), now)
+	b.Bubble.Source, b.Bubble.Label, b.Bubble.Actions = source, label, actions
 	b.lastSpoke = now
 }
 
@@ -211,7 +286,7 @@ func (b *Brain) askAboutGame(now time.Time) {
 // Choose: risposta alla domanda sui giochi
 func (b *Brain) Choose(now time.Time, i int) {
 	bb := b.Bubble
-	if bb == nil || i < 0 || i >= len(bb.Actions) {
+	if bb == nil || i < 0 || i >= len(bb.Actions) || bb.More() {
 		return
 	}
 	choice := bb.Actions[i].Choice
@@ -254,8 +329,17 @@ func (b *Brain) ClickSilver(now time.Time) {
 }
 
 // ClickBubble: un clic sul fumetto lo chiude (non quello con la domanda: lì si sceglie)
-func (b *Brain) ClickBubble() {
-	if b.Bubble != nil && len(b.Bubble.Actions) == 0 {
+// ClickBubble: un clic sul fumetto: finisce di scrivere la pagina, poi passa alla pagina dopo, poi lo chiude
+// (non quello con la domanda: lì si sceglie)
+func (b *Brain) ClickBubble(now time.Time) {
+	bb := b.Bubble
+	switch {
+	case bb == nil:
+	case !bb.Done():
+		bb.start = now.Add(-time.Duration(len(bb.runes)+1) * charEvery) // tutta la pagina subito
+	case bb.More():
+		bb.nextPage(now)
+	case len(bb.Actions) == 0:
 		b.Bubble = nil
 	}
 }
@@ -306,13 +390,19 @@ func (b *Brain) Tick(now time.Time, userIdle time.Duration) {
 			if bb.typed >= len(bb.runes) {
 				bb.typed = len(bb.runes)
 				bb.doneAt = now
-				if bb.Alert && len(bb.Actions) > 0 {
+				if bb.More() { // il tempo di leggerla, poi la pagina dopo
+					bb.nextAt = now.Add(min(7*time.Second, 1200*time.Millisecond+time.Duration(len(bb.runes))*40*time.Millisecond))
+				} else if bb.Alert && len(bb.Actions) > 0 {
 					bb.hideAt = now.Add(15 * time.Minute) // un promemoria aspetta che torni
 				} else if len(bb.Actions) > 0 {
 					bb.hideAt = now.Add(30 * time.Second)
 				} else {
 					bb.hideAt = now.Add(2500*time.Millisecond + time.Duration(len(bb.runes))*45*time.Millisecond)
 				}
+			}
+		} else if bb.More() {
+			if !bb.nextAt.IsZero() && now.After(bb.nextAt) {
+				bb.nextPage(now)
 			}
 		} else if now.After(bb.hideAt) {
 			b.Bubble = nil

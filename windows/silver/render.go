@@ -360,7 +360,7 @@ func (r *Renderer) Render(now time.Time, mono float64, b *Brain) (*image.RGBA, H
 	if bb := b.Bubble; bb != nil {
 		// il fumetto si ridisegna solo quando cambia (lettera nuova, cursore, comparsa, casella)
 		appearing := now.Sub(bb.shown) < 220*time.Millisecond
-		key := fmt.Sprintf("%p|%d|%v|%v", bb, bb.typed, bb.Remember, !bb.Done() && math.Mod(mono, 0.8) < 0.4)
+		key := fmt.Sprintf("%p|%d|%d|%v|%v|%v", bb, bb.page, bb.typed, bb.Remember, !bb.Done() && math.Mod(mono, 0.8) < 0.4, bb.More() && math.Mod(mono, 1) < 0.6)
 		if appearing || key != r.bubKey || r.bubLayer == nil {
 			if r.bubLayer == nil {
 				r.bubLayer = image.NewRGBA(img.Bounds())
@@ -485,19 +485,24 @@ func (r *Renderer) drawBubble(img *image.RGBA, bb *Bubble, now time.Time, mono f
 	fSmall := r.face("regular", 11)
 	fSrc := r.face("italic", 11)
 	inner := bubW*s - 2*padX
+	// pulsanti, fonte e casella solo sull'ultima pagina
+	actions, source, remember := bb.Actions, bb.Source, bb.RememberLabel
+	if bb.More() {
+		actions, source, remember = nil, "", ""
+	}
 	// le righe si calcolano sul testo intero, così non saltano mentre si scrive
 	rows := wrap(fText, bb.Full(), inner)
 	lineH := 20 * s
 	h := padY + 16*s + float64(len(rows))*lineH
-	if bb.Source != "" {
+	if source != "" {
 		h += 18 * s
 	}
 	var btnW []float64
 	btnRows := 0
-	if len(bb.Actions) > 0 {
+	if len(actions) > 0 {
 		rowW := 0.0
 		btnRows = 1
-		for _, a := range bb.Actions {
+		for _, a := range actions {
 			w := float64(font.MeasureString(fSmall, a.Label).Ceil()) + 20*s
 			if rowW > 0 && rowW+w > inner {
 				btnRows++
@@ -507,7 +512,7 @@ func (r *Renderer) drawBubble(img *image.RGBA, bb *Bubble, now time.Time, mono f
 			btnW = append(btnW, w)
 		}
 		h += 10*s + float64(btnRows)*30*s
-		if bb.RememberLabel != "" {
+		if remember != "" {
 			h += 22 * s
 		}
 	}
@@ -528,9 +533,21 @@ func (r *Renderer) drawBubble(img *image.RGBA, bb *Bubble, now time.Time, mono f
 
 	cy := y + padY + 9*s
 	drawTextSpaced(img, fLabel, x+padX, cy, "SILVER", color.NRGBA{95, 211, 176, 255}, alpha, 2.2*s)
-	if bb.Label != "" {
-		lw := float64(font.MeasureString(fSmall, "· "+bb.Label).Ceil())
-		drawText(img, fSmall, x+bubW*s-padX-lw, cy, "· "+bb.Label, color.NRGBA{141, 150, 166, 255}, alpha)
+	label := bb.Label
+	if p := bb.Page(); p != "" { // pagina 2/3
+		if label != "" {
+			label += " · "
+		}
+		label += p
+	}
+	if label != "" {
+		lw := float64(font.MeasureString(fSmall, "· "+label).Ceil())
+		drawText(img, fSmall, x+bubW*s-padX-lw, cy, "· "+label, color.NRGBA{141, 150, 166, 255}, alpha)
+	}
+	// continua: il triangolino che lampeggia in basso a destra (come nei giochi)
+	if bb.More() && bb.Done() && math.Mod(mono, 1) < 0.6 {
+		tx, tyy := x+bubW*s-padX-6*s, y+h-padY+2*s
+		fillTriangle(img, tx-5*s, tyy-6*s, tx+5*s, tyy-6*s, tx, tyy, color.NRGBA{95, 211, 176, 255}, alpha)
 	}
 	// testo scritto fin qui (lettera per lettera) e il cursore che lampeggia
 	typed := []rune(bb.Typed())
@@ -557,21 +574,21 @@ func (r *Renderer) drawBubble(img *image.RGBA, bb *Bubble, now time.Time, mono f
 		}
 		n += len(rr) + 1 // lo spazio tolto andando a capo
 	}
-	if bb.Source != "" && bb.Done() {
+	if source != "" && bb.Done() {
 		ty += 18 * s
-		drawText(img, fSrc, x+padX, ty-6*s, "— "+bb.Source, color.NRGBA{141, 150, 166, 255}, alpha)
-	} else if bb.Source != "" {
+		drawText(img, fSrc, x+padX, ty-6*s, "— "+source, color.NRGBA{141, 150, 166, 255}, alpha)
+	} else if source != "" {
 		ty += 18 * s
 	}
 	// pulsanti (domanda sui giochi): compaiono a frase finita
-	if len(bb.Actions) > 0 {
+	if len(actions) > 0 {
 		by := ty + 10*s
 		bx := x + padX
 		show := 0.0
 		if bb.Done() {
 			show = alpha
 		}
-		for i, a := range bb.Actions {
+		for i, a := range actions {
 			w := btnW[i]
 			if bx > x+padX && bx+w > x+padX+inner {
 				bx = x + padX
@@ -586,7 +603,7 @@ func (r *Renderer) drawBubble(img *image.RGBA, bb *Bubble, now time.Time, mono f
 			}
 			bx += w + 6*s
 		}
-		if bb.RememberLabel != "" {
+		if remember != "" {
 			ry := by + 32*s
 			box := rectF{x + padX, ry, 13 * s, 13 * s}
 			if bb.Remember {
@@ -596,7 +613,7 @@ func (r *Renderer) drawBubble(img *image.RGBA, bb *Bubble, now time.Time, mono f
 				fillRoundRect(img, box, 3*s, color.NRGBA{141, 150, 166, 255}, show)
 				fillRoundRect(img, rectF{box.x + 1.5*s, box.y + 1.5*s, box.w - 3*s, box.h - 3*s}, 2*s, color.NRGBA{22, 26, 33, 255}, show)
 			}
-			drawText(img, fSmall, box.x+20*s, ry+11*s, bb.RememberLabel, color.NRGBA{141, 150, 166, 255}, show)
+			drawText(img, fSmall, box.x+20*s, ry+11*s, remember, color.NRGBA{141, 150, 166, 255}, show)
 			if bb.Done() {
 				hits.Remember = rectF{box.x, ry - 2*s, inner, 18 * s}
 			}

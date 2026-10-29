@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -69,6 +70,8 @@ var (
 	pMessageBox          = user32.NewProc("MessageBoxW")
 	pCreateIconIndirect  = user32.NewProc("CreateIconIndirect")
 	pFindWindow          = user32.NewProc("FindWindowW")
+	pGetWindowLong       = user32.NewProc("GetWindowLongW")
+	pIsZoomed            = user32.NewProc("IsZoomed")
 	pAllowSetForeground  = user32.NewProc("AllowSetForegroundWindow")
 	pDestroyIcon         = user32.NewProc("DestroyIcon")
 	pGetSystemMetrics    = user32.NewProc("GetSystemMetrics")
@@ -414,9 +417,22 @@ func main() {
 	go a.watchGestor()
 	go a.watchFeed()
 	// Ctrl+Alt+S: la finestra per scrivergli
-	pRegisterHotKey.Call(a.hwnd, 1, modControl|modAlt|modNoRepeat, 'S')
+	// (se un altro programma usa già la stessa combinazione, Windows non ce la dà: si dice)
+	var taken []string
+	if r, _, _ := pRegisterHotKey.Call(a.hwnd, 1, modControl|modAlt|modNoRepeat, 'S'); r == 0 {
+		taken = append(taken, "Ctrl+Alt+S")
+	}
 	// Ctrl+Alt+V: parla con Silver
-	pRegisterHotKey.Call(a.hwnd, 2, modControl|modAlt|modNoRepeat, 'V')
+	if r, _, _ := pRegisterHotKey.Call(a.hwnd, 2, modControl|modAlt|modNoRepeat, 'V'); r == 0 {
+		taken = append(taken, "Ctrl+Alt+V")
+	}
+	if len(taken) > 0 {
+		msg := strings.Join(taken, " e ") + " li usa già un altro programma, quindi da tastiera non arrivano a me. Usa il mio menu (clic destro su di me)."
+		go func() {
+			time.Sleep(20 * time.Second)
+			a.post <- func() { a.chat.Add("error", msg); a.brain.Reply(time.Now(), msg) }
+		}()
+	}
 	a.brain.later(time.Now(), 1200*time.Millisecond, func(now time.Time) {
 		if a.r.HasSprite() {
 			a.brain.Say(now, greeting, "", "", nil)
@@ -504,7 +520,12 @@ func (a *app) foreground() Context {
 	mi := monitorInfo{}
 	mi.Size = uint32(unsafe.Sizeof(mi))
 	pGetMonitorInfo.Call(mon, uintptr(unsafe.Pointer(&mi)))
-	full := wr.L <= mi.Monitor.L && wr.T <= mi.Monitor.T && wr.R >= mi.Monitor.R && wr.B >= mi.Monitor.B
+	// schermo intero vero (giochi): copre tutto il monitor, senza barra del titolo e senza essere solo "ingrandita"
+	// (una finestra ingrandita con la barra delle applicazioni nascosta copre tutto anche lei, ma non è un gioco)
+	style, _, _ := pGetWindowLong.Call(fg, ^uintptr(15)) // GWL_STYLE = -16
+	zoomed, _, _ := pIsZoomed.Call(fg)
+	full := wr.L <= mi.Monitor.L && wr.T <= mi.Monitor.T && wr.R >= mi.Monitor.R && wr.B >= mi.Monitor.B &&
+		zoomed == 0 && uint32(style)&0x00C00000 != 0x00C00000 // WS_CAPTION
 	return classify(exe, windows.UTF16ToString(tb), windows.UTF16ToString(cb), full)
 }
 
@@ -731,7 +752,7 @@ func (a *app) clickAt(x, y float64) {
 	case h.Remember.w > 0 && h.Remember.has(x, y):
 		a.brain.ToggleRemember()
 	case h.Bubble.w > 0 && h.Bubble.has(x, y):
-		a.brain.ClickBubble()
+		a.brain.ClickBubble(now)
 	case h.Silver.has(x, y):
 		a.brain.ClickSilver(now)
 	}

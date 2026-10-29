@@ -21,6 +21,7 @@ func TestRiconosceIProgrammi(t *testing.T) {
 		{`D:\SteamLibrary\steamapps\common\ELDEN RING\Game\eldenring.exe`, "ELDEN RING™", "ELDEN RING™", false, "game", "ELDEN RING™"},
 		{`C:\Games\Hollow Knight\hollow_knight.exe`, "Hollow Knight", "UnityWndClass", true, "game", "Hollow Knight"},
 		{`C:\Program Files (x86)\Steam\steam.exe`, "Steam", "SDL_app", true, "other", "Steam"},
+		{`C:\Users\x\AppData\Local\AnthropicClaude\app-1.0\claude.exe`, "Claude", "Chrome_WidgetWin_1", true, "other", "Claude"}, // Claude a tutto schermo non è un gioco
 		{`C:\Users\x\Documenti\MusicantePlayer.exe`, "Musicante Player", "webview", false, "music", "Musicante Player"},
 		{`C:\Windows\explorer.exe`, "Download", "CabinetWClass", false, "explorer", "Esplora file"},
 		{`C:\Users\x\AppData\Local\Programs\Microsoft VS Code\Code.exe`, "main.go - silver - Visual Studio Code", "Chrome_WidgetWin_1", false, "code", "Visual Studio Code"},

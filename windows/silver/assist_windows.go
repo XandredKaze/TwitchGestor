@@ -238,7 +238,7 @@ func (a *app) submitPanel() {
 // reply: risponde nel fumetto e nella finestra
 func (a *app) reply(text string) {
 	a.chat.Add("silver", text)
-	a.brain.Reply(time.Now(), short(text, 170))
+	a.brain.Reply(time.Now(), text)
 }
 
 func (a *app) handleInput(text string) {
@@ -426,7 +426,7 @@ func (a *app) askAI(q string) {
 			if len(a.history) > 8 {
 				a.history = a.history[len(a.history)-8:]
 			}
-			a.brain.Reply(time.Now(), short(answer, 170))
+			a.brain.Reply(time.Now(), answer)
 		}
 	}()
 }

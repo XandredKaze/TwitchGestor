@@ -143,4 +143,14 @@ func TestFotogrammi(t *testing.T) {
 	b.Thinking = "Ci penso…"
 	img, _ = frame(b, t0.Add(time.Second), 0)
 	save("8-ci-penso", img)
+
+	// risposta lunga: a pagine, con 1/3 e il triangolino
+	b = NewBrain(11)
+	b.Reply(t0, "Ecco tre idee per il titolo. Prima: stanotte non si dorme, horror a luci spente con la chat che decide quando aprire le porte. Seconda: urla garantite, le mie, e voi a ridere. Terza: il buio ha fame.")
+	b.ClickBubble(t0)
+	img, h = frame(b, t0.Add(100*time.Millisecond), 0)
+	save("9-pagine", img)
+	if len(h.Buttons) != 0 || h.Bubble.w == 0 {
+		t.Fatal("pagina 1")
+	}
 }
