@@ -230,9 +230,11 @@
   }
 
   // Silver: la sua immagine e la sua voce stanno solo qui sul Raspberry (non dentro Silver.exe):
-  // le carichi una volta, Silver le scarica da sé e le tiene sul PC
+  // le carichi una volta, Silver le scarica da sé e le tiene sul PC.
+  // Collegamento: Silver sul PC chiede il permesso (per avvisi e comandi) e qui premi "Consenti".
   function silverBox() {
     const box = el('div', { className: 'sys-silver' });
+    let st = {};
     const row = (kind, label, accept, have) => {
       const input = el('input', { type: 'file', accept, hidden: true });
       input.onchange = async () => {
@@ -248,12 +250,29 @@
         el('button', { type: 'button', className: 'small-btn', onclick: () => input.click() }, have ? 'Cambia…' : 'Carica…'),
         have ? el('button', { type: 'button', className: 'small-btn', onclick: async () => { const res = await api(`/api/silver/asset/delete?kind=${kind}`); if (res) draw(res); } }, 'Togli') : null);
     };
-    const draw = (v) => box.replaceChildren(
-      el('b', {}, '🦔 Silver: immagine e voce'),
-      el('span', { className: 'small muted' }, 'Restano solo sul Raspberry. Silver le prende da qui (anche quando le cambi).'),
-      row('image', 'Immagine (PNG/WEBP con sfondo trasparente)', 'image/png,image/webp,image/jpeg', v.image),
-      row('voice', 'Voce (MP3, un borbottio di un paio di secondi)', 'audio/mpeg,.mp3', v.voice));
-    api('/api/silver', { method: 'GET', quiet: true }).then((v) => v && draw(v));
+    const pairCall = async (what, id) => { const res = await api(`/api/silver/${what}`, { body: { id } }); if (res) draw(res); };
+    const draw = (v) => {
+      st = { ...st, ...v };
+      box.replaceChildren(
+        el('b', {}, '🦔 Silver: immagine e voce'),
+        el('span', { className: 'small muted' }, 'Restano solo sul Raspberry. Silver le prende da qui (anche quando le cambi).'),
+        row('image', 'Immagine (PNG/WEBP con sfondo trasparente)', 'image/png,image/webp,image/jpeg', st.image),
+        row('voice', 'Voce (MP3, un borbottio di un paio di secondi)', 'audio/mpeg,.mp3', st.voice),
+        el('b', { className: 'sys-silver-sub' }, '🔗 PC collegati'),
+        el('span', { className: 'small muted' }, 'Un PC collegato riceve gli avvisi (follow, donazioni, prossima live) e può usare i comandi (musica, scene, note).'),
+        ...(st.pending ?? []).map((r) => el('div', { className: 'sys-silver-row sys-silver-ask' },
+          el('span', {}, '❓ Silver su ', el('b', {}, r.pc), ` (${r.ip}) chiede di collegarsi`),
+          el('button', { type: 'button', className: 'small-btn primary', onclick: () => pairCall('allow', r.id) }, 'Consenti'),
+          el('button', { type: 'button', className: 'small-btn', onclick: () => pairCall('deny', r.id) }, 'No'))),
+        ...(st.devices ?? []).map((d) => el('div', { className: 'sys-silver-row' },
+          el('span', {}, '💻 ', d.pc, el('span', { className: 'muted small' }, ` — dal ${new Date(d.at).toLocaleDateString('it-IT')}`)),
+          el('button', { type: 'button', className: 'small-btn', onclick: () => confirm(`Scollegare Silver su ${d.pc}?`) && pairCall('unpair', d.id) }, 'Scollega'))),
+        !(st.pending ?? []).length && !(st.devices ?? []).length ? el('span', { className: 'small muted' }, 'Nessuno. Apri Silver sul PC: la richiesta compare qui.') : null);
+    };
+    const refresh = () => api('/api/silver', { method: 'GET', quiet: true }).then((v) => v && draw(v));
+    refresh();
+    // le richieste arrivano mentre guardi: si ricontrolla finché il riquadro è aperto
+    const timer = setInterval(() => { if (!box.isConnected || $('sys-tools').hidden || !dialog.open) clearInterval(timer); else refresh(); }, 4000);
     return box;
   }
   $('sys-tools-btn').onclick = () => {

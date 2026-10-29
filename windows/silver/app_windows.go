@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"image"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -218,6 +219,12 @@ type config struct {
 	// versioni dell'immagine e della voce già scaricate da Gestor (in %APPDATA%\Silver)
 	ImageVer int64 `json:"imageVer"`
 	VoiceVer int64 `json:"voiceVer"`
+	// collegamento con Gestor (la chiave la dà Gestor quando premi "Consenti")
+	Key           string     `json:"key"`
+	PairDenied    bool       `json:"pairDenied"`
+	PairHintShown bool       `json:"pairHintShown"`
+	Reminders     []Reminder `json:"reminders"`
+	Model         string     `json:"model"` // il modello dell'IA (Ollama)
 }
 
 func dataDir() string {
@@ -265,33 +272,48 @@ func setAutostart(on bool) {
 // ---------- il programma ----------
 
 type app struct {
-	hwnd      uintptr
-	owner     uintptr // finestra invisibile per l'icona vicino all'orologio e il menu (Silver non prende mai il fuoco)
-	inst      windows.Handle
-	cfg       config
-	brain     *Brain
-	r         *Renderer
-	hits      Hits
-	start     time.Time
-	scale     float64
-	pos       point
-	memDC     uintptr
-	screenDC  uintptr
-	bits      unsafe.Pointer
-	bmp       uintptr
-	bw, bh    int
-	tray      notifyIconData
-	trayMsg   uint32
-	tracking  bool
-	lastFg    time.Time
-	lastPos   time.Time
-	live      atomic.Bool
-	voice     *voice
-	player    *oto.Player
-	otoCtx    *oto.Context
-	otoReady  chan struct{}
-	post      chan func() // dal filo che parla con Gestor a quello della finestra
-	trayIcon  uintptr
+	hwnd     uintptr
+	owner    uintptr // finestra invisibile per l'icona vicino all'orologio e il menu (Silver non prende mai il fuoco)
+	inst     windows.Handle
+	cfg      config
+	brain    *Brain
+	r        *Renderer
+	hits     Hits
+	start    time.Time
+	scale    float64
+	pos      point
+	memDC    uintptr
+	screenDC uintptr
+	bits     unsafe.Pointer
+	bmp      uintptr
+	bw, bh   int
+	tray     notifyIconData
+	trayMsg  uint32
+	tracking bool
+	lastFg   time.Time
+	lastPos  time.Time
+	live     atomic.Bool
+	voice    *voice
+	player   *oto.Player
+	otoCtx   *oto.Context
+	otoReady chan struct{}
+	post     chan func() // dal filo che parla con Gestor a quello della finestra
+	trayIcon uintptr
+
+	// le cose utili (assist_windows.go)
+	panel     *panel
+	ai        *AI
+	aiBusy    bool
+	history   []chatMsg
+	pendingQ  string
+	feed      *Feed
+	watch     Watch
+	base      atomic.Value // indirizzo di Gestor trovato
+	feedKey   atomic.Value // la chiave, letta dal filo degli avvisi
+	lastAlert string
+	rnd       *rand.Rand
+	pairing   bool
+	lastRem   time.Time
 	quitAt    time.Time
 	hoverHand bool
 }
@@ -313,7 +335,7 @@ func main() {
 	}
 	pSetDpiAwarenessCtx.Call(^uintptr(3)) // -4: per monitor v2 (schermi con scala diversa)
 
-	a := &app{cfg: loadConfig(), start: time.Now(), post: make(chan func(), 8)}
+	a := &app{cfg: loadConfig(), start: time.Now(), post: make(chan func(), 64), ai: NewAI(), rnd: rand.New(rand.NewSource(time.Now().UnixNano()))}
 	theApp = a
 	if a.cfg.Autostart {
 		setAutostart(true)
@@ -323,6 +345,7 @@ func main() {
 	a.brain.GameChoices = a.cfg.Games
 	a.brain.lastSpoke = time.Now() // appena acceso saluta, niente commenti sovrapposti
 	a.brain.OnChoicesChanged = func() { a.cfg.Games = a.brain.GameChoices; a.cfg.save() }
+	a.brain.OnAction = func(c string) { a.onAction(c) }
 
 	var inst windows.Handle
 	_ = windows.GetModuleHandleEx(0, nil, &inst)
@@ -375,6 +398,9 @@ func main() {
 	}
 
 	go a.watchGestor()
+	go a.watchFeed()
+	// Ctrl+Alt+S: la finestra per scrivergli
+	pRegisterHotKey.Call(a.hwnd, 1, modControl|modAlt|modNoRepeat, 'S')
 	a.brain.later(time.Now(), 1200*time.Millisecond, func(now time.Time) {
 		if a.r.HasSprite() {
 			a.brain.Say(now, greeting, "", "", nil)
@@ -490,6 +516,15 @@ func (a *app) watchGestor() {
 			_ = json.NewDecoder(res.Body).Decode(&st)
 			res.Body.Close()
 			a.live.Store(st.Live)
+			if a.gestorBase() == "" { // la prima volta: se non è collegato, chiede il permesso
+				a.base.Store(base)
+				a.post <- func() {
+					if a.cfg.Key == "" && !a.cfg.PairDenied {
+						a.pair(false)
+					}
+				}
+			}
+			a.base.Store(base)
 			tries = []string{base} // trovato: si resta su questo
 			if v := st.Assets.Image; v != 0 && v != imageVer {
 				if b := download(base + "/silver/asset/image"); b != nil {
@@ -636,6 +671,14 @@ func (a *app) tick() {
 		a.lastPos = now
 		a.place()
 	}
+	a.feedKey.Store(a.cfg.Key)
+	if now.Sub(a.lastRem) > time.Second {
+		a.lastRem = now
+		a.checkReminders(now)
+	}
+	if a.panel != nil {
+		a.panel.flush()
+	}
 	a.brain.Tick(now, a.userIdle())
 	if a.voice != nil {
 		a.voice.SetSpeaking(a.brain.Speaking())
@@ -695,6 +738,9 @@ func (a *app) menu() {
 		cmdNormal
 		cmdLots
 		cmdQuit
+		cmdAsk
+		cmdPair
+		cmdOllama
 	)
 	check := func(on bool) uintptr {
 		if on {
@@ -711,6 +757,14 @@ func (a *app) menu() {
 	add(sub, check(a.cfg.Chattiness >= 0.3 && a.cfg.Chattiness < 0.6), cmdNormal, "Normale")
 	add(sub, check(a.cfg.Chattiness >= 0.6), cmdLots, "Tanto")
 	m, _, _ := pCreatePopupMenu.Call()
+	add(m, 0, cmdAsk, "Chiedi a Silver…\tCtrl+Alt+S")
+	if a.cfg.Key == "" {
+		add(m, 0, cmdPair, "Collega a TwitchGestor")
+	}
+	if a.cfg.Model == "" {
+		add(m, 0, cmdOllama, "Scarica l'IA gratuita (Ollama)…")
+	}
+	add(m, mfSeparator, 0, "")
 	add(m, check(a.cfg.Enabled), cmdEnabled, "Silver attivo")
 	add(m, check(a.cfg.Voice), cmdVoice, "Voce")
 	add(m, mfPopup, sub, "Quanto parla da solo")
@@ -752,6 +806,13 @@ func (a *app) menu() {
 	case cmdLittle, cmdNormal, cmdLots:
 		a.cfg.Chattiness = map[uintptr]float64{cmdLittle: 0.15, cmdNormal: 0.4, cmdLots: 0.75}[cmd]
 		a.brain.Chattiness = a.cfg.Chattiness
+	case cmdAsk:
+		a.showPanel()
+	case cmdPair:
+		a.cfg.PairDenied = false
+		a.pair(true)
+	case cmdOllama:
+		openURL("https://ollama.com/download")
 	case cmdQuit:
 		a.brain.GameMode = "talk"
 		a.brain.Say(now, bye, "", "", nil)
@@ -826,6 +887,13 @@ func wndProc(hwnd, message, wparam, lparam uintptr) uintptr {
 		return 0
 	case wmShowMenu:
 		a.menu()
+		return 0
+	case wmHotkey:
+		if a.panelVisible() {
+			a.hidePanel()
+		} else {
+			a.showPanel()
+		}
 		return 0
 	case wmDestroy:
 		pShellNotifyIcon.Call(nimDelete, uintptr(unsafe.Pointer(&a.tray)))

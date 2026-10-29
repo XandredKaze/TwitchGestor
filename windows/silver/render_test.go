@@ -122,4 +122,25 @@ func TestFotogrammi(t *testing.T) {
 	if b.Speaking() {
 		t.Fatal("in live non deve usare la voce")
 	}
+
+	// promemoria con i pulsanti, anche se in quel gioco l'hai fatto sparire; e "Ci penso…"
+	b = NewBrain(9)
+	b.GameChoices["eldenring.exe"] = "hide"
+	b.SetContext(t0, Context{ID: "game", Name: "Elden Ring", Key: "eldenring.exe"})
+	b.Alert(t0, "⏰ bere un bicchiere d'acqua", []Action{{"Fatto", "x:done"}, {"Tra 10 minuti", "x:snooze"}})
+	var chosen string
+	b.OnAction = func(c string) { chosen = c }
+	img, h = frame(b, t0.Add(4*time.Second), 0)
+	save("7-promemoria", img)
+	if len(h.Buttons) != 2 {
+		t.Fatal("promemoria senza pulsanti")
+	}
+	b.Choose(t0.Add(4*time.Second), 1)
+	if chosen != "x:snooze" || b.Hidden() != true {
+		t.Fatal("scelta", chosen)
+	}
+	b = NewBrain(10)
+	b.Thinking = "Ci penso…"
+	img, _ = frame(b, t0.Add(time.Second), 0)
+	save("8-ci-penso", img)
 }

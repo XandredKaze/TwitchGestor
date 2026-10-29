@@ -268,7 +268,7 @@ func (r *Renderer) Render(now time.Time, mono float64, b *Brain) (*image.RGBA, H
 	img := r.frame
 	clear(img.Pix)
 	var hits Hits
-	if !b.Enabled || b.Hidden() {
+	if !b.Visible() {
 		return img, hits
 	}
 	dt := 1.0 / 30
@@ -352,8 +352,10 @@ func (r *Renderer) Render(now time.Time, mono float64, b *Brain) (*image.RGBA, H
 	hits.Silver = rectF{boxX * s, (winH - boxH - 8) * s, boxW * s, (boxH + 8) * s}
 
 	r.drawProps(img, pose, now, mono)
-	if b.Idle {
-		r.drawIdle(img, b, mono)
+	if b.Thinking != "" && b.Bubble == nil {
+		r.drawPill(img, b.Thinking, "", mono)
+	} else if b.Idle {
+		r.drawPill(img, b.IdleTask, strconv.Itoa(b.IdlePct)+"%", mono)
 	}
 	if bb := b.Bubble; bb != nil {
 		// il fumetto si ridisegna solo quando cambia (lettera nuova, cursore, comparsa, casella)
@@ -433,11 +435,10 @@ func (r *Renderer) chipW(img *image.RGBA, x, y float64, text string, bg, fg colo
 }
 
 // "finge di lavorare": la pillola con la rotellina e la percentuale
-func (r *Renderer) drawIdle(img *image.RGBA, b *Brain, mono float64) {
+// drawPill: la pastiglia con la rotellina (finta attività, "ci penso…")
+func (r *Renderer) drawPill(img *image.RGBA, text, pct string, mono float64) {
 	s := r.Scale
 	f := r.face("regular", 12)
-	text := b.IdleTask
-	pct := strconv.Itoa(b.IdlePct) + "%"
 	tw := float64(font.MeasureString(f, text).Ceil())
 	pw := float64(font.MeasureString(f, pct).Ceil())
 	x, y, h := 130*s, (winH-64-26)*s, 26*s

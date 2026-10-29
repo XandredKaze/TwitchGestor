@@ -1417,6 +1417,8 @@ html:root[data-ui="brutal"] {
 .sys-silver { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; border: 1px dashed var(--border); }
 .sys-silver-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sys-silver-row > span { flex: 1; min-width: 200px; }
+.sys-silver-sub { margin-top: 6px; }
+.sys-silver-ask { padding: 6px 8px; border-radius: 8px; background: var(--inset); border: 1px solid var(--accent); }
 
 /* ===== Overlay (grafiche delle scene di OBS) ===== */
 .ov-tab { max-width: 1480px; margin: 0 auto; padding: 12px 16px 80px; display: grid; gap: 12px; }

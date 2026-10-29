@@ -18,6 +18,7 @@ import { createLogger } from './logger.js';
 import { createOverlayFolder } from './overlayFolder.js';
 import { createMusicFolder } from './musicFolder.js';
 import * as silverAssets from './silverAssets.js';
+import { createSilverLink } from './silverLink.js';
 
 const log = createLogger('server');
 const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
@@ -219,6 +220,7 @@ export function createServer(app) {
   const isAuthorized = (req, url) => !env.DASHBOARD_TOKEN
     || safeEqual(req.headers['x-dashboard-token'] ?? url.searchParams.get('token'), env.DASHBOARD_TOKEN);
 
+  const silver = createSilverLink(app);
   const routes = {
     'GET /api/state': () => app.getState(),
     'POST /api/queue/pause': () => app.manager.pause(),
@@ -274,6 +276,14 @@ export function createServer(app) {
       if (route === 'GET /silver/state') {
         const t = app.music?.player?.current;
         return send(res, 200, { live: Boolean(await app.isLive?.()), song: t ? t.name.replace(/\.[a-z0-9]+$/i, '') : '', assets: silverAssets.versions() });
+      }
+      // collegamento di Silver: il PC chiede, tu consenti in ⚙ Sistema → Tools; poi avvisi e comandi con la sua chiave
+      if (route === 'POST /silver/pair') return send(res, 200, silver.request((await readBody(req, 2000)).pc, req.socket.remoteAddress));
+      if (req.method === 'GET' && /^\/silver\/pair\/[a-f0-9]{24}$/.test(url.pathname)) return send(res, 200, silver.poll(url.pathname.split('/').pop()));
+      if (route === 'GET /silver/feed' || route === 'POST /silver/do') {
+        if (!silver.check(req.headers['x-silver-key'])) return send(res, 401, { error: 'Silver non è collegato' });
+        if (route === 'GET /silver/feed') return send(res, 200, await silver.feed(Number(url.searchParams.get('since')) || 0));
+        return send(res, 200, await silver.run(await readBody(req, 10_000)));
       }
       // la sua immagine e la sua voce (caricate da te in ⚙ Sistema → Tools; restano solo sul Raspberry)
       if (route === 'GET /silver/asset/image' || route === 'GET /silver/asset/voice') {
@@ -716,7 +726,10 @@ export function createServer(app) {
           return send(res, 404, { error: 'Non trovato' });
         }
         // Silver: immagine e voce
-        if (route === 'GET /api/silver') return send(res, 200, silverAssets.versions());
+        if (route === 'GET /api/silver') return send(res, 200, { ...silverAssets.versions(), pending: silver.pending(), devices: silver.devices() });
+        if (route === 'POST /api/silver/allow') { silver.allow(String((await readBody(req)).id ?? '')); return send(res, 200, { pending: silver.pending(), devices: silver.devices() }); }
+        if (route === 'POST /api/silver/deny') { silver.deny(String((await readBody(req)).id ?? '')); return send(res, 200, { pending: silver.pending(), devices: silver.devices() }); }
+        if (route === 'POST /api/silver/unpair') { silver.unpair(String((await readBody(req)).id ?? '')); return send(res, 200, { pending: silver.pending(), devices: silver.devices() }); }
         if (route === 'POST /api/silver/asset') return send(res, 200, await silverAssets.save(req, url.searchParams.get('kind')));
         if (route === 'POST /api/silver/asset/delete') return send(res, 200, silverAssets.remove(url.searchParams.get('kind')));
         if (route === 'POST /api/upload') {

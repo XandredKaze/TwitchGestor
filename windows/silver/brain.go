@@ -30,6 +30,7 @@ type Bubble struct {
 	Actions       []Action
 	Remember      bool
 	RememberLabel string
+	Alert         bool // promemoria e avvisi importanti: si vedono anche se l'hai fatto sparire, e restano finché non clicchi
 
 	runes  []rune
 	start  time.Time
@@ -60,7 +61,10 @@ type Brain struct {
 	IdleTask string
 	IdlePct  int
 
+	Thinking string // "Ci penso…": mentre l'IA risponde
+
 	OnChoicesChanged func()
+	OnAction         func(choice string) // pulsanti dei promemoria e degli avvisi (scelte che non sono dei giochi)
 
 	rnd        *rand.Rand
 	lastSpoke  time.Time
@@ -79,6 +83,34 @@ func (b *Brain) pick(list []string) string { return list[b.rnd.Intn(len(list))] 
 
 // Hidden: in un gioco hai chiesto di farlo sparire
 func (b *Brain) Hidden() bool { return b.GameMode == "hide" }
+
+// Visible: si disegna? (un promemoria si vede sempre, anche se è spento o nascosto)
+func (b *Brain) Visible() bool {
+	if (b.Bubble != nil && b.Bubble.Alert) || b.Thinking != "" {
+		return true
+	}
+	return b.Enabled && !b.Hidden()
+}
+
+// Alert: promemoria o avviso importante (passa sopra a tutto; actions: i pulsanti, es. Fatto / Tra 10 minuti)
+func (b *Brain) Alert(now time.Time, text string, actions []Action) {
+	b.exitIdle()
+	text = noEmoji(text)
+	b.Bubble = &Bubble{Text: text, Label: "promemoria", Actions: actions, Alert: true, runes: []rune(text), start: now, shown: now}
+	b.lastSpoke = now
+}
+
+// Reply: risposta a quello che gli hai scritto (si vede anche se è spento: gliel'hai chiesto tu)
+func (b *Brain) Reply(now time.Time, text string) {
+	b.exitIdle()
+	label := ""
+	if b.Live {
+		label = "live"
+	}
+	text = noEmoji(text)
+	b.Bubble = &Bubble{Text: text, Label: label, Alert: !b.Enabled || b.Hidden(), runes: []rune(text), start: now, shown: now}
+	b.lastSpoke = now
+}
 
 // Pose: l'atteggiamento di Silver (in live vince la live)
 func (b *Brain) Pose() string {
@@ -103,6 +135,7 @@ func (b *Brain) Say(now time.Time, text, source, note string, actions []Action) 
 	} else if b.Ctx.ID != "desktop" {
 		label = b.Ctx.Name
 	}
+	full = noEmoji(full)
 	b.Bubble = &Bubble{Text: full, Source: source, Label: label, Actions: actions, runes: []rune(full), start: now, shown: now}
 	b.lastSpoke = now
 }
@@ -182,6 +215,13 @@ func (b *Brain) Choose(now time.Time, i int) {
 		return
 	}
 	choice := bb.Actions[i].Choice
+	if strings.HasPrefix(choice, "x:") { // non è la domanda sui giochi
+		b.Bubble = nil
+		if b.OnAction != nil {
+			b.OnAction(choice)
+		}
+		return
+	}
 	if bb.Remember && b.Ctx.Key != "" {
 		b.GameChoices[b.Ctx.Key] = choice
 		if b.OnChoicesChanged != nil {
@@ -266,7 +306,9 @@ func (b *Brain) Tick(now time.Time, userIdle time.Duration) {
 			if bb.typed >= len(bb.runes) {
 				bb.typed = len(bb.runes)
 				bb.doneAt = now
-				if len(bb.Actions) > 0 {
+				if bb.Alert && len(bb.Actions) > 0 {
+					bb.hideAt = now.Add(15 * time.Minute) // un promemoria aspetta che torni
+				} else if len(bb.Actions) > 0 {
 					bb.hideAt = now.Add(30 * time.Second)
 				} else {
 					bb.hideAt = now.Add(2500*time.Millisecond + time.Duration(len(bb.runes))*45*time.Millisecond)
@@ -319,4 +361,20 @@ func (b *Brain) Speaking() bool {
 		return false
 	}
 	return !strings.ContainsRune(" .,!?…—\"“”'", bb.runes[bb.typed-1])
+}
+
+// noEmoji: il carattere del fumetto non ha emoji e simboli (⏰ ⚙ 🧰…): si tolgono (le frecce restano)
+func noEmoji(s string) string {
+	var out []rune
+	for _, r := range s {
+		if (r >= 0x2300 && r <= 0x23FF) || (r >= 0x2600 && r <= 0x27BF) || r >= 0x1F000 || r == 0xFE0F || r == 0x200D {
+			continue
+		}
+		out = append(out, r)
+	}
+	lines := strings.Split(string(out), "\n")
+	for i, l := range lines {
+		lines[i] = strings.Join(strings.Fields(l), " ")
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
 }

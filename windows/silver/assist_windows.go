@@ -1,0 +1,461 @@
+//go:build windows
+
+package main
+
+// Le cose utili: quello che gli scrivi (comandi o domande per l'IA), il collegamento con Gestor
+// (avvisi, prossima live, musica, scene, note), i promemoria.
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+const (
+	pairHint  = "Per gli avvisi e i comandi devo collegarmi a TwitchGestor: apri ⚙ Sistema → 🧰 Tools e premi \"Consenti\"."
+	paired    = "Collegato a TwitchGestor. Adesso ti tengo d'occhio anche lì."
+	needPair  = "Prima collegami a TwitchGestor: dal mio menu scegli \"Collega a TwitchGestor\", poi in ⚙ Sistema → 🧰 Tools premi \"Consenti\"."
+	noOllama  = "Per risponderti mi serve l'IA sul tuo PC: Ollama, gratis. Installalo (due clic), poi chiedimi di nuovo."
+	askPull   = "Ollama c'è, ma manca il cervello: lo scarico? Sono circa 3 GB, una volta sola."
+	noGestor  = "Non trovo TwitchGestor. Il Raspberry è acceso?"
+	hotkeyTip = "Scrivimi quando vuoi: Ctrl+Alt+S."
+)
+
+func (a *app) gestorBase() string {
+	b, _ := a.base.Load().(string)
+	return b
+}
+
+// gestorCall: chiamata a Gestor con la chiave di Silver (fuori dal filo della finestra)
+func gestorCall(base, key, method, path string, body any, out any) (int, error) {
+	var rd *bytes.Reader
+	if body != nil {
+		b, _ := json.Marshal(body)
+		rd = bytes.NewReader(b)
+	} else {
+		rd = bytes.NewReader(nil)
+	}
+	req, _ := http.NewRequest(method, base+path, rd)
+	req.Header.Set("Content-Type", "application/json")
+	if key != "" {
+		req.Header.Set("x-silver-key", key)
+	}
+	res, err := (&http.Client{Timeout: 8 * time.Second}).Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer res.Body.Close()
+	if out != nil {
+		_ = json.NewDecoder(res.Body).Decode(out)
+	}
+	return res.StatusCode, nil
+}
+
+// ---------- collegamento con Gestor ----------
+
+// pair: chiede il permesso a Gestor e aspetta "Consenti" (al massimo 10 minuti)
+func (a *app) pair(announce bool) {
+	if a.pairing {
+		if announce {
+			a.brain.Reply(time.Now(), pairHint)
+		}
+		return
+	}
+	base := a.gestorBase()
+	if base == "" {
+		if announce {
+			a.brain.Reply(time.Now(), noGestor)
+		}
+		return
+	}
+	a.pairing = true
+	if announce || !a.cfg.PairHintShown {
+		a.cfg.PairHintShown = true
+		a.cfg.save()
+		wait := 2 * time.Second
+		if !announce {
+			wait = 12 * time.Second // all'avvio: dopo il saluto
+		}
+		go func() {
+			time.Sleep(wait)
+			a.post <- func() { a.brain.Reply(time.Now(), pairHint) }
+		}()
+	}
+	pc, _ := os.Hostname()
+	go func() {
+		var r struct {
+			ID string `json:"id"`
+		}
+		if code, err := gestorCall(base, "", "POST", "/silver/pair", map[string]string{"pc": pc}, &r); err != nil || code != 200 || r.ID == "" {
+			a.post <- func() { a.pairing = false }
+			return
+		}
+		for i := 0; i < 200; i++ {
+			time.Sleep(3 * time.Second)
+			var st struct {
+				Status string `json:"status"`
+				Key    string `json:"key"`
+			}
+			if _, err := gestorCall(base, "", "GET", "/silver/pair/"+r.ID, nil, &st); err != nil {
+				continue
+			}
+			switch st.Status {
+			case "ok":
+				a.post <- func() {
+					a.pairing = false
+					a.cfg.Key, a.cfg.PairDenied = st.Key, false
+					a.cfg.save()
+					a.brain.Reply(time.Now(), paired+" "+hotkeyTip)
+				}
+				return
+			case "denied", "gone":
+				a.post <- func() {
+					a.pairing = false
+					if st.Status == "denied" {
+						a.cfg.PairDenied = true
+						a.cfg.save()
+					}
+				}
+				return
+			}
+		}
+		a.post <- func() { a.pairing = false }
+	}()
+}
+
+// watchFeed: avvisi e prossima live da Gestor (ogni 10 secondi, quando è collegato)
+func (a *app) watchFeed() {
+	for {
+		time.Sleep(10 * time.Second)
+		base, key := a.gestorBase(), a.feedKey.Load()
+		k, _ := key.(string)
+		if base == "" || k == "" {
+			continue
+		}
+		var f Feed
+		code, err := gestorCall(base, k, "GET", "/silver/feed?since=0", nil, &f)
+		if err != nil {
+			continue
+		}
+		if code == 401 { // scollegato da Gestor
+			a.post <- func() {
+				if a.cfg.Key == k {
+					a.cfg.Key = ""
+					a.cfg.save()
+				}
+			}
+			continue
+		}
+		if code == 200 {
+			a.post <- func() { a.onFeed(f) }
+		}
+	}
+}
+
+func (a *app) onFeed(f Feed) {
+	a.feed = &f
+	now := time.Now()
+	events, alerts := a.watch.Lines(f, now, a.rnd)
+	for _, t := range alerts {
+		a.brain.Alert(now, t, nil)
+	}
+	if len(alerts) > 0 {
+		return
+	}
+	if quiet := a.brain.Ctx.ID == "game" && a.brain.GameMode == "quiet"; len(events) > 0 && !quiet && (a.brain.Bubble == nil || !a.brain.Bubble.Alert) {
+		if len(events) > 2 { // tanti insieme: uno solo
+			a.brain.Say(now, fmt.Sprintf("%s E altri %d avvisi.", events[len(events)-1], len(events)-1), "", "", nil)
+		} else {
+			a.brain.Say(now, strings.Join(events, " "), "", "", nil)
+		}
+	}
+}
+
+// ---------- promemoria ----------
+
+func (a *app) checkReminders(now time.Time) {
+	if len(a.cfg.Reminders) == 0 || (a.brain.Bubble != nil && a.brain.Bubble.Alert) {
+		return
+	}
+	due, rest := dueReminders(a.cfg.Reminders, now)
+	if len(due) == 0 {
+		return
+	}
+	r := due[0] // uno alla volta: gli altri al prossimo giro
+	a.cfg.Reminders = append(rest, due[1:]...)
+	a.cfg.save()
+	a.lastAlert = r.Text
+	a.brain.Alert(now, "⏰ "+r.Text, []Action{{"Fatto", "x:done"}, {"Tra 10 minuti", "x:snooze"}})
+	if a.panel != nil {
+		a.panel.add("Silver: ⏰ " + r.Text)
+	}
+}
+
+func (a *app) addReminder(at time.Time, text string) {
+	a.cfg.Reminders = append(a.cfg.Reminders, Reminder{ID: strconv.FormatInt(time.Now().UnixNano(), 36), At: at.UnixMilli(), Text: text})
+	a.cfg.save()
+}
+
+func (a *app) onAction(choice string) {
+	now := time.Now()
+	switch choice {
+	case "x:snooze":
+		a.addReminder(now.Add(10*time.Minute), a.lastAlert)
+		a.brain.Reply(now, "Va bene, tra 10 minuti te lo ridico.")
+	case "x:done":
+		a.brain.Reply(now, a.pick([]string{"Bene.", "Visto? Non era difficile.", "Uno in meno."}))
+	case "x:ollama":
+		openURL("https://ollama.com/download")
+	case "x:pull":
+		a.pullModel()
+	case "x:nopull":
+		a.pendingQ = ""
+	}
+}
+
+func (a *app) pick(list []string) string { return list[a.rnd.Intn(len(list))] }
+
+// ---------- quello che gli scrivi ----------
+
+func (a *app) submitPanel() {
+	text := a.panel.takeInput()
+	if text == "" {
+		return
+	}
+	a.panel.add("Tu: " + text)
+	a.handleInput(text)
+}
+
+// reply: risponde nel fumetto e nella finestra
+func (a *app) reply(text string) {
+	if a.panel != nil {
+		a.panel.add("Silver: " + text)
+	}
+	a.brain.Reply(time.Now(), short(text, 170))
+}
+
+func (a *app) handleInput(text string) {
+	now := time.Now()
+	c := ParseCommand(text, now)
+	switch c.Kind {
+	case "help":
+		if a.panel != nil {
+			a.panel.add("Silver: " + helpText)
+		}
+		a.brain.Reply(now, "Ecco cosa so fare. Leggi nella finestra.")
+	case "time":
+		a.reply("Sono le " + now.Format("15:04") + ". " + a.pick([]string{"Il tempo vola, tu un po' meno.", "Fai tu.", ""}))
+	case "remind":
+		a.addReminder(c.At, c.Text)
+		a.reply(fmt.Sprintf("Va bene: %s ti ricordo \"%s\".", whenText(c.At, now), c.Text))
+	case "reminders":
+		a.reply(remindersText(a.cfg.Reminders, now))
+	case "clear":
+		n := len(a.cfg.Reminders)
+		a.cfg.Reminders = nil
+		a.cfg.save()
+		a.reply(fmt.Sprintf("Cancellati %d promemoria.", n))
+	case "nextlive":
+		if a.feed == nil {
+			if a.cfg.Key == "" {
+				a.reply(needPair)
+			} else {
+				a.reply("Non ho ancora sentito TwitchGestor. Riprova tra poco.")
+			}
+			return
+		}
+		if t := nextLiveText(a.feed, now); t != "" {
+			a.reply("Prossima live: " + t + ".")
+		} else {
+			a.reply("Nessuna live in programma. Aggiungine una in Programmazione (o in Howl-UP).")
+		}
+	case "open":
+		host := "twitchgestor"
+		if u, err := url.Parse(a.gestorBase()); err == nil && u.Hostname() != "" {
+			host = u.Hostname()
+		}
+		switch c.Text {
+		case "gestor":
+			openURL("http://" + host + ":3000/dashboard")
+		case "howlup":
+			openURL("http://" + host + ":3100/")
+		case "musicante":
+			openURL("http://" + host + ":3200/")
+		case "ollama":
+			openURL("https://ollama.com/download")
+		}
+		a.reply("Aperto.")
+	case "note", "music", "scene":
+		a.gestorDo(c)
+	default:
+		a.askAI(text)
+	}
+}
+
+// gestorDo: musica, scena, nota (passano da Gestor)
+func (a *app) gestorDo(c Command) {
+	base, key := a.gestorBase(), a.cfg.Key
+	if base == "" {
+		a.reply(noGestor)
+		return
+	}
+	if key == "" {
+		a.reply(needPair)
+		a.pair(false)
+		return
+	}
+	body := map[string]string{"action": c.Kind}
+	switch c.Kind {
+	case "note":
+		body["text"] = c.Text
+	case "music":
+		body["what"] = c.Text
+	case "scene":
+		body["scene"] = c.Text
+	}
+	go func() {
+		var r struct {
+			Text  string `json:"text"`
+			Error string `json:"error"`
+		}
+		code, err := gestorCall(base, key, "POST", "/silver/do", body, &r)
+		a.post <- func() {
+			switch {
+			case err != nil:
+				a.reply(noGestor)
+			case code == 401:
+				a.cfg.Key = ""
+				a.cfg.save()
+				a.reply(needPair)
+			case r.Error != "":
+				a.reply(r.Error)
+			default:
+				a.reply(r.Text)
+			}
+		}
+	}()
+}
+
+// ---------- IA (Ollama sul PC) ----------
+
+func (a *app) askAI(q string) {
+	if a.aiBusy {
+		a.reply("Un attimo: sto ancora pensando alla domanda di prima.")
+		return
+	}
+	a.aiBusy = true
+	a.brain.Thinking = "Ci penso…"
+	ctxInfo, live, next := a.brain.Ctx, a.brain.Live, nextLiveText(a.feed, time.Now())
+	history := append([]chatMsg(nil), a.history...)
+	go func() {
+		ok, models := a.ai.Detect(context.Background())
+		model := pickModel(models, a.cfg.Model)
+		if !ok || model == "" {
+			a.post <- func() {
+				a.aiBusy = false
+				a.brain.Thinking = ""
+				now := time.Now()
+				if !ok {
+					a.panelLine("Silver: " + noOllama)
+					a.brain.Alert(now, noOllama, []Action{{"Apri la pagina di Ollama", "x:ollama"}})
+				} else {
+					a.pendingQ = q
+					a.panelLine("Silver: " + askPull)
+					a.brain.Alert(now, askPull, []Action{{"Sì, scarica", "x:pull"}, {"No", "x:nopull"}})
+				}
+			}
+			return
+		}
+		a.ai.Model = model
+		msgs := append([]chatMsg{{"system", systemPrompt(time.Now(), ctxInfo, live, next)}}, history...)
+		msgs = append(msgs, chatMsg{"user", q})
+		a.post <- func() { a.panelLine("Silver: ") }
+		answer, err := a.ai.Chat(context.Background(), msgs, func(tok string) {
+			a.post <- func() {
+				if a.panel != nil {
+					a.panel.appendLast(tok)
+				}
+			}
+		})
+		answer = strings.TrimSpace(plain(answer))
+		a.post <- func() {
+			a.aiBusy = false
+			a.brain.Thinking = ""
+			if err != nil && answer == "" {
+				a.panelSetLast("Silver: Non riesco a pensare: " + err.Error())
+				a.brain.Reply(time.Now(), "Qualcosa non va con l'IA. Dettagli nella finestra.")
+				return
+			}
+			if a.panel != nil {
+				a.panel.setLast("Silver: " + answer)
+				a.panel.lastAnswer = answer
+			}
+			a.history = append(a.history, chatMsg{"user", q}, chatMsg{"assistant", answer})
+			if len(a.history) > 8 {
+				a.history = a.history[len(a.history)-8:]
+			}
+			a.brain.Reply(time.Now(), short(answer, 170))
+		}
+	}()
+}
+
+func (a *app) panelLine(s string) {
+	if a.panel != nil {
+		a.panel.add(s)
+	}
+}
+
+func (a *app) panelSetLast(s string) {
+	if a.panel != nil {
+		a.panel.setLast(s)
+	}
+}
+
+// pullModel: scarica il modello (una volta sola), poi risponde alla domanda rimasta in sospeso
+func (a *app) pullModel() {
+	if a.aiBusy {
+		return
+	}
+	a.aiBusy = true
+	a.brain.Thinking = "Scarico il cervello…"
+	a.panelLine("Silver: Scarico " + defaultModel + "…")
+	go func() {
+		last := time.Time{}
+		err := a.ai.Pull(context.Background(), defaultModel, func(f float64, status string) {
+			if time.Since(last) < 500*time.Millisecond || f < 0 {
+				return
+			}
+			last = time.Now()
+			pct := int(f * 100)
+			a.post <- func() {
+				a.brain.Thinking = fmt.Sprintf("Scarico il cervello… %d%%", pct)
+				a.panelSetLast(fmt.Sprintf("Silver: Scarico %s… %d%%", defaultModel, pct))
+			}
+		})
+		a.post <- func() {
+			a.aiBusy = false
+			a.brain.Thinking = ""
+			if err != nil {
+				a.panelSetLast("Silver: Download non riuscito: " + err.Error())
+				a.brain.Reply(time.Now(), "Il download non è andato. Riprova più tardi.")
+				return
+			}
+			a.cfg.Model = defaultModel
+			a.cfg.save()
+			a.panelSetLast("Silver: Fatto, ho il cervello. Adesso ragiono.")
+			if q := a.pendingQ; q != "" {
+				a.pendingQ = ""
+				a.askAI(q)
+			} else {
+				a.brain.Reply(time.Now(), "Fatto. Adesso puoi chiedermi quello che vuoi.")
+			}
+		}
+	}()
+}
