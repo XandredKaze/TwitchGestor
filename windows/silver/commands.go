@@ -36,6 +36,8 @@ var (
 	rePrevWords  = regexp.MustCompile(`\b(precedente|prima|indietro|torna)\b`)
 	rePauseWords = regexp.MustCompile(`\b(ferma|fermare|pausa|stop|basta|spegni|zitta)\b`)
 	rePlayWords  = regexp.MustCompile(`\b(metti|suona|accendi|fai partire|riprendi|play|ascoltare|ascolta)\b`)
+	reVolUp      = regexp.MustCompile(`^(?:alza|alzare|aumenta|più alto|piu alto|più forte|piu forte)(?: il volume| la musica| un po'?)*$`)
+	reVolDown    = regexp.MustCompile(`^(?:abbassa|abbassare|diminuisci|più basso|piu basso|più piano|piu piano)(?: il volume| la musica| un po'?)*$`)
 	reNotMusic   = regexp.MustCompile(`(?i)\b(timer|promemoria|sveglia|scena|nota)\b`)
 	reLead       = regexp.MustCompile(`(?i)^\s*(?:di|che|a|:|-)\s+`)
 )
@@ -118,7 +120,7 @@ func ParseCommand(text string, now time.Time) Command {
 	}
 	m = strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(m, "musica:"), "musica "), "player "))
 	m = strings.TrimSuffix(strings.TrimSuffix(m, " la musica"), " musica")
-	music := map[string]string{"pausa": "pause", "stop": "pause", "ferma": "pause", "ferma la musica": "pause", "metti in pausa": "pause", "play": "play", "riprendi": "play", "metti": "play", "suona": "play", "metti la musica": "play", "fai partire": "play", "avanti": "next", "prossima": "next", "salta": "next", "prossimo brano": "next", "prossima canzone": "next", "brano successivo": "next", "cambia canzone": "next", "indietro": "prev", "precedente": "prev", "brano precedente": "prev", "canzone precedente": "prev"}
+	music := map[string]string{"pausa": "pause", "stop": "pause", "ferma": "pause", "ferma la musica": "pause", "metti in pausa": "pause", "metti pausa": "pause", "fermati": "pause", "stoppa": "pause", "fermala": "pause", "skippa": "next", "skip": "next", "next": "next", "rimetti": "play", "riparti": "play", "fai ripartire": "play", "play": "play", "riprendi": "play", "metti": "play", "suona": "play", "metti la musica": "play", "fai partire": "play", "avanti": "next", "prossima": "next", "salta": "next", "prossimo brano": "next", "prossima canzone": "next", "brano successivo": "next", "cambia canzone": "next", "indietro": "prev", "precedente": "prev", "brano precedente": "prev", "canzone precedente": "prev"}
 	if v, ok := music[m]; ok {
 		return Command{Kind: "music", Text: v, Where: where}
 	}
@@ -140,6 +142,12 @@ func ParseCommand(text string, now time.Time) Command {
 		case rePlayWords.MatchString(m) && len([]rune(m)) <= 30:
 			return Command{Kind: "music", Text: "play", Where: where}
 		}
+	}
+	switch {
+	case reVolUp.MatchString(m):
+		return Command{Kind: "music", Text: "volume", Arg: "+15", Where: where}
+	case reVolDown.MatchString(m):
+		return Command{Kind: "music", Text: "volume", Arg: "-15", Where: where}
 	}
 	if g := reVolume.FindStringSubmatch(low); g != nil {
 		return Command{Kind: "music", Text: "volume", Arg: g[1], Where: where}

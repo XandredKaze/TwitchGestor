@@ -14,8 +14,31 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
+	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
+
+// playerRunning: Musicante Player è aperto? (anche se è una versione vecchia senza telecomando)
+func playerRunning() bool {
+	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
+	if err != nil {
+		return false
+	}
+	defer windows.CloseHandle(snap)
+	var pe windows.ProcessEntry32
+	pe.Size = uint32(unsafe.Sizeof(pe))
+	for err = windows.Process32First(snap, &pe); err == nil; err = windows.Process32Next(snap, &pe) {
+		if strings.EqualFold(windows.UTF16ToString(pe.ExeFile[:]), "MusicantePlayer.exe") {
+			return true
+		}
+	}
+	return false
+}
+
+const oldPlayer = "Musicante Player è aperto ma è una versione vecchia, che non si lascia comandare. Chiudilo e riscarica MusicantePlayer.exe da TwitchGestor (⚙ Sistema → 🧰 Tools), poi riaprilo: da lì in poi lo comando io."
 
 const playerURL = "http://127.0.0.1:47321"
 
@@ -119,6 +142,14 @@ func (a *app) musicCmd(c Command) {
 	go func() {
 		var st playerState
 		open := playerCall("GET", "/state", nil, &st)
+		if !open && playerRunning() {
+			// aperto ma senza telecomando (scaricato prima della 1.50): niente musica della live al suo posto
+			time.Sleep(1500 * time.Millisecond) // magari si sta ancora aprendo
+			if open = playerCall("GET", "/state", nil, &st); !open {
+				a.post <- func() { a.reply(oldPlayer) }
+				return
+			}
+		}
 		if !open {
 			// non è aperto: pausa/avanti/indietro vanno alla musica della live; per il resto si apre il Player
 			if c.Text == "pause" || c.Text == "next" || c.Text == "prev" || c.Text == "toggle" {
@@ -150,7 +181,10 @@ func (a *app) musicCmd(c Command) {
 		case "find":
 			cmd["query"] = c.Arg
 		case "volume":
-			v, _ := strconv.Atoi(c.Arg)
+			v, _ := strconv.Atoi(strings.TrimPrefix(c.Arg, "+"))
+			if strings.HasPrefix(c.Arg, "+") || strings.HasPrefix(c.Arg, "-") { // "alza il volume": un po' più su
+				v += st.Volume
+			}
 			cmd["value"] = min(100, max(0, v))
 		}
 		var res struct {
@@ -159,7 +193,7 @@ func (a *app) musicCmd(c Command) {
 			State playerState `json:"state"`
 		}
 		if !playerCall("POST", "/cmd", cmd, &res) {
-			a.post <- func() { a.reply("Musicante Player non risponde.") }
+			a.post <- func() { a.reply("Musicante Player non risponde. Prova a chiuderlo e riaprirlo.") }
 			return
 		}
 		text := res.Text
@@ -183,6 +217,10 @@ func (a *app) musicCmd(c Command) {
 func (a *app) launchPlayer() {
 	if playerCall("GET", "/state", nil, nil) {
 		a.reply("Musicante Player è già aperto.")
+		return
+	}
+	if playerRunning() {
+		a.reply(oldPlayer)
 		return
 	}
 	exe := playerExe()
