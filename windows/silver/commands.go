@@ -20,18 +20,24 @@ type Command struct {
 }
 
 var (
-	reRemind   = regexp.MustCompile(`(?i)^(?:ricordami|ricordarmi|promemoria|avvisami|dimmi)\b\s*(.*)$`)
-	reIn       = regexp.MustCompile(`(?i)\btra\s+(?:(un|una|mezz|\d+(?:[.,]\d+)?)\s*'?\s*)(secondi|secondo|sec|s|minuti|minuto|min|m|ore|ora|h)\b`)
-	reInHalf   = regexp.MustCompile(`(?i)\btra\s+mezz\s*'?\s*ora\b`)
-	reAt       = regexp.MustCompile(`(?i)\b(?:(domani)\s+)?(?:alle|all'|alle ore|a)\s*(\d{1,2})(?:[:.](\d{2}))?\b`)
-	reTimer    = regexp.MustCompile(`(?i)^(?:(?:metti|imposta|fai partire|avvia)\s+(?:un\s+)?)?(?:timer|countdown|conto alla rovescia)\s*(?:di\s+)?(\d+(?:[.,]\d+)?)?\s*(secondi|secondo|sec|s|minuti|minuto|min|m|ore|ora|h)?\s*(.*)$`)
-	reNote     = regexp.MustCompile(`(?i)^(?:nota|note|appunta|appuntati|annota|segna|segnati)\b\s*(?:che\s+)?:?\s*(.+)$`)
-	reScene    = regexp.MustCompile(`(?i)^(?:scena|passa alla scena|vai alla scena|metti la scena|cambia scena(?: in| a)?)\s+(.+)$`)
-	reOpen     = regexp.MustCompile(`(?i)^apri\s+(?:il\s+|la\s+)?(musicante\s*player|il player|player|twitch\s*gestor|gestor|howl[\s-]?up|musicante|ollama)\b`)
-	reVolume   = regexp.MustCompile(`^(?:musica\s+)?(?:volume|vol)\s*(?:a|al)?\s*(\d{1,3})\s*%?$`)
-	reFind     = regexp.MustCompile(`(?i)^(?:metti|suona|ascolta|riproduci|fammi sentire|voglio sentire|play)\s+(?:un po' di\s+|qualcosa di\s+|la playlist\s+|le canzoni di\s+|i brani di\s+|musica di\s+|la canzone\s+)?(.+)$`)
-	reNotMusic = regexp.MustCompile(`(?i)\b(timer|promemoria|sveglia|scena|nota)\b`)
-	reLead     = regexp.MustCompile(`(?i)^\s*(?:di|che|a|:|-)\s+`)
+	reRemind     = regexp.MustCompile(`(?i)^(?:ricordami|ricordarmi|promemoria|avvisami|dimmi)\b\s*(.*)$`)
+	reIn         = regexp.MustCompile(`(?i)\btra\s+(?:(un|una|mezz|\d+(?:[.,]\d+)?)\s*'?\s*)(secondi|secondo|sec|s|minuti|minuto|min|m|ore|ora|h)\b`)
+	reInHalf     = regexp.MustCompile(`(?i)\btra\s+mezz\s*'?\s*ora\b`)
+	reAt         = regexp.MustCompile(`(?i)\b(?:(domani)\s+)?(?:alle|all'|alle ore|a)\s*(\d{1,2})(?:[:.](\d{2}))?\b`)
+	reTimer      = regexp.MustCompile(`(?i)^(?:(?:metti|imposta|fai partire|avvia)\s+(?:un\s+)?)?(?:timer|countdown|conto alla rovescia)\s*(?:di\s+)?(\d+(?:[.,]\d+)?)?\s*(secondi|secondo|sec|s|minuti|minuto|min|m|ore|ora|h)?\s*(.*)$`)
+	reNote       = regexp.MustCompile(`(?i)^(?:nota|note|appunta|appuntati|annota|segna|segnati)\b\s*(?:che\s+)?:?\s*(.+)$`)
+	reScene      = regexp.MustCompile(`(?i)^(?:scena|passa alla scena|vai alla scena|metti la scena|cambia scena(?: in| a)?)\s+(.+)$`)
+	reOpen       = regexp.MustCompile(`(?i)^apri\s+(?:il\s+|la\s+)?(musicante\s*player|il player|player|twitch\s*gestor|gestor|howl[\s-]?up|musicante|ollama)\b`)
+	reVolume     = regexp.MustCompile(`^(?:musica\s+)?(?:volume|vol)\s*(?:a|al)?\s*(\d{1,3})\s*%?$`)
+	reFind       = regexp.MustCompile(`(?i)^(?:metti|suona|ascolta|riproduci|fammi sentire|voglio sentire|play)\s+(?:un po' di\s+|qualcosa di\s+|la playlist\s+|le canzoni di\s+|i brani di\s+|musica di\s+|la canzone\s+)?(.+)$`)
+	rePlaylist   = regexp.MustCompile(`(?:dalla|della|nella|alla|la|una|sulla|mia|dalle)\s+playlist\s+(.+)$`)
+	reSong       = regexp.MustCompile(`\b(canzone|canzoni|brano|brani|traccia|pezzo|musica|song)\b`)
+	reNextWords  = regexp.MustCompile(`\b(cambia|cambiare|passa|passare|salta|saltare|altra|altro|prossim[ao]|successiv[ao]|avanti|skippa|skip)\b`)
+	rePrevWords  = regexp.MustCompile(`\b(precedente|prima|indietro|torna)\b`)
+	rePauseWords = regexp.MustCompile(`\b(ferma|fermare|pausa|stop|basta|spegni|zitta)\b`)
+	rePlayWords  = regexp.MustCompile(`\b(metti|suona|accendi|fai partire|riprendi|play|ascoltare|ascolta)\b`)
+	reNotMusic   = regexp.MustCompile(`(?i)\b(timer|promemoria|sveglia|scena|nota)\b`)
+	reLead       = regexp.MustCompile(`(?i)^\s*(?:di|che|a|:|-)\s+`)
 )
 
 func unitDur(n float64, unit string) time.Duration {
@@ -119,6 +125,22 @@ func ParseCommand(text string, now time.Time) Command {
 	if low == "musica" {
 		return Command{Kind: "music", Text: "toggle"}
 	}
+	// frasi più libere: "cambia canzone dalla playlist Alf", "metti qualcosa della playlist Chill", "un'altra canzone"
+	if g := rePlaylist.FindStringSubmatch(m); g != nil && !reNotMusic.MatchString(m) {
+		return Command{Kind: "music", Text: "find", Arg: "playlist " + strings.TrimSpace(strings.Trim(g[1], " .!?\"'")), Where: where}
+	}
+	if reSong.MatchString(m) && !reNotMusic.MatchString(m) {
+		switch {
+		case reNextWords.MatchString(m):
+			return Command{Kind: "music", Text: "next", Where: where}
+		case rePrevWords.MatchString(m):
+			return Command{Kind: "music", Text: "prev", Where: where}
+		case rePauseWords.MatchString(m):
+			return Command{Kind: "music", Text: "pause", Where: where}
+		case rePlayWords.MatchString(m) && len([]rune(m)) <= 30:
+			return Command{Kind: "music", Text: "play", Where: where}
+		}
+	}
 	if g := reVolume.FindStringSubmatch(low); g != nil {
 		return Command{Kind: "music", Text: "volume", Arg: g[1], Where: where}
 	}
@@ -126,7 +148,12 @@ func ParseCommand(text string, now time.Time) Command {
 		return Command{Kind: "music", Text: "now", Where: where}
 	}
 	if g := reFind.FindStringSubmatch(t); g != nil && !reNotMusic.MatchString(g[1]) {
-		return Command{Kind: "music", Text: "find", Arg: strings.TrimSpace(g[1])}
+		arg := strings.TrimSpace(g[1])
+		switch strings.ToLower(strings.Trim(arg, " .!?")) {
+		case "musica", "la musica", "qualcosa", "un po' di musica", "un po di musica", "della musica", "una canzone", "un brano":
+			return Command{Kind: "music", Text: "play"}
+		}
+		return Command{Kind: "music", Text: "find", Arg: arg}
 	}
 	if g := reScene.FindStringSubmatch(t); g != nil {
 		return Command{Kind: "scene", Text: strings.TrimSpace(g[1])}

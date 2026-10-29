@@ -30,6 +30,12 @@ func TestComandi(t *testing.T) {
 		{"Prossima", "music", "next", time.Time{}},
 		{"metti in pausa la musica", "music", "pause", time.Time{}},
 		{"metti Linkin Park", "music", "find", time.Time{}},
+		{"cambia canzone dalla playlist Alf", "music", "find", time.Time{}},
+		{"puoi cambiare canzone?", "music", "next", time.Time{}},
+		{"metti un'altra canzone", "music", "next", time.Time{}},
+		{"torna alla canzone di prima", "music", "prev", time.Time{}},
+		{"ferma la canzone", "music", "pause", time.Time{}},
+		{"metti un po' di musica", "music", "play", time.Time{}},
 		{"volume 40", "music", "volume", time.Time{}},
 		{"che canzone è?", "music", "now", time.Time{}},
 		{"apri musicante player", "open", "player", time.Time{}},
@@ -57,7 +63,10 @@ func TestComandi(t *testing.T) {
 			t.Errorf("%q → %+v (volevo %s %q %v)", c.in, got, c.kind, c.text, c.at)
 		}
 	}
-	if c := ParseCommand("metti la playlist Chill", now); c.Arg != "Chill" || c.Where != "" {
+	if c := ParseCommand("cambia canzone dalla playlist Alf", now); c.Arg != "playlist alf" {
+		t.Errorf("%+v", c)
+	}
+	if c := ParseCommand("metti la playlist Chill", now); c.Arg != "playlist chill" || c.Where != "" {
 		t.Errorf("%+v", c)
 	}
 	if c := ParseCommand("pausa la musica della live", now); c.Text != "pause" || c.Where != "live" {

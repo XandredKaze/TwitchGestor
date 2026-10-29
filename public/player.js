@@ -253,11 +253,21 @@
   };
   const norm = (x) => String(x).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
   function remoteFind(q) {
-    const want = norm(q);
+    let want = norm(q);
+    const onlyPlaylist = want.startsWith('playlist ');
+    if (onlyPlaylist) want = want.slice(9).trim();
     if (!want) return { ok: false, text: 'Cosa metto?' };
     // prima una playlist, poi brani per titolo o artista
-    const pl = playlists().find((p) => p.id !== ALL && norm(p.name) === want) ?? playlists().find((p) => p.id !== ALL && norm(p.name).includes(want));
-    if (pl) { shown = pl.id; playPlaylist(pl.id); renderPlaylists(); return { ok: true, text: `Playlist ${pl.name}.` }; }
+    const lists = playlists().filter((p) => p.id !== ALL);
+    const pl = lists.find((p) => norm(p.name) === want) ?? lists.find((p) => norm(p.name).includes(want)) ?? lists.find((p) => want.includes(norm(p.name)));
+    if (pl) {
+      // "cambia canzone dalla playlist X" mentre X sta già suonando: la canzone dopo
+      if (playlistOfQueue === pl.id && current()) { next(false); const i = infoOf(current()); return { ok: true, text: `${pl.name}: ${i.title}${i.artist ? ` di ${i.artist}` : ''}.` }; }
+      shown = pl.id; playPlaylist(pl.id); renderPlaylists();
+      const i = current() ? infoOf(current()) : null;
+      return { ok: true, text: `Playlist ${pl.name}${i ? `: ${i.title}${i.artist ? ` di ${i.artist}` : ''}` : ''}.` };
+    }
+    if (onlyPlaylist) return { ok: false, text: `Non trovo la playlist "${q.replace(/^playlist\s+/i, '')}". Ho: ${lists.map((p) => p.name).join(', ') || 'nessuna playlist'}.` };
     const words = want.split(' ');
     const hits = tracks.filter((t) => { const i = infoOf(t); const h = norm(`${i.title} ${i.artist} ${t.name}`); return words.every((w) => h.includes(w)); });
     if (!hits.length) return { ok: false, text: `Non trovo "${q}" nella tua musica.` };
