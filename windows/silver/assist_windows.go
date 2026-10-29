@@ -205,7 +205,7 @@ func (a *app) addReminder(at time.Time, text string) {
 
 func (a *app) onAction(choice string) {
 	now := time.Now()
-	if a.launchChoice(choice) || a.fileAction(choice) {
+	if a.launchChoice(choice) || a.fileAction(choice) || a.guardAction(choice) {
 		return
 	}
 	switch choice {
@@ -349,6 +349,12 @@ func (a *app) handleInput(text string) {
 		a.diagnoseMusic()
 	case "launch":
 		a.launchCmd(c.Text)
+	case "briefing":
+		a.briefing()
+	case "weather":
+		a.weatherCmd(c.Text == "tomorrow")
+	case "city":
+		a.setCity(c.Text)
 	case "close":
 		a.closeCmd(c.Text)
 	case "pc":

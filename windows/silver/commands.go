@@ -41,6 +41,9 @@ var (
 	reOtherPl    = regexp.MustCompile(`\b(?:altra|un'altra|un altra|nuova|diversa|prossima|cambia(?:re)?|cambiami)\s+(?:la\s+)?playlist\b|\bplaylist\s+(?:diversa|nuova|differente)\b|\bcambia(?:re)?\s+(?:la\s+)?playlist\b`)
 	reAnyPl      = regexp.MustCompile(`\b(?:qualsiasi|qualunque|a caso|casuale|random)\b.*\bplaylist\b|\bplaylist\b.*\b(?:qualsiasi|qualunque|a caso|casuale|random)\b|\b(?:musica|qualcosa|canzoni|brani)\s+(?:a caso|qualsiasi|qualunque|random)\b`)
 	reNotMusic   = regexp.MustCompile(`(?i)\b(timer|promemoria|sveglia|scena|nota)\b`)
+	reBriefing   = regexp.MustCompile(`^(?:buongiorno|buondì|buon giorno|briefing|riepilogo(?: della giornata| di oggi)?|com'è la giornata|come sarà la giornata|cosa mi aspetta oggi|cosa c'è oggi|che si fa oggi|aggiornami|fammi il punto)(?:\s+silver)?$`)
+	reWeather    = regexp.MustCompile(`(?:che tempo fa|che tempo farà|che tempo fara|meteo|piove|pioverà|piovera|fa freddo|fa caldo|farà freddo|farà caldo|temperatura fuori|serve l'ombrello)`)
+	reCity       = regexp.MustCompile(`(?i)^(?:la mia città è|la mia citta è|la mia città|abito a|vivo a|sono di|imposta la città(?: a)?|città:)\s+(.+)$`)
 	reRemember   = regexp.MustCompile(`(?i)^(?:silver[,\s]+)?(?:ricordati|ricorda|tieni a mente|memorizza|impara|segnati in memoria)\s+(?:che\s+|questo:\s*)?(.+)$`)
 	reMemories   = regexp.MustCompile(`^(?:cosa|che cosa|che) (?:sai di me|ti ricordi(?: di me)?|ricordi di me|hai in memoria)`)
 	reForget     = regexp.MustCompile(`(?i)^(?:dimentica|dimenticati|scordati|cancella dalla memoria)\s+(?:che\s+|di\s+)?(.+)$`)
@@ -91,6 +94,13 @@ func ParseCommand(text string, now time.Time) Command {
 		return Command{Kind: "reminders"}
 	case low == "cancella promemoria" || low == "cancella i promemoria" || low == "togli i promemoria" || low == "ferma timer" || low == "ferma il timer" || low == "cancella timer":
 		return Command{Kind: "clear"}
+	case reBriefing.MatchString(low):
+		return Command{Kind: "briefing"}
+	case reWeather.MatchString(low) && len(strings.Fields(low)) <= 8:
+		if strings.Contains(low, "domani") {
+			return Command{Kind: "weather", Text: "tomorrow"}
+		}
+		return Command{Kind: "weather"}
 	case low == "diagnosi musica" || low == "diagnosi" || low == "controlla la musica" || low == "diagnosi player":
 		return Command{Kind: "diag"}
 	case low == "diagnosi programmi" || low == "diagnosi app":
@@ -105,6 +115,9 @@ func ParseCommand(text string, now time.Time) Command {
 	// creare un impegno, una cosa da fare o una live in Howl-UP ("domani alle 15 ho il dentista")
 	if IsCreateRequest(t, now) {
 		return Command{Kind: "create", Text: t}
+	}
+	if g := reCity.FindStringSubmatch(t); g != nil {
+		return Command{Kind: "city", Text: strings.TrimSpace(strings.Trim(g[1], " .!?"))}
 	}
 	// memoria personale: "ricordati che il mio gioco preferito è…" (non "ricordami", che è un promemoria)
 	if g := reRemember.FindStringSubmatch(t); g != nil {
@@ -322,6 +335,7 @@ const helpText = `Posso:
 • "prossimo impegno" · "impegni di oggi" / "di domani" / "della settimana" · "cose da fare" (da Howl-UP)
 • Nuovi impegni come li diresti a una persona: "domani alle 15 ho il dentista", "cena con Marco venerdì dalle 20 alle 23, avvisami un'ora prima", "ogni martedì alle 18 palestra fino a dicembre", "tra le cose da fare: comprare il microfono entro sabato", "live di Elden Ring venerdì alle 21". Ti mostro la scheda: Salva, Annulla o correggi ("no, alle 17").
 • Programmi e giochi del PC: "apri Discord" · "avvia OBS" · "lancia lol" · "apri Baldur's Gate 3"
+• "buongiorno" (meteo, agenda, live, promemoria) · "che tempo fa?" · "che tempo farà domani?" · "la mia città è Roma"
 • Il PC: "alza/abbassa il volume del pc" · "volume del pc al 30" · "metti il pc in muto" · "fai uno screenshot" · "blocca il pc" · "chiudi Discord" · "spegni/riavvia/sospendi il pc" (con conferma)
 • File: "apri la cartella download" · "apri la cartella condivisa" · "trova il file grafica halloween" · "cerca la foto del gatto" · "apri l'ultimo video" / "l'ultimo screenshot"
 • Memoria: "ricordati che…" · "cosa sai di me?" · "dimentica che…"

@@ -224,14 +224,20 @@ type config struct {
 	PosesVer int64 `json:"posesVer"` // il foglio delle pose (facoltativo)
 	VoiceVer int64 `json:"voiceVer"`
 	// collegamento con Gestor (la chiave la dà Gestor quando premi "Consenti")
-	Key           string     `json:"key"`
-	PairDenied    bool       `json:"pairDenied"`
-	PairHintShown bool       `json:"pairHintShown"`
-	Reminders     []Reminder `json:"reminders"`
-	Model         string     `json:"model"`     // il modello dell'IA (Ollama)
-	BadModels     []string   `json:"badModels"` // modelli che su questo PC non partono
-	WakeWord      bool       `json:"wakeWord"`  // ascolta "Ehi Silver"
-	Memory        []string   `json:"memory"`    // "ricordati che…": cose su di te (l'IA le usa)
+	Key            string     `json:"key"`
+	PairDenied     bool       `json:"pairDenied"`
+	PairHintShown  bool       `json:"pairHintShown"`
+	Reminders      []Reminder `json:"reminders"`
+	Model          string     `json:"model"`     // il modello dell'IA (Ollama)
+	BadModels      []string   `json:"badModels"` // modelli che su questo PC non partono
+	WakeWord       bool       `json:"wakeWord"`  // ascolta "Ehi Silver"
+	Memory         []string   `json:"memory"`    // "ricordati che…": cose su di te (l'IA le usa)
+	City           string     `json:"city"`      // per il meteo
+	Lat            float64    `json:"lat"`
+	Lon            float64    `json:"lon"`
+	NoGuard        bool       `json:"noGuard"`        // avvisi automatici spenti
+	NoAutoBriefing bool       `json:"noAutoBriefing"` // niente buongiorno da solo
+	LastBriefing   string     `json:"lastBriefing"`
 }
 
 func dataDir() string {
@@ -327,6 +333,11 @@ type app struct {
 	lastPath      string     // ultimo file (screenshot, ultimo video…) per i pulsanti
 	fileHits      []fileHit  // risultati di "trova il file…"
 	closeExe      string     // programma da chiudere del tutto (se chiesto)
+	guard         Guard      // avvisi automatici (guard_windows.go)
+	lastGuard     time.Time
+	activeSince   time.Time
+	cpuPrev       [3]uint64
+	wx            *Weather
 	launchChoices []AppEntry
 	draft         *Draft // impegno da confermare (assist_windows.go)
 	draftAt       time.Time
@@ -768,6 +779,7 @@ func (a *app) tick() {
 	}
 	a.tickListening(now)
 	a.tickWake(now)
+	a.tickGuard(now)
 	a.chat.Thinking, a.chat.Busy = a.brain.Thinking, a.aiBusy
 	a.paintPanel(now)
 	a.brain.Tick(now, a.userIdle())
@@ -832,6 +844,8 @@ func (a *app) menu() {
 		cmdAsk
 		cmdListen
 		cmdWake
+		cmdGuard
+		cmdBriefing
 		cmdPair
 		cmdOllama
 	)
@@ -853,6 +867,8 @@ func (a *app) menu() {
 	add(m, 0, cmdAsk, "Chiedi a Silver…\tCtrl+Alt+S")
 	add(m, 0, cmdListen, "Parla con Silver\tCtrl+Alt+V")
 	add(m, check(a.cfg.WakeWord), cmdWake, "Ascolta \"Ehi Silver\"")
+	add(m, check(!a.cfg.NoGuard), cmdGuard, "Avvisi automatici (live, disco, PC, pause)")
+	add(m, check(!a.cfg.NoAutoBriefing), cmdBriefing, "Buongiorno la mattina")
 	if a.cfg.Key == "" {
 		add(m, 0, cmdPair, "Collega a TwitchGestor")
 	}
@@ -907,6 +923,10 @@ func (a *app) menu() {
 		a.startListening(false, false)
 	case cmdWake:
 		a.toggleWake()
+	case cmdGuard:
+		a.cfg.NoGuard = !a.cfg.NoGuard
+	case cmdBriefing:
+		a.cfg.NoAutoBriefing = !a.cfg.NoAutoBriefing
 	case cmdPair:
 		a.cfg.PairDenied = false
 		a.pair(true)
