@@ -67,6 +67,8 @@ var (
 	pRegisterWindowMsg   = user32.NewProc("RegisterWindowMessageW")
 	pMessageBox          = user32.NewProc("MessageBoxW")
 	pCreateIconIndirect  = user32.NewProc("CreateIconIndirect")
+	pFindWindow          = user32.NewProc("FindWindowW")
+	pAllowSetForeground  = user32.NewProc("AllowSetForegroundWindow")
 	pDestroyIcon         = user32.NewProc("DestroyIcon")
 	pGetSystemMetrics    = user32.NewProc("GetSystemMetrics")
 	pCreateBitmap        = gdi32.NewProc("CreateBitmap")
@@ -90,6 +92,7 @@ const (
 	wmDpiChanged    = 0x02E0
 	wmApp           = 0x8000
 	wmTray          = wmApp + 1
+	wmShowMenu      = wmApp + 2 // da un secondo Silver.exe aperto: mostra il menu
 	wmNull          = 0
 
 	wsPopup         = 0x80000000
@@ -263,6 +266,7 @@ func setAutostart(on bool) {
 
 type app struct {
 	hwnd      uintptr
+	owner     uintptr // finestra invisibile per l'icona vicino all'orologio e il menu (Silver non prende mai il fuoco)
 	inst      windows.Handle
 	cfg       config
 	brain     *Brain
@@ -299,6 +303,12 @@ func main() {
 	// una sola Silver alla volta
 	name, _ := windows.UTF16PtrFromString(`Local\SilverCompanion`)
 	if _, err := windows.CreateMutex(nil, false, name); err == windows.ERROR_ALREADY_EXISTS {
+		// già acceso: riaprirlo mostra il suo menu (da lì si chiude con "Esci")
+		cls, _ := windows.UTF16PtrFromString("SilverCompanion")
+		if w, _, _ := pFindWindow.Call(uintptr(unsafe.Pointer(cls)), 0); w != 0 {
+			pAllowSetForeground.Call(^uintptr(0)) // ASFW_ANY: il menu può venire in primo piano
+			pPostMessage.Call(w, wmShowMenu, 0, 0)
+		}
 		return
 	}
 	pSetDpiAwarenessCtx.Call(^uintptr(3)) // -4: per monitor v2 (schermi con scala diversa)
@@ -329,6 +339,11 @@ func main() {
 		messageBox("Silver non riesce ad aprire la sua finestra.")
 		return
 	}
+	// il menu di Windows si apre solo da una finestra che può stare in primo piano: questa, invisibile
+	a.owner, _, _ = pCreateWindowEx.Call(wsExToolWindow, uintptr(unsafe.Pointer(cls)), uintptr(unsafe.Pointer(title)), wsPopup, 0, 0, 0, 0, 0, 0, uintptr(inst), 0)
+	if a.owner == 0 {
+		a.owner = a.hwnd
+	}
 	a.screenDC, _, _ = pGetDC.Call(0)
 	a.memDC, _, _ = pCreateCompatibleDC.Call(a.screenDC)
 	a.scale = a.dpiScale()
@@ -340,7 +355,7 @@ func main() {
 	tbc, _ := windows.UTF16PtrFromString("TaskbarCreated")
 	m, _, _ := pRegisterWindowMsg.Call(uintptr(unsafe.Pointer(tbc)))
 	a.trayMsg = uint32(m)
-	a.tray = notifyIconData{Wnd: a.hwnd, ID: 1, Flags: nifMessage | nifIcon | nifTip, CallbackMessage: wmTray, Icon: icon}
+	a.tray = notifyIconData{Wnd: a.owner, ID: 1, Flags: nifMessage | nifIcon | nifTip, CallbackMessage: wmTray, Icon: icon}
 	a.tray.Size = uint32(unsafe.Sizeof(a.tray))
 	copy(a.tray.Tip[:], windows.StringToUTF16("Silver"))
 	pShellNotifyIcon.Call(nimAdd, uintptr(unsafe.Pointer(&a.tray)))
@@ -706,12 +721,12 @@ func (a *app) menu() {
 		add(m, 0, cmdForget, "Dimentica le scelte sui giochi")
 	}
 	add(m, mfSeparator, 0, "")
-	add(m, 0, cmdQuit, "Esci")
+	add(m, 0, cmdQuit, "Chiudi Silver")
 	var pt point
 	pGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
-	pSetForegroundWindow.Call(a.hwnd)
-	cmd, _, _ := pTrackPopupMenu.Call(m, tpmReturnCmd|tpmRightButton|tpmBottomAlign, uintptr(pt.X), uintptr(pt.Y), 0, a.hwnd, 0)
-	pPostMessage.Call(a.hwnd, wmNull, 0, 0)
+	pSetForegroundWindow.Call(a.owner)
+	cmd, _, _ := pTrackPopupMenu.Call(m, tpmReturnCmd|tpmRightButton|tpmBottomAlign, uintptr(pt.X), uintptr(pt.Y), 0, a.owner, 0)
+	pPostMessage.Call(a.owner, wmNull, 0, 0)
 	pDestroyMenu.Call(m)
 	now := time.Now()
 	switch cmd {
@@ -753,6 +768,22 @@ func wndProc(hwnd, message, wparam, lparam uintptr) uintptr {
 		r, _, _ := pDefWindowProc.Call(hwnd, message, wparam, lparam)
 		return r
 	}
+	if hwnd == a.owner && hwnd != a.hwnd { // la finestra invisibile: solo l'icona vicino all'orologio
+		switch {
+		case uint32(message) == wmTray:
+			if l := uint32(lparam & 0xffff); l == wmLButtonUp || l == wmRButtonUp {
+				a.menu()
+			}
+			return 0
+		case uint32(message) == wmShowMenu:
+			a.menu()
+			return 0
+		case a.trayMsg != 0 && uint32(message) == a.trayMsg: // Esplora risorse riavviato: si rimette l'icona
+			pShellNotifyIcon.Call(nimAdd, uintptr(unsafe.Pointer(&a.tray)))
+		}
+		r, _, _ := pDefWindowProc.Call(hwnd, message, wparam, lparam)
+		return r
+	}
 	x := float64(int16(lparam & 0xffff))
 	y := float64(int16((lparam >> 16) & 0xffff))
 	switch uint32(message) {
@@ -783,23 +814,23 @@ func wndProc(hwnd, message, wparam, lparam uintptr) uintptr {
 	case wmLButtonUp:
 		a.clickAt(x, y)
 		return 0
+	case wmRButtonUp: // tasto destro su Silver: lo stesso menu dell'icona
+		if a.clickable(x, y) {
+			a.menu()
+		}
+		return 0
 	case wmDpiChanged:
 		a.scale = float64(wparam&0xffff) / 96
 		a.r.SetScale(a.scale)
 		a.place()
 		return 0
-	case wmTray:
-		if l := uint32(lparam & 0xffff); l == wmLButtonUp || l == wmRButtonUp {
-			a.menu()
-		}
+	case wmShowMenu:
+		a.menu()
 		return 0
 	case wmDestroy:
 		pShellNotifyIcon.Call(nimDelete, uintptr(unsafe.Pointer(&a.tray)))
 		pPostQuitMessage.Call(0)
 		return 0
-	}
-	if a.trayMsg != 0 && uint32(message) == a.trayMsg { // Esplora risorse riavviato: si rimette l'icona
-		pShellNotifyIcon.Call(nimAdd, uintptr(unsafe.Pointer(&a.tray)))
 	}
 	r, _, _ := pDefWindowProc.Call(hwnd, message, wparam, lparam)
 	return r
