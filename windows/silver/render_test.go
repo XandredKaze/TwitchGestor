@@ -175,6 +175,12 @@ func TestFotogrammi(t *testing.T) {
 		b.Act(t0.Add(-500 * time.Millisecond))
 		img, _ = frame(b, t0, 0)
 		save("p4-azione", img)
+		// nei giochi il controller sta accanto alle mani, non sulla faccia
+		b = NewBrain(15)
+		b.GameChoices["x.exe"] = "talk"
+		b.SetContext(t0, Context{ID: "game", Name: "Gioco", Key: "x.exe"})
+		img, _ = frame(b, t0.Add(2*time.Second), 0)
+		save("p5-gioco", img)
 		r.SetPoses(nil)
 	}
 }

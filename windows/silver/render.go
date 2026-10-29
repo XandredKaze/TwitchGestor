@@ -377,9 +377,11 @@ func (r *Renderer) Render(now time.Time, mono float64, b *Brain) (*image.RGBA, H
 	a, bb, d, e := cos*sx, -sin*sy, sin*sx, cos*sy
 	m := f64.Aff3{a, bb, tx - a*sw/2 - bb*sh, d, e, ty - d*sw/2 - e*sh}
 	draw.ApproxBiLinear.Transform(img, m, sprite, sprite.Bounds(), draw.Over, nil)
-	hits.Silver = rectF{boxX * s, (winH - boxH - 8) * s, boxW * s, (boxH + 8) * s}
+	// dove sta davvero la figura (le immagini larghe sono più basse del riquadro): gli oggetti si mettono lì intorno
+	drawn := rectF{tx - sw*fit/2, ty - sh*fit, sw * fit, sh * fit}
+	hits.Silver = rectF{math.Min(boxX*s, drawn.x), drawn.y - 8*s, math.Max(boxW*s, drawn.w), drawn.h + 8*s}
 
-	r.drawProps(img, pose, now, mono)
+	r.drawProps(img, pose, now, mono, drawn)
 	if b.Thinking != "" && b.Bubble == nil {
 		r.drawPill(img, b.Thinking, "", mono)
 	} else if b.Idle {
@@ -411,11 +413,12 @@ func (r *Renderer) Render(now time.Time, mono float64, b *Brain) (*image.RGBA, H
 }
 
 // gli oggetti accanto a Silver per ogni attività (compaiono con un piccolo "pop")
-func (r *Renderer) drawProps(img *image.RGBA, pose string, now time.Time, mono float64) {
+func (r *Renderer) drawProps(img *image.RGBA, pose string, now time.Time, mono float64, fig rectF) {
 	s := r.Scale
 	pop := math.Min(1, now.Sub(r.poseAt).Seconds()/0.35)
 	pop = 1 - math.Pow(1-pop, 3)
-	bx, by := boxX*s, (winH-boxH-2)*s
+	// riferimenti: la figura disegnata (in alto a sinistra, larghezza e altezza)
+	bx, by, fw, fh := fig.x, fig.y, fig.w, fig.h
 	put := func(name string, x, y, size float64, alpha float64) {
 		im := r.props[name]
 		sz := size * s * (0.6 + 0.4*pop)
@@ -427,22 +430,22 @@ func (r *Renderer) drawProps(img *image.RGBA, pose string, now time.Time, mono f
 		for i, n := range []string{"note1", "note2"} {
 			t := math.Mod(mono+float64(i)*0.5, 1.6) / 1.6
 			alpha := math.Min(1, t/0.3) * (1 - t)
-			put(n, bx+boxW*s+2*s+float64(i)*14*s, by+20*s-24*s*t, 22, alpha*1.6)
+			put(n, bx+fw+2*s+float64(i)*14*s, by+20*s-24*s*t, 22, alpha*1.6)
 		}
 	case "game":
-		put("pad", bx+boxW*s/2, by+boxH*s-58*s, 30, 1)
+		put("pad", bx+fw*0.86, by+fh*0.74, 30, 1) // accanto alle mani, mai sulla faccia
 	case "obs":
-		put("cam", bx+boxW*s+4*s, by+18*s, 28, 1)
+		put("cam", bx+fw+4*s, by+18*s, 28, 1)
 	case "explorer":
-		put("folder", bx+boxW*s+2*s, by+22*s, 28, 1)
+		put("folder", bx+fw+2*s, by+22*s, 28, 1)
 	case "code":
-		r.chip(img, bx+boxW*s-14*s, by+4*s, "</>", color.NRGBA{29, 34, 43, 255}, color.NRGBA{159, 240, 214, 255}, pop)
+		r.chip(img, bx+fw-14*s, by+4*s, "</>", color.NRGBA{29, 34, 43, 255}, color.NRGBA{159, 240, 214, 255}, pop)
 	case "twitch", "discord":
 		y := by + 4*s - 3*s*smooth(mono, 1.8)
-		r.chip(img, bx+boxW*s-12*s, y, "…", color.NRGBA{255, 255, 255, 255}, color.NRGBA{40, 40, 40, 255}, pop)
+		r.chip(img, bx+fw-12*s, y, "…", color.NRGBA{255, 255, 255, 255}, color.NRGBA{40, 40, 40, 255}, pop)
 	case "live":
 		w := 1 + 0.5*smooth(mono, 1.4)
-		r.chipW(img, bx+boxW*s/2-26*s, by-14*s, "● LIVE", color.NRGBA{229, 72, 77, 255}, color.NRGBA{255, 255, 255, 255}, pop, w)
+		r.chipW(img, bx+fw/2-26*s, by-14*s, "● LIVE", color.NRGBA{229, 72, 77, 255}, color.NRGBA{255, 255, 255, 255}, pop, w)
 	}
 }
 
