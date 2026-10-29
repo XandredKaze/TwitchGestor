@@ -41,6 +41,13 @@ var (
 	reOtherPl    = regexp.MustCompile(`\b(?:altra|un'altra|un altra|nuova|diversa|prossima|cambia(?:re)?|cambiami)\s+(?:la\s+)?playlist\b|\bplaylist\s+(?:diversa|nuova|differente)\b|\bcambia(?:re)?\s+(?:la\s+)?playlist\b`)
 	reAnyPl      = regexp.MustCompile(`\b(?:qualsiasi|qualunque|a caso|casuale|random)\b.*\bplaylist\b|\bplaylist\b.*\b(?:qualsiasi|qualunque|a caso|casuale|random)\b|\b(?:musica|qualcosa|canzoni|brani)\s+(?:a caso|qualsiasi|qualunque|random)\b`)
 	reNotMusic   = regexp.MustCompile(`(?i)\b(timer|promemoria|sveglia|scena|nota)\b`)
+	reRemember   = regexp.MustCompile(`(?i)^(?:silver[,\s]+)?(?:ricordati|ricorda|tieni a mente|memorizza|impara|segnati in memoria)\s+(?:che\s+|questo:\s*)?(.+)$`)
+	reMemories   = regexp.MustCompile(`^(?:cosa|che cosa|che) (?:sai di me|ti ricordi(?: di me)?|ricordi di me|hai in memoria)`)
+	reForget     = regexp.MustCompile(`(?i)^(?:dimentica|dimenticati|scordati|cancella dalla memoria)\s+(?:che\s+|di\s+)?(.+)$`)
+	reFolder     = regexp.MustCompile(`^(?:apri|aprimi|mostrami|vai (?:nella|alla))\s+(?:la\s+)?cartella\s+(?:dei\s+|delle\s+|degli\s+|di\s+|del\s+|della\s+|dello\s+)?(.+?)[\s.!?]*$`)
+	reLastFile   = regexp.MustCompile(`(?:^|\s)(?:l'|l )?ultim[oa]\s+(video|registrazione|screenshot|foto|immagine|download|file scaricato|file)(?:\s|$|[.!?])`)
+	reFindFile   = regexp.MustCompile(`(?i)^(?:trova(?:mi)?|cerca(?:mi)?|dov'è|dove sta|dove si trova|apri)\s+(?:il\s+|la\s+|lo\s+|l'|i\s+|le\s+)?(file|documento|foto|immagine|video|grafica|pdf|cartella)\s+(?:di\s+|del\s+|della\s+|chiamat[oa]\s+|con\s+)?(.+)$`)
+	reClose      = regexp.MustCompile(`(?i)^(?:chiudi|chiudimi|termina|esci da|chiudere)\s+(?:il\s+|la\s+|lo\s+|l'|i\s+|gli\s+)?(?:programma\s+|gioco\s+|app\s+)?(.+?)[\s.!?]*$`)
 	reLaunch     = regexp.MustCompile(`(?i)^(?:apri|aprimi|apriti|avvia|avviami|lancia|lanciami|fai partire|esegui|accendi|fammi partire)\s+(?:il\s+|la\s+|lo\s+|l'|i\s+|gli\s+)?(?:programma\s+|gioco\s+|app\s+|applicazione\s+)?(.+?)[\s.!?]*$`)
 	reNotLaunch  = regexp.MustCompile(`(?i)(timer|promemoria|sveglia|musica|playlist|canzone|brano|scena|nota|finestra di silver)`)
 	reLead       = regexp.MustCompile(`(?i)^\s*(?:di|che|a|:|-)\s+`)
@@ -98,6 +105,20 @@ func ParseCommand(text string, now time.Time) Command {
 	// creare un impegno, una cosa da fare o una live in Howl-UP ("domani alle 15 ho il dentista")
 	if IsCreateRequest(t, now) {
 		return Command{Kind: "create", Text: t}
+	}
+	// memoria personale: "ricordati che il mio gioco preferito è…" (non "ricordami", che è un promemoria)
+	if g := reRemember.FindStringSubmatch(t); g != nil {
+		return Command{Kind: "remember", Text: strings.TrimSpace(strings.TrimRight(g[1], " .!"))}
+	}
+	if reMemories.MatchString(low) {
+		return Command{Kind: "memories"}
+	}
+	if g := reForget.FindStringSubmatch(t); g != nil {
+		return Command{Kind: "forget", Text: strings.TrimSpace(strings.TrimRight(g[1], " .!"))}
+	}
+	// il PC: volume di Windows, screenshot, blocca, spegni/riavvia/sospendi
+	if pc := parsePC(low); pc.Kind != "" {
+		return pc
 	}
 	// agenda di Howl-UP (fatti non domande lunghe: "impegni di domani", "cosa ho oggi", "cose da fare")
 	if len([]rune(low)) <= 45 {
@@ -201,6 +222,19 @@ func ParseCommand(text string, now time.Time) Command {
 		}
 		return Command{Kind: "open", Text: w}
 	}
+	// cartelle e file
+	if g := reFolder.FindStringSubmatch(low); g != nil {
+		return Command{Kind: "folder", Text: strings.TrimSpace(g[1])}
+	}
+	if g := reLastFile.FindStringSubmatch(low); g != nil {
+		return Command{Kind: "lastfile", Text: g[1]}
+	}
+	if g := reFindFile.FindStringSubmatch(t); g != nil {
+		return Command{Kind: "findfile", Text: strings.TrimSpace(strings.TrimRight(g[2], " .!?")), Arg: strings.ToLower(g[1])}
+	}
+	if g := reClose.FindStringSubmatch(t); g != nil && !reNotLaunch.MatchString(g[1]) {
+		return Command{Kind: "close", Text: cleanAppQuery(strings.TrimSpace(g[1]))}
+	}
 	// qualsiasi altro programma o gioco del PC: "apri Discord", "avvia OBS", "lancia lol"
 	if g := reLaunch.FindStringSubmatch(t); g != nil && !reNotLaunch.MatchString(g[1]) {
 		return Command{Kind: "launch", Text: strings.TrimSpace(g[1])}
@@ -288,6 +322,48 @@ const helpText = `Posso:
 • "prossimo impegno" · "impegni di oggi" / "di domani" / "della settimana" · "cose da fare" (da Howl-UP)
 • Nuovi impegni come li diresti a una persona: "domani alle 15 ho il dentista", "cena con Marco venerdì dalle 20 alle 23, avvisami un'ora prima", "ogni martedì alle 18 palestra fino a dicembre", "tra le cose da fare: comprare il microfono entro sabato", "live di Elden Ring venerdì alle 21". Ti mostro la scheda: Salva, Annulla o correggi ("no, alle 17").
 • Programmi e giochi del PC: "apri Discord" · "avvia OBS" · "lancia lol" · "apri Baldur's Gate 3"
+• Il PC: "alza/abbassa il volume del pc" · "volume del pc al 30" · "metti il pc in muto" · "fai uno screenshot" · "blocca il pc" · "chiudi Discord" · "spegni/riavvia/sospendi il pc" (con conferma)
+• File: "apri la cartella download" · "apri la cartella condivisa" · "trova il file grafica halloween" · "cerca la foto del gatto" · "apri l'ultimo video" / "l'ultimo screenshot"
+• Memoria: "ricordati che…" · "cosa sai di me?" · "dimentica che…"
 • "prossima live" · "apri Gestor" · "apri Howl-UP" · "apri Musicante"
 • Con la voce: tieni premuto Ctrl+Alt+V e parla (o premi il microfono qui sotto), oppure chiamami con "Ehi Silver" (si attiva dal mio menu)
 • Qualsiasi altra cosa: ti rispondo io (con l'IA sul tuo PC).`
+
+var (
+	rePCVolUp   = regexp.MustCompile(`^(?:alza|aumenta|più alto|piu alto)\s+(?:il\s+|l')?(?:volume|audio)\s+(?:del|di|al)\s+(?:pc|computer|sistema|windows)`)
+	rePCVolDown = regexp.MustCompile(`^(?:abbassa|diminuisci|più basso|piu basso)\s+(?:il\s+|l')?(?:volume|audio)\s+(?:del|di|al)\s+(?:pc|computer|sistema|windows)`)
+	rePCVolSet  = regexp.MustCompile(`^(?:metti\s+)?(?:il\s+)?volume\s+(?:del|di)\s+(?:pc|computer|sistema|windows)\s+(?:a|al)\s+(\d{1,3})`)
+	rePCMute    = regexp.MustCompile(`^(?:metti\s+(?:il\s+)?(?:pc|computer)\s+(?:in|a)\s+muto|muta (?:il\s+)?(?:pc|computer)|silenzia(?:\s+il)?\s+(?:pc|computer)|togli (?:l')?audio(?: del pc)?|riattiva (?:l')?audio(?: del pc)?|muto)[\s.!]*$`)
+	rePCShot    = regexp.MustCompile(`(?:screenshot|cattura(?: lo| dello)? schermo|foto (?:allo|dello) schermo|stampa schermo|screen dello schermo)`)
+	rePCLock    = regexp.MustCompile(`^(?:blocca|bloccami)\s+(?:il\s+|lo\s+)?(?:pc|computer|schermo)`)
+	rePCOff     = regexp.MustCompile(`^(?:spegni|spegnimi|arresta)\s+(?:il\s+)?(?:pc|computer)`)
+	rePCRestart = regexp.MustCompile(`^(?:riavvia|riavviami)\s+(?:il\s+)?(?:pc|computer)`)
+	rePCSleep   = regexp.MustCompile(`^(?:sospendi|metti in sospensione|metti a dormire|manda in sospensione)\s+(?:il\s+)?(?:pc|computer)`)
+)
+
+// parsePC: comandi per il PC (Kind "pc", Text: volup | voldown | volset | mute | screenshot | lock | shutdown | restart | sleep)
+func parsePC(low string) Command {
+	low = strings.TrimSpace(strings.Trim(low, " .!?"))
+	switch {
+	case rePCVolUp.MatchString(low):
+		return Command{Kind: "pc", Text: "volup"}
+	case rePCVolDown.MatchString(low):
+		return Command{Kind: "pc", Text: "voldown"}
+	case rePCMute.MatchString(low):
+		return Command{Kind: "pc", Text: "mute"}
+	case rePCShot.MatchString(low) && len(strings.Fields(low)) <= 6:
+		return Command{Kind: "pc", Text: "screenshot"}
+	case rePCLock.MatchString(low):
+		return Command{Kind: "pc", Text: "lock"}
+	case rePCOff.MatchString(low):
+		return Command{Kind: "pc", Text: "shutdown"}
+	case rePCRestart.MatchString(low):
+		return Command{Kind: "pc", Text: "restart"}
+	case rePCSleep.MatchString(low):
+		return Command{Kind: "pc", Text: "sleep"}
+	}
+	if g := rePCVolSet.FindStringSubmatch(low); g != nil {
+		return Command{Kind: "pc", Text: "volset", Arg: g[1]}
+	}
+	return Command{}
+}

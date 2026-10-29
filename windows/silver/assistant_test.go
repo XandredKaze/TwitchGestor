@@ -88,7 +88,7 @@ func TestOllamaFinto(t *testing.T) {
 		t.Fatal(ok, models)
 	}
 	ai.Model = pickModel(models, "")
-	msgs := []chatMsg{{"system", systemPrompt(time.Now(), Context{ID: "obs", Name: "OBS Studio"}, false, "", "")}, {"user", "titolo?"}}
+	msgs := []chatMsg{{"system", systemPrompt(time.Now(), Context{ID: "obs", Name: "OBS Studio"}, false, "", "", "")}, {"user", "titolo?"}}
 	got, err := ai.Chat(context.Background(), msgs, func(string) {})
 	if err != nil || plain(got) != "Titolo: Notte horror" {
 		t.Fatalf("%q %v", got, err)
@@ -128,7 +128,7 @@ func TestAgenda(t *testing.T) {
 	if len(al) != 1 || al[0] != "Tra 10 minuti: Dentista." {
 		t.Fatal(al)
 	}
-	if !strings.Contains(systemPrompt(now, Context{}, false, "", agendaBrief(f.Agenda, now)), "Dentista") {
+	if !strings.Contains(systemPrompt(now, Context{}, false, "", agendaBrief(f.Agenda, now), "ama Hollow Knight"), "Dentista") {
 		t.Error("l'IA non vede l'agenda")
 	}
 }

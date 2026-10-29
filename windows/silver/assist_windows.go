@@ -205,7 +205,7 @@ func (a *app) addReminder(at time.Time, text string) {
 
 func (a *app) onAction(choice string) {
 	now := time.Now()
-	if a.launchChoice(choice) {
+	if a.launchChoice(choice) || a.fileAction(choice) {
 		return
 	}
 	switch choice {
@@ -274,7 +274,7 @@ func (a *app) handleInput(text string) {
 	}
 	c := ParseCommand(text, now)
 	switch c.Kind { // fa qualcosa: la posa d'azione (se hai caricato le pose)
-	case "remind", "clear", "note", "music", "scene", "open", "launch":
+	case "remind", "clear", "note", "music", "scene", "open", "launch", "close", "folder", "lastfile":
 		a.brain.Act(now)
 	}
 	switch c.Kind {
@@ -349,6 +349,22 @@ func (a *app) handleInput(text string) {
 		a.diagnoseMusic()
 	case "launch":
 		a.launchCmd(c.Text)
+	case "close":
+		a.closeCmd(c.Text)
+	case "pc":
+		a.pcCmd(c)
+	case "folder":
+		a.folderCmd(c.Text)
+	case "findfile":
+		a.findCmd(c.Text, c.Arg)
+	case "lastfile":
+		a.lastFileCmd(c.Text)
+	case "remember":
+		a.remember(c.Text)
+	case "memories":
+		a.memories()
+	case "forget":
+		a.forget(c.Text)
 	case "applist", "appdiag":
 		a.appsInfo(c.Kind == "appdiag")
 	case "music":
@@ -443,7 +459,7 @@ func (a *app) askAI(q string) {
 			return
 		}
 		a.ai.Model = model
-		msgs := append([]chatMsg{{"system", systemPrompt(time.Now(), ctxInfo, live, next, agenda)}}, history...)
+		msgs := append([]chatMsg{{"system", systemPrompt(time.Now(), ctxInfo, live, next, agenda, strings.Join(a.cfg.Memory, "\n"))}}, history...)
 		msgs = append(msgs, chatMsg{"user", q})
 		a.post <- func() { a.chat.Add("silver", "") }
 		answer, err := a.ai.Chat(context.Background(), msgs, func(tok string) {

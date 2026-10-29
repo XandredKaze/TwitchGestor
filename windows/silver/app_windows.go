@@ -231,6 +231,7 @@ type config struct {
 	Model         string     `json:"model"`     // il modello dell'IA (Ollama)
 	BadModels     []string   `json:"badModels"` // modelli che su questo PC non partono
 	WakeWord      bool       `json:"wakeWord"`  // ascolta "Ehi Silver"
+	Memory        []string   `json:"memory"`    // "ricordati che…": cose su di te (l'IA le usa)
 }
 
 func dataDir() string {
@@ -323,6 +324,9 @@ type app struct {
 	listen        *listening // il microfono è acceso (listen_windows.go)
 	installingEar bool
 	apps          []AppEntry // programmi e giochi del PC (apps_windows.go)
+	lastPath      string     // ultimo file (screenshot, ultimo video…) per i pulsanti
+	fileHits      []fileHit  // risultati di "trova il file…"
+	closeExe      string     // programma da chiudere del tutto (se chiesto)
 	launchChoices []AppEntry
 	draft         *Draft // impegno da confermare (assist_windows.go)
 	draftAt       time.Time
