@@ -322,6 +322,8 @@ type app struct {
 	pairing       bool
 	listen        *listening // il microfono è acceso (listen_windows.go)
 	installingEar bool
+	apps          []AppEntry // programmi e giochi del PC (apps_windows.go)
+	launchChoices []AppEntry
 	draft         *Draft // impegno da confermare (assist_windows.go)
 	draftAt       time.Time
 	wantPanel     bool
@@ -422,6 +424,7 @@ func main() {
 
 	go a.watchGestor()
 	go a.watchFeed()
+	go a.watchApps()
 	// Ctrl+Alt+S: la finestra per scrivergli
 	// (se un altro programma usa già la stessa combinazione, Windows non ce la dà: si dice)
 	var taken []string

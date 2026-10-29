@@ -27,7 +27,7 @@ var (
 	reTimer      = regexp.MustCompile(`(?i)^(?:(?:metti|imposta|fai partire|avvia)\s+(?:un\s+)?)?(?:timer|countdown|conto alla rovescia)\s*(?:di\s+)?(\d+(?:[.,]\d+)?)?\s*(secondi|secondo|sec|s|minuti|minuto|min|m|ore|ora|h)?\s*(.*)$`)
 	reNote       = regexp.MustCompile(`(?i)^(?:nota|note|appunta|appuntati|annota|segna|segnati)\b\s*(?:che\s+)?:?\s*(.+)$`)
 	reScene      = regexp.MustCompile(`(?i)^(?:scena|passa alla scena|vai alla scena|metti la scena|cambia scena(?: in| a)?)\s+(.+)$`)
-	reOpen       = regexp.MustCompile(`(?i)^apri\s+(?:il\s+|la\s+)?(musicante\s*player|il player|player|twitch\s*gestor|gestor|howl[\s-]?up|musicante|ollama)\b`)
+	reOpen       = regexp.MustCompile(`(?i)^(?:apri|avvia|lancia)\s+(?:il\s+|la\s+)?(musicante\s*player|il player|player|twitch\s*gestor|gestor|howl[\s-]?up|musicante|ollama)\b`)
 	reVolume     = regexp.MustCompile(`^(?:musica\s+)?(?:volume|vol)\s*(?:a|al)?\s*(\d{1,3})\s*%?$`)
 	reFind       = regexp.MustCompile(`(?i)^(?:metti|suona|ascolta|riproduci|fammi sentire|voglio sentire|play)\s+(?:un po' di\s+|qualcosa di\s+|la playlist\s+|le canzoni di\s+|i brani di\s+|musica di\s+|la canzone\s+)?(.+)$`)
 	rePlaylist   = regexp.MustCompile(`(?:dalla|della|nella|alla|la|una|sulla|mia|dalle)\s+playlist\s+(.+)$`)
@@ -41,6 +41,8 @@ var (
 	reOtherPl    = regexp.MustCompile(`\b(?:altra|un'altra|un altra|nuova|diversa|prossima|cambia(?:re)?|cambiami)\s+(?:la\s+)?playlist\b|\bplaylist\s+(?:diversa|nuova|differente)\b|\bcambia(?:re)?\s+(?:la\s+)?playlist\b`)
 	reAnyPl      = regexp.MustCompile(`\b(?:qualsiasi|qualunque|a caso|casuale|random)\b.*\bplaylist\b|\bplaylist\b.*\b(?:qualsiasi|qualunque|a caso|casuale|random)\b|\b(?:musica|qualcosa|canzoni|brani)\s+(?:a caso|qualsiasi|qualunque|random)\b`)
 	reNotMusic   = regexp.MustCompile(`(?i)\b(timer|promemoria|sveglia|scena|nota)\b`)
+	reLaunch     = regexp.MustCompile(`(?i)^(?:apri|aprimi|apriti|avvia|avviami|lancia|lanciami|fai partire|esegui|accendi|fammi partire)\s+(?:il\s+|la\s+|lo\s+|l'|i\s+|gli\s+)?(?:programma\s+|gioco\s+|app\s+|applicazione\s+)?(.+?)[\s.!?]*$`)
+	reNotLaunch  = regexp.MustCompile(`(?i)(timer|promemoria|sveglia|musica|playlist|canzone|brano|scena|nota|finestra di silver)`)
 	reLead       = regexp.MustCompile(`(?i)^\s*(?:di|che|a|:|-)\s+`)
 )
 
@@ -195,6 +197,10 @@ func ParseCommand(text string, now time.Time) Command {
 		}
 		return Command{Kind: "open", Text: w}
 	}
+	// qualsiasi altro programma o gioco del PC: "apri Discord", "avvia OBS", "lancia lol"
+	if g := reLaunch.FindStringSubmatch(t); g != nil && !reNotLaunch.MatchString(g[1]) {
+		return Command{Kind: "launch", Text: strings.TrimSpace(g[1])}
+	}
 	if g := reNote.FindStringSubmatch(t); g != nil {
 		return Command{Kind: "note", Text: strings.TrimSpace(g[1])}
 	}
@@ -277,6 +283,7 @@ const helpText = `Posso:
 • "scena Gioco" (cambia scena in OBS)
 • "prossimo impegno" · "impegni di oggi" / "di domani" / "della settimana" · "cose da fare" (da Howl-UP)
 • Nuovi impegni come li diresti a una persona: "domani alle 15 ho il dentista", "cena con Marco venerdì dalle 20 alle 23, avvisami un'ora prima", "ogni martedì alle 18 palestra fino a dicembre", "tra le cose da fare: comprare il microfono entro sabato", "live di Elden Ring venerdì alle 21". Ti mostro la scheda: Salva, Annulla o correggi ("no, alle 17").
+• Programmi e giochi del PC: "apri Discord" · "avvia OBS" · "lancia lol" · "apri Baldur's Gate 3"
 • "prossima live" · "apri Gestor" · "apri Howl-UP" · "apri Musicante"
 • Con la voce: tieni premuto Ctrl+Alt+V e parla (o premi il microfono qui sotto), oppure chiamami con "Ehi Silver" (si attiva dal mio menu)
 • Qualsiasi altra cosa: ti rispondo io (con l'IA sul tuo PC).`

@@ -205,6 +205,9 @@ func (a *app) addReminder(at time.Time, text string) {
 
 func (a *app) onAction(choice string) {
 	now := time.Now()
+	if a.launchChoice(choice) {
+		return
+	}
 	switch choice {
 	case "x:snooze":
 		a.addReminder(now.Add(10*time.Minute), a.lastAlert)
@@ -271,7 +274,7 @@ func (a *app) handleInput(text string) {
 	}
 	c := ParseCommand(text, now)
 	switch c.Kind { // fa qualcosa: la posa d'azione (se hai caricato le pose)
-	case "remind", "clear", "note", "music", "scene", "open":
+	case "remind", "clear", "note", "music", "scene", "open", "launch":
 		a.brain.Act(now)
 	}
 	switch c.Kind {
@@ -344,6 +347,8 @@ func (a *app) handleInput(text string) {
 		a.reply("Aperto.")
 	case "diag":
 		a.diagnoseMusic()
+	case "launch":
+		a.launchCmd(c.Text)
 	case "music":
 		a.musicCmd(c)
 	case "note", "scene":
