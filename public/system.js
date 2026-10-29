@@ -258,6 +258,7 @@
         el('span', { className: 'small muted' }, 'Restano solo sul Raspberry. Silver le prende da qui (anche quando le cambi).'),
         row('image', 'Immagine (PNG/WEBP con sfondo trasparente)', 'image/png,image/webp,image/jpeg', st.image),
         row('voice', 'Voce (MP3, un borbottio di un paio di secondi)', 'audio/mpeg,.mp3', st.voice),
+        row('poses', 'Pose (facoltativo: un foglio con più pose una accanto all\'altra, sfondo trasparente — Silver lo divide da solo)', 'image/png,image/webp', st.poses),
         el('b', { className: 'sys-silver-sub' }, '🔗 PC collegati'),
         el('span', { className: 'small muted' }, 'Un PC collegato riceve gli avvisi (follow, donazioni, prossima live) e può usare i comandi (musica, scene, note).'),
         ...(st.pending ?? []).map((r) => el('div', { className: 'sys-silver-row sys-silver-ask' },

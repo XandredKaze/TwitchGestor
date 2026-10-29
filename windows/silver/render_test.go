@@ -153,4 +153,28 @@ func TestFotogrammi(t *testing.T) {
 	if len(h.Buttons) != 0 || h.Bubble.w == 0 {
 		t.Fatal("pagina 1")
 	}
+
+	// pose dal foglio (SILVER_SHEET=percorso): normale, pensa, in azione
+	if p := os.Getenv("SILVER_SHEET"); p != "" {
+		f, _ := os.Open(p)
+		sheet, err := png.Decode(f)
+		f.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.SetPoses(splitSheet(sheet))
+		b = NewBrain(12)
+		b.Say(t0, "Pose nuove. Non male, eh?", "", "", nil)
+		img, _ = frame(b, t0.Add(400*time.Millisecond), 0)
+		save("p1-parla", img)
+		b = NewBrain(13)
+		b.Thinking = "Ci penso…"
+		img, _ = frame(b, t0, 0)
+		save("p3-pensa", img)
+		b = NewBrain(14)
+		b.Act(t0.Add(-500 * time.Millisecond))
+		img, _ = frame(b, t0, 0)
+		save("p4-azione", img)
+		r.SetPoses(nil)
+	}
 }

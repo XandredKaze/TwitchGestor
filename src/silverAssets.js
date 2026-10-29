@@ -5,7 +5,9 @@ import path from 'node:path';
 import { DATA_DIR } from './config.js';
 
 const DIR = path.join(DATA_DIR, 'silver');
-const LIMIT = { image: 15 * 1024 * 1024, voice: 5 * 1024 * 1024 };
+// poses: un foglio con più pose una accanto all'altra (come gli sprite dei videogiochi): Silver lo divide da sé
+const LIMIT = { image: 15 * 1024 * 1024, voice: 5 * 1024 * 1024, poses: 15 * 1024 * 1024 };
+const IMAGE_KINDS = ['image', 'poses'];
 const TYPES = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp', mp3: 'audio/mpeg' };
 
 // che file è davvero (dai primi byte, non dal nome)
@@ -19,7 +21,7 @@ export function sniff(buf) {
 }
 
 function find(kind) {
-  for (const ext of kind === 'image' ? ['png', 'jpg', 'webp'] : ['mp3']) {
+  for (const ext of IMAGE_KINDS.includes(kind) ? ['png', 'jpg', 'webp'] : ['mp3']) {
     const file = path.join(DIR, `${kind}.${ext}`);
     if (fs.existsSync(file)) return { file, ext };
   }
@@ -29,7 +31,7 @@ function find(kind) {
 // versione (data di modifica): Silver riscarica solo quando cambia; 0 = non c'è
 export function versions() {
   const v = (kind) => { const f = find(kind); return f ? Math.round(fs.statSync(f.file).mtimeMs) : 0; };
-  return { image: v('image'), voice: v('voice') };
+  return { image: v('image'), voice: v('voice'), poses: v('poses') };
 }
 
 export async function save(req, kind) {
@@ -43,8 +45,8 @@ export async function save(req, kind) {
   }
   const buf = Buffer.concat(chunks);
   const ext = sniff(buf);
-  if (kind === 'image' ? !['png', 'jpg', 'webp'].includes(ext) : ext !== 'mp3') {
-    throw Object.assign(new Error(kind === 'image' ? 'Serve un\'immagine PNG, JPG o WEBP' : 'Serve un file MP3'), { status: 400 });
+  if (IMAGE_KINDS.includes(kind) ? !['png', 'jpg', 'webp'].includes(ext) : ext !== 'mp3') {
+    throw Object.assign(new Error(IMAGE_KINDS.includes(kind) ? 'Serve un\'immagine PNG, JPG o WEBP' : 'Serve un file MP3'), { status: 400 });
   }
   fs.mkdirSync(DIR, { recursive: true });
   const old = find(kind);
@@ -54,6 +56,7 @@ export async function save(req, kind) {
 }
 
 export function remove(kind) {
+  if (!(kind in LIMIT)) throw Object.assign(new Error('Tipo sconosciuto'), { status: 400 });
   const f = find(kind);
   if (f) fs.rmSync(f.file);
   return versions();

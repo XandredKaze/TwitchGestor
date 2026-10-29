@@ -78,8 +78,10 @@ type fonts struct{ regular, bold, italic *opentype.Font }
 type Renderer struct {
 	Scale float64
 
-	src      image.Image // l'immagine di Silver (scaricata da Gestor); nil = sagoma di riserva
-	sprite   image.Image // Silver già alla dimensione giusta
+	src      image.Image   // l'immagine di Silver (scaricata da Gestor); nil = sagoma di riserva
+	sprite   image.Image   // Silver già alla dimensione giusta
+	srcPoses []image.Image // le pose del foglio (se l'hai caricato)
+	poses    []image.Image // …già alla dimensione giusta
 	props    map[string]image.Image
 	fonts    fonts
 	faces    map[string]font.Face
@@ -192,13 +194,35 @@ func (r *Renderer) SetScale(scale float64) {
 	if src == nil {
 		src = placeholder()
 	}
-	w := int(math.Round(boxW * scale * 1.1))
-	h := int(math.Round(float64(w) * float64(src.Bounds().Dy()) / float64(src.Bounds().Dx())))
-	dst := image.NewRGBA(image.Rect(0, 0, w, h))
-	draw.CatmullRom.Scale(dst, dst.Bounds(), src, src.Bounds(), draw.Src, nil)
-	r.sprite = dst
+	r.sprite = fitSprite(src, scale)
+	r.poses = nil
+	for _, p := range r.srcPoses {
+		r.poses = append(r.poses, fitSprite(p, scale))
+	}
 	r.faces = map[string]font.Face{}
 	r.frame, r.glow, r.bubLayer, r.glowKey, r.bubKey = nil, nil, nil, "", ""
+}
+
+// spriteFit: quanto ingrandire perché stia nel riquadro di Silver (alto boxH, largo al massimo boxW×1.25)
+func spriteFit(w, h, s float64) float64 { return math.Min(boxH*s/h, boxW*1.25*s/w) }
+
+// fitSprite: l'immagine già alla misura giusta (la pixel art a pixel netti, il resto morbido)
+func fitSprite(src image.Image, scale float64) *image.RGBA {
+	b := src.Bounds()
+	f := spriteFit(float64(b.Dx()), float64(b.Dy()), scale)
+	dst := image.NewRGBA(image.Rect(0, 0, max(1, int(math.Round(float64(b.Dx())*f))), max(1, int(math.Round(float64(b.Dy())*f)))))
+	if isPixelArt(src) {
+		draw.NearestNeighbor.Scale(dst, dst.Bounds(), src, b, draw.Src, nil)
+	} else {
+		draw.CatmullRom.Scale(dst, dst.Bounds(), src, b, draw.Src, nil)
+	}
+	return dst
+}
+
+// SetPoses: più pose dal foglio (nil: si torna all'immagine sola)
+func (r *Renderer) SetPoses(list []image.Image) {
+	r.srcPoses = list
+	r.SetScale(r.Scale)
 }
 
 // faceIcon: la faccia di Silver in un cerchio, per l'icona vicino all'orologio (n×n pixel, non premoltiplicato)
@@ -235,7 +259,7 @@ func (r *Renderer) SetSprite(img image.Image) {
 }
 
 // HasSprite: c'è l'immagine vera
-func (r *Renderer) HasSprite() bool { return r.src != nil }
+func (r *Renderer) HasSprite() bool { return r.src != nil || len(r.srcPoses) > 0 }
 
 func (r *Renderer) face(kind string, size float64) font.Face {
 	key := kind + ":" + strconv.FormatFloat(size, 'f', 2, 64)
@@ -337,8 +361,12 @@ func (r *Renderer) Render(now time.Time, mono float64, b *Brain) (*image.RGBA, H
 	draw.Draw(img, gr, r.glow, gr.Min, draw.Over)
 
 	// Silver: dal suo fondo al centro, schiacciamento, oscillazione, posa, passaggio del mouse
-	sw, sh := float64(r.sprite.Bounds().Dx()), float64(r.sprite.Bounds().Dy())
-	fit := boxH * s / sh // la figura sta nell'altezza del riquadro
+	sprite := r.sprite
+	if n := len(r.poses); n > 0 { // la posa giusta per quello che sta facendo
+		sprite = r.poses[b.Frame(now, mono, n)]
+	}
+	sw, sh := float64(sprite.Bounds().Dx()), float64(sprite.Bounds().Dy())
+	fit := spriteFit(sw, sh, s) // già alla misura: circa 1
 	sx := fit * sqX * r.cur.sx * (1 + 0.03*hov)
 	sy := fit * sqY * r.cur.sy * (1 + 0.03*hov)
 	ang := (wobA + r.cur.angle) * math.Pi / 180
@@ -348,7 +376,7 @@ func (r *Renderer) Render(now time.Time, mono float64, b *Brain) (*image.RGBA, H
 	// punto della figura (u,v) → schermo: R·S·(u - sw/2, v - sh) + (tx, ty)
 	a, bb, d, e := cos*sx, -sin*sy, sin*sx, cos*sy
 	m := f64.Aff3{a, bb, tx - a*sw/2 - bb*sh, d, e, ty - d*sw/2 - e*sh}
-	draw.ApproxBiLinear.Transform(img, m, r.sprite, r.sprite.Bounds(), draw.Over, nil)
+	draw.ApproxBiLinear.Transform(img, m, sprite, sprite.Bounds(), draw.Over, nil)
 	hits.Silver = rectF{boxX * s, (winH - boxH - 8) * s, boxW * s, (boxH + 8) * s}
 
 	r.drawProps(img, pose, now, mono)

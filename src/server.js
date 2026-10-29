@@ -286,7 +286,7 @@ export function createServer(app) {
         return send(res, 200, await silver.run(await readBody(req, 10_000)));
       }
       // la sua immagine e la sua voce (caricate da te in ⚙ Sistema → Tools; restano solo sul Raspberry)
-      if (route === 'GET /silver/asset/image' || route === 'GET /silver/asset/voice') {
+      if (route === 'GET /silver/asset/image' || route === 'GET /silver/asset/voice' || route === 'GET /silver/asset/poses') {
         const a = silverAssets.get(path.basename(url.pathname));
         if (!a) return send(res, 404, 'Non ancora caricato');
         res.writeHead(200, { 'Content-Type': a.type, 'Content-Length': fs.statSync(a.file).size, 'Cache-Control': 'no-store' });

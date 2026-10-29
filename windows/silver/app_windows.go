@@ -221,6 +221,7 @@ type config struct {
 	Gestor     string            `json:"gestor"`
 	// versioni dell'immagine e della voce già scaricate da Gestor (in %APPDATA%\Silver)
 	ImageVer int64 `json:"imageVer"`
+	PosesVer int64 `json:"posesVer"` // il foglio delle pose (facoltativo)
 	VoiceVer int64 `json:"voiceVer"`
 	// collegamento con Gestor (la chiave la dà Gestor quando premi "Consenti")
 	Key           string     `json:"key"`
@@ -410,6 +411,9 @@ func main() {
 	if b, err := os.ReadFile(filepath.Join(dataDir(), "image.bin")); err == nil {
 		a.applyImage(b)
 	}
+	if b, err := os.ReadFile(filepath.Join(dataDir(), "poses.bin")); err == nil {
+		a.applyPoses(b)
+	}
 	if b, err := os.ReadFile(filepath.Join(dataDir(), "voice.mp3")); err == nil {
 		a.applyVoice(b)
 	}
@@ -536,7 +540,7 @@ func (a *app) watchGestor() {
 		tries = append([]string{a.cfg.Gestor}, tries...)
 	}
 	client := http.Client{Timeout: 4 * time.Second}
-	imageVer, voiceVer := a.cfg.ImageVer, a.cfg.VoiceVer // (letti qui: la configurazione la tocca solo la finestra)
+	imageVer, voiceVer, posesVer := a.cfg.ImageVer, a.cfg.VoiceVer, a.cfg.PosesVer // (letti qui: la configurazione la tocca solo la finestra)
 	for {
 		for _, base := range tries {
 			res, err := client.Get(base + "/silver/state")
@@ -547,6 +551,7 @@ func (a *app) watchGestor() {
 				Live   bool `json:"live"`
 				Assets struct {
 					Image int64 `json:"image"`
+					Poses int64 `json:"poses"`
 					Voice int64 `json:"voice"`
 				} `json:"assets"`
 			}
@@ -576,6 +581,27 @@ func (a *app) watchGestor() {
 								a.brain.Say(time.Now(), gotArt, "", "", nil)
 							}
 						}
+					}
+				}
+			}
+			// il foglio delle pose: nuovo, cambiato o tolto in Gestor
+			if v := st.Assets.Poses; v != posesVer {
+				var b []byte
+				if v != 0 {
+					b = download(base + "/silver/asset/poses")
+				}
+				if v == 0 || b != nil {
+					posesVer = v
+					a.post <- func() {
+						if v == 0 {
+							_ = os.Remove(filepath.Join(dataDir(), "poses.bin"))
+							a.r.SetPoses(nil)
+						} else if a.applyPoses(b) {
+							_ = os.WriteFile(filepath.Join(dataDir(), "poses.bin"), b, 0o644)
+							a.brain.Say(time.Now(), "Pose nuove. Non male, eh?", "", "", nil)
+						}
+						a.cfg.PosesVer = v
+						a.cfg.save()
 					}
 				}
 			}
@@ -622,6 +648,20 @@ func (a *app) applyImage(b []byte) bool {
 	}
 	a.r.SetSprite(img)
 	a.setTrayFace(img)
+	return true
+}
+
+// applyPoses: il foglio con più pose (Silver lo divide e usa la posa giusta per quello che fa)
+func (a *app) applyPoses(b []byte) bool {
+	img, err := decodeImage(b)
+	if err != nil {
+		return false
+	}
+	poses := splitSheet(img)
+	a.r.SetPoses(poses)
+	if a.cfg.ImageVer == 0 { // senza l'immagine singola, la faccia vicino all'orologio viene dalla prima posa
+		a.setTrayFace(poses[0])
+	}
 	return true
 }
 

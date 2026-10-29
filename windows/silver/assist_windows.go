@@ -171,6 +171,7 @@ func (a *app) onFeed(f Feed) {
 		return
 	}
 	if quiet := a.brain.Ctx.ID == "game" && a.brain.GameMode == "quiet"; len(events) > 0 && !quiet && (a.brain.Bubble == nil || !a.brain.Bubble.Alert) {
+		a.brain.Act(now)
 		if len(events) > 2 { // tanti insieme: uno solo
 			a.brain.Say(now, fmt.Sprintf("%s E altri %d avvisi.", events[len(events)-1], len(events)-1), "", "", nil)
 		} else {
@@ -244,6 +245,10 @@ func (a *app) reply(text string) {
 func (a *app) handleInput(text string) {
 	now := time.Now()
 	c := ParseCommand(text, now)
+	switch c.Kind { // fa qualcosa: la posa d'azione (se hai caricato le pose)
+	case "remind", "clear", "note", "music", "scene", "open":
+		a.brain.Act(now)
+	}
 	switch c.Kind {
 	case "help":
 		a.chat.Add("silver", helpText)

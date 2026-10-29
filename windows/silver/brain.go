@@ -136,7 +136,8 @@ type Brain struct {
 	IdleTask string
 	IdlePct  int
 
-	Thinking string // "Ci penso…": mentre l'IA risponde
+	Thinking string    // "Ci penso…": mentre l'IA risponde
+	actUntil time.Time // posa "in azione" (comandi, follow, donazioni)
 
 	OnChoicesChanged func()
 	OnAction         func(choice string) // pulsanti dei promemoria e degli avvisi (scelte che non sono dei giochi)
@@ -185,6 +186,29 @@ func (b *Brain) Reply(now time.Time, text string) {
 	b.Bubble = newBubble(noEmoji(text), now)
 	b.Bubble.Label, b.Bubble.Alert = label, !b.Enabled || b.Hidden()
 	b.lastSpoke = now
+}
+
+// Act: Silver "fa qualcosa" (ha eseguito un comando, è arrivato un follow…): la posa d'azione per un po'
+func (b *Brain) Act(now time.Time) { b.actUntil = now.Add(2500 * time.Millisecond) }
+
+// Frame: quale posa del foglio usare (n = quante sono): 1 normale, 1 e 2 alternate mentre parla,
+// 3 mentre ascolta o pensa, 4 in azione
+func (b *Brain) Frame(now time.Time, mono float64, n int) int {
+	pick := func(i int) int {
+		if i < n {
+			return i
+		}
+		return 0
+	}
+	switch {
+	case b.Thinking != "":
+		return pick(2)
+	case now.Before(b.actUntil):
+		return pick(3)
+	case b.Talking() && int(mono*6)%2 == 1:
+		return pick(1)
+	}
+	return 0
 }
 
 // Pose: l'atteggiamento di Silver (in live vince la live)
