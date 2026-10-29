@@ -38,6 +38,8 @@ var (
 	rePlayWords  = regexp.MustCompile(`\b(metti|suona|accendi|fai partire|riprendi|play|ascoltare|ascolta)\b`)
 	reVolUp      = regexp.MustCompile(`^(?:alza|alzare|aumenta|più alto|piu alto|più forte|piu forte)(?: il volume| la musica| un po'?)*$`)
 	reVolDown    = regexp.MustCompile(`^(?:abbassa|abbassare|diminuisci|più basso|piu basso|più piano|piu piano)(?: il volume| la musica| un po'?)*$`)
+	reOtherPl    = regexp.MustCompile(`\b(?:altra|un'altra|un altra|nuova|diversa|prossima|cambia(?:re)?|cambiami)\s+(?:la\s+)?playlist\b|\bplaylist\s+(?:diversa|nuova|differente)\b|\bcambia(?:re)?\s+(?:la\s+)?playlist\b`)
+	reAnyPl      = regexp.MustCompile(`\b(?:qualsiasi|qualunque|a caso|casuale|random)\b.*\bplaylist\b|\bplaylist\b.*\b(?:qualsiasi|qualunque|a caso|casuale|random)\b|\b(?:musica|qualcosa|canzoni|brani)\s+(?:a caso|qualsiasi|qualunque|random)\b`)
 	reNotMusic   = regexp.MustCompile(`(?i)\b(timer|promemoria|sveglia|scena|nota)\b`)
 	reLead       = regexp.MustCompile(`(?i)^\s*(?:di|che|a|:|-)\s+`)
 )
@@ -128,6 +130,15 @@ func ParseCommand(text string, now time.Time) Command {
 	}
 	if low == "musica" {
 		return Command{Kind: "music", Text: "toggle"}
+	}
+	// un'altra playlist / una a caso
+	if !reNotMusic.MatchString(m) {
+		switch {
+		case reOtherPl.MatchString(m):
+			return Command{Kind: "music", Text: "otherPlaylist", Where: where}
+		case reAnyPl.MatchString(m):
+			return Command{Kind: "music", Text: "randomPlaylist", Where: where}
+		}
 	}
 	// frasi più libere: "cambia canzone dalla playlist Alf", "metti qualcosa della playlist Chill", "un'altra canzone"
 	if g := rePlaylist.FindStringSubmatch(m); g != nil && !reNotMusic.MatchString(m) {

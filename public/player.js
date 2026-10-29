@@ -252,7 +252,19 @@
     return { playing: Boolean(t) && !audio.paused, title: i?.title ?? '', artist: i?.artist ?? '', playlist: t ? (playlistOfQueue === ALL ? '' : playlistOfQueue) : '', volume: Math.round(prefs.volume * 100), tracks: tracks.length };
   };
   const norm = (x) => String(x).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-  function remoteFind(q) {
+  // una playlist a caso (diversa da quella che suona, se si chiede "un'altra")
+  function remoteRandomPlaylist(other) {
+    let lists = playlists().filter((p) => p.id !== ALL && (!other || p.id !== playlistOfQueue));
+    if (!lists.length) lists = playlists().filter((p) => p.id !== ALL);
+    if (!lists.length) { playPlaylist(ALL); return { ok: true, text: 'Non hai playlist: metto tutta la musica.' }; }
+    const pl = lists[Math.floor(Math.random() * lists.length)];
+    shown = pl.id; playPlaylist(pl.id); renderPlaylists();
+    const i = current() ? infoOf(current()) : null;
+    return { ok: true, text: `Playlist ${pl.name}${i ? `: ${i.title}${i.artist ? ` di ${i.artist}` : ''}` : ''}.` };
+  }
+  // parole di contorno che non servono a cercare ("metti musica da una playlist che ho")
+  const FILLER = new Set('metti metta mettimi suona suonami musica canzone canzoni brano brani pezzo pezzi traccia tracce da dalla della delle dei degli di del una un uno la il lo le gli i che ho mia mie mio miei tua per favore po qualcosa ascoltare sentire voglio vorrei puoi altra altro qualsiasi qualunque caso a random diversa nuova cambia'.split(' '));
+  function remoteFind(q, retry = true) {
     let want = norm(q);
     const onlyPlaylist = want.startsWith('playlist ');
     if (onlyPlaylist) want = want.slice(9).trim();
@@ -267,10 +279,15 @@
       const i = current() ? infoOf(current()) : null;
       return { ok: true, text: `Playlist ${pl.name}${i ? `: ${i.title}${i.artist ? ` di ${i.artist}` : ''}` : ''}.` };
     }
-    if (onlyPlaylist) return { ok: false, text: `Non trovo la playlist "${q.replace(/^playlist\s+/i, '')}". Ho: ${lists.map((p) => p.name).join(', ') || 'nessuna playlist'}.` };
+    if (onlyPlaylist && !retry) return { ok: false, text: `Non trovo la playlist "${q.replace(/^playlist\s+/i, '')}". Ho: ${lists.map((p) => p.name).join(', ') || 'nessuna playlist'}.` };
     const words = want.split(' ');
     const hits = tracks.filter((t) => { const i = infoOf(t); const h = norm(`${i.title} ${i.artist} ${t.name}`); return words.every((w) => h.includes(w)); });
-    if (!hits.length) return { ok: false, text: `Non trovo "${q}" nella tua musica.` };
+    if (!hits.length) {
+      // senza le parole di contorno: se non resta niente, una playlist a caso
+      const core = want.split(' ').filter((w) => w && w !== 'playlist' && !FILLER.has(w)).join(' ');
+      if (retry && core !== want) return core ? remoteFind(core, false) : remoteRandomPlaylist(false);
+      return { ok: false, text: `Non trovo "${q.replace(/^playlist\s+/i, '')}" nella tua musica. Le tue playlist: ${lists.map((p) => p.name).join(', ') || 'nessuna'}.` };
+    }
     let ids = hits.map((t) => t.id);
     if (prefs.shuffle) ids = shuffled(ids);
     queue = ids; index = 0; playlistOfQueue = ALL;
@@ -292,6 +309,8 @@
         break;
       }
       case 'find': res = remoteFind(cmd.query ?? ''); break;
+      case 'otherPlaylist': res = remoteRandomPlaylist(true); break;
+      case 'randomPlaylist': res = remoteRandomPlaylist(false); break;
       default: break;
     }
     return { ...res, state: remoteState() };
