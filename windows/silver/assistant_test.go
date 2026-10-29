@@ -71,7 +71,7 @@ func TestOllamaFinto(t *testing.T) {
 				Messages []chatMsg `json:"messages"`
 			}
 			json.NewDecoder(r.Body).Decode(&body)
-			if body.Model != "gemma3:4b" || body.Messages[0].Role != "system" {
+			if body.Model != "llama3.2:3b" || body.Messages[0].Role != "system" {
 				w.WriteHeader(400)
 				return
 			}

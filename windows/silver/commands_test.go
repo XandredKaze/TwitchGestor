@@ -53,7 +53,10 @@ func TestComandi(t *testing.T) {
 }
 
 func TestModello(t *testing.T) {
-	if m := pickModel([]string{"nomic-embed-text:latest", "llama3.2:3b", "gemma3:4b"}, ""); m != "gemma3:4b" {
+	if m := pickModel([]string{"nomic-embed-text:latest", "llama3.2:3b", "gemma3:4b"}, ""); m != "llama3.2:3b" {
+		t.Error(m)
+	}
+	if m := pickModel([]string{"gemma3:4b"}, "gemma3:4b", "gemma3:4b"); m != "" {
 		t.Error(m)
 	}
 	if m := pickModel([]string{"nomic-embed-text:latest", "mistral:latest"}, ""); m != "mistral:latest" {

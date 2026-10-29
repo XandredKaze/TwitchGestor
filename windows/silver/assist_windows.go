@@ -19,13 +19,14 @@ import (
 )
 
 const (
-	pairHint  = "Per gli avvisi e i comandi devo collegarmi a TwitchGestor: apri ⚙ Sistema → 🧰 Tools e premi \"Consenti\"."
-	paired    = "Collegato a TwitchGestor. Adesso ti tengo d'occhio anche lì."
-	needPair  = "Prima collegami a TwitchGestor: dal mio menu scegli \"Collega a TwitchGestor\", poi in ⚙ Sistema → 🧰 Tools premi \"Consenti\"."
-	noOllama  = "Per risponderti mi serve l'IA sul tuo PC: Ollama, gratis. Installalo (due clic), poi chiedimi di nuovo."
-	askPull   = "Ollama c'è, ma manca il cervello: lo scarico? Sono circa 3 GB, una volta sola."
-	noGestor  = "Non trovo TwitchGestor. Il Raspberry è acceso?"
-	hotkeyTip = "Scrivimi quando vuoi: Ctrl+Alt+S."
+	pairHint     = "Per gli avvisi e i comandi devo collegarmi a TwitchGestor: apri ⚙ Sistema → 🧰 Tools e premi \"Consenti\"."
+	paired       = "Collegato a TwitchGestor. Adesso ti tengo d'occhio anche lì."
+	needPair     = "Prima collegami a TwitchGestor: dal mio menu scegli \"Collega a TwitchGestor\", poi in ⚙ Sistema → 🧰 Tools premi \"Consenti\"."
+	noOllama     = "Per risponderti mi serve l'IA sul tuo PC: Ollama, gratis. Installalo (due clic), poi chiedimi di nuovo."
+	askPull      = "Ollama c'è, ma manca il cervello: lo scarico? Sono circa 2 GB, una volta sola."
+	askPullAgain = "Il cervello che ho non funziona su questo PC. Ne scarico uno più leggero? Circa 2 GB, una volta sola."
+	noGestor     = "Non trovo TwitchGestor. Il Raspberry è acceso?"
+	hotkeyTip    = "Scrivimi quando vuoi: Ctrl+Alt+S."
 )
 
 func (a *app) gestorBase() string {
@@ -192,10 +193,8 @@ func (a *app) checkReminders(now time.Time) {
 	a.cfg.Reminders = append(rest, due[1:]...)
 	a.cfg.save()
 	a.lastAlert = r.Text
-	a.brain.Alert(now, "⏰ "+r.Text, []Action{{"Fatto", "x:done"}, {"Tra 10 minuti", "x:snooze"}})
-	if a.panel != nil {
-		a.panel.add("Silver: ⏰ " + r.Text)
-	}
+	a.brain.Alert(now, r.Text, []Action{{"Fatto", "x:done"}, {"Tra 10 minuti", "x:snooze"}})
+	a.chat.Add("silver", "⏰ "+r.Text)
 }
 
 func (a *app) addReminder(at time.Time, text string) {
@@ -229,15 +228,13 @@ func (a *app) submitPanel() {
 	if text == "" {
 		return
 	}
-	a.panel.add("Tu: " + text)
+	a.chat.Add("me", text)
 	a.handleInput(text)
 }
 
 // reply: risponde nel fumetto e nella finestra
 func (a *app) reply(text string) {
-	if a.panel != nil {
-		a.panel.add("Silver: " + text)
-	}
+	a.chat.Add("silver", text)
 	a.brain.Reply(time.Now(), short(text, 170))
 }
 
@@ -246,9 +243,7 @@ func (a *app) handleInput(text string) {
 	c := ParseCommand(text, now)
 	switch c.Kind {
 	case "help":
-		if a.panel != nil {
-			a.panel.add("Silver: " + helpText)
-		}
+		a.chat.Add("silver", helpText)
 		a.brain.Reply(now, "Ecco cosa so fare. Leggi nella finestra.")
 	case "time":
 		a.reply("Sono le " + now.Format("15:04") + ". " + a.pick([]string{"Il tempo vola, tu un po' meno.", "Fai tu.", ""}))
@@ -356,19 +351,23 @@ func (a *app) askAI(q string) {
 	history := append([]chatMsg(nil), a.history...)
 	go func() {
 		ok, models := a.ai.Detect(context.Background())
-		model := pickModel(models, a.cfg.Model)
+		model := pickModel(models, a.cfg.Model, a.cfg.BadModels...)
 		if !ok || model == "" {
 			a.post <- func() {
 				a.aiBusy = false
 				a.brain.Thinking = ""
 				now := time.Now()
 				if !ok {
-					a.panelLine("Silver: " + noOllama)
+					a.chat.Add("silver", noOllama)
 					a.brain.Alert(now, noOllama, []Action{{"Apri la pagina di Ollama", "x:ollama"}})
 				} else {
 					a.pendingQ = q
-					a.panelLine("Silver: " + askPull)
-					a.brain.Alert(now, askPull, []Action{{"Sì, scarica", "x:pull"}, {"No", "x:nopull"}})
+					msg := askPull
+					if len(a.cfg.BadModels) > 0 {
+						msg = askPullAgain
+					}
+					a.chat.Add("silver", msg)
+					a.brain.Alert(now, msg, []Action{{"Sì, scarica", "x:pull"}, {"No", "x:nopull"}})
 				}
 			}
 			return
@@ -376,27 +375,29 @@ func (a *app) askAI(q string) {
 		a.ai.Model = model
 		msgs := append([]chatMsg{{"system", systemPrompt(time.Now(), ctxInfo, live, next)}}, history...)
 		msgs = append(msgs, chatMsg{"user", q})
-		a.post <- func() { a.panelLine("Silver: ") }
+		a.post <- func() { a.chat.Add("silver", "") }
 		answer, err := a.ai.Chat(context.Background(), msgs, func(tok string) {
-			a.post <- func() {
-				if a.panel != nil {
-					a.panel.appendLast(tok)
-				}
-			}
+			a.post <- func() { a.chat.AppendLast(tok) }
 		})
 		answer = strings.TrimSpace(plain(answer))
 		a.post <- func() {
 			a.aiBusy = false
 			a.brain.Thinking = ""
 			if err != nil && answer == "" {
-				a.panelSetLast("Silver: Non riesco a pensare: " + err.Error())
+				if brokenModel(err) { // questo modello non parte sul PC: si segna e se ne usa (o scarica) un altro
+					a.cfg.BadModels = append(a.cfg.BadModels, model)
+					a.cfg.Model = ""
+					a.cfg.save()
+					a.chat.SetLast("error", "Il cervello "+model+" non riesce a partire su questo PC. Ne provo un altro.")
+					a.askAI(q)
+					return
+				}
+				a.chat.SetLast("error", "Non riesco a pensare: "+err.Error())
 				a.brain.Reply(time.Now(), "Qualcosa non va con l'IA. Dettagli nella finestra.")
 				return
 			}
-			if a.panel != nil {
-				a.panel.setLast("Silver: " + answer)
-				a.panel.lastAnswer = answer
-			}
+			a.cfg.Model = model
+			a.chat.SetLast("silver", answer)
 			a.history = append(a.history, chatMsg{"user", q}, chatMsg{"assistant", answer})
 			if len(a.history) > 8 {
 				a.history = a.history[len(a.history)-8:]
@@ -406,18 +407,6 @@ func (a *app) askAI(q string) {
 	}()
 }
 
-func (a *app) panelLine(s string) {
-	if a.panel != nil {
-		a.panel.add(s)
-	}
-}
-
-func (a *app) panelSetLast(s string) {
-	if a.panel != nil {
-		a.panel.setLast(s)
-	}
-}
-
 // pullModel: scarica il modello (una volta sola), poi risponde alla domanda rimasta in sospeso
 func (a *app) pullModel() {
 	if a.aiBusy {
@@ -425,7 +414,7 @@ func (a *app) pullModel() {
 	}
 	a.aiBusy = true
 	a.brain.Thinking = "Scarico il cervello…"
-	a.panelLine("Silver: Scarico " + defaultModel + "…")
+	a.chat.Add("silver", "Scarico il cervello ("+defaultModel+")…")
 	go func() {
 		last := time.Time{}
 		err := a.ai.Pull(context.Background(), defaultModel, func(f float64, status string) {
@@ -436,20 +425,23 @@ func (a *app) pullModel() {
 			pct := int(f * 100)
 			a.post <- func() {
 				a.brain.Thinking = fmt.Sprintf("Scarico il cervello… %d%%", pct)
-				a.panelSetLast(fmt.Sprintf("Silver: Scarico %s… %d%%", defaultModel, pct))
+				a.chat.SetLast("silver", fmt.Sprintf("Scarico il cervello (%s)… %d%%", defaultModel, pct))
 			}
 		})
 		a.post <- func() {
 			a.aiBusy = false
 			a.brain.Thinking = ""
 			if err != nil {
-				a.panelSetLast("Silver: Download non riuscito: " + err.Error())
+				a.chat.SetLast("error", "Download non riuscito: "+err.Error())
 				a.brain.Reply(time.Now(), "Il download non è andato. Riprova più tardi.")
 				return
 			}
 			a.cfg.Model = defaultModel
 			a.cfg.save()
-			a.panelSetLast("Silver: Fatto, ho il cervello. Adesso ragiono.")
+			for _, m := range a.cfg.BadModels { // quelli che non partivano: si tolgono (liberano spazio)
+				go a.ai.Delete(context.Background(), m)
+			}
+			a.chat.SetLast("silver", "Fatto, ho il cervello. Adesso ragiono.")
 			if q := a.pendingQ; q != "" {
 				a.pendingQ = ""
 				a.askAI(q)

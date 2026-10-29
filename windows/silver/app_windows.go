@@ -224,7 +224,8 @@ type config struct {
 	PairDenied    bool       `json:"pairDenied"`
 	PairHintShown bool       `json:"pairHintShown"`
 	Reminders     []Reminder `json:"reminders"`
-	Model         string     `json:"model"` // il modello dell'IA (Ollama)
+	Model         string     `json:"model"`     // il modello dell'IA (Ollama)
+	BadModels     []string   `json:"badModels"` // modelli che su questo PC non partono
 }
 
 func dataDir() string {
@@ -302,6 +303,7 @@ type app struct {
 
 	// le cose utili (assist_windows.go)
 	panel     *panel
+	chat      *ChatView
 	ai        *AI
 	aiBusy    bool
 	history   []chatMsg
@@ -335,10 +337,14 @@ func main() {
 	}
 	pSetDpiAwarenessCtx.Call(^uintptr(3)) // -4: per monitor v2 (schermi con scala diversa)
 
-	a := &app{cfg: loadConfig(), start: time.Now(), post: make(chan func(), 64), ai: NewAI(), rnd: rand.New(rand.NewSource(time.Now().UnixNano()))}
+	a := &app{cfg: loadConfig(), start: time.Now(), post: make(chan func(), 64), chat: NewChatView(), ai: NewAI(), rnd: rand.New(rand.NewSource(time.Now().UnixNano()))}
 	theApp = a
 	if a.cfg.Autostart {
 		setAutostart(true)
+	}
+	if a.cfg.Model == "gemma3:4b" && len(a.cfg.BadModels) == 0 { // il primo cervello scelto da Silver vede anche le immagini: su molti PC non parte
+		a.cfg.Model, a.cfg.BadModels = "", []string{"gemma3:4b"}
+		a.cfg.save()
 	}
 	a.brain = NewBrain(time.Now().UnixNano())
 	a.brain.Enabled, a.brain.Voice, a.brain.Chattiness = a.cfg.Enabled, a.cfg.Voice, a.cfg.Chattiness
@@ -676,9 +682,8 @@ func (a *app) tick() {
 		a.lastRem = now
 		a.checkReminders(now)
 	}
-	if a.panel != nil {
-		a.panel.flush()
-	}
+	a.chat.Thinking, a.chat.Busy = a.brain.Thinking, a.aiBusy
+	a.paintPanel(now)
 	a.brain.Tick(now, a.userIdle())
 	if a.voice != nil {
 		a.voice.SetSpeaking(a.brain.Speaking())

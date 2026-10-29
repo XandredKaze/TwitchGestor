@@ -607,7 +607,7 @@ func (r *Renderer) drawBubble(img *image.RGBA, bb *Bubble, now time.Time, mono f
 // ---------- disegno di base (con i bordi morbidi) ----------
 
 func blend(img *image.RGBA, x, y int, c color.NRGBA, cov float64) {
-	if cov <= 0 || x < 0 || y < 0 || x >= img.Rect.Dx() || y >= img.Rect.Dy() {
+	if cov <= 0 || !image.Pt(x, y).In(img.Rect) { // (anche su un pezzo di immagine: SubImage)
 		return
 	}
 	if cov > 1 {

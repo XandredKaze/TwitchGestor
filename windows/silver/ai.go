@@ -17,11 +17,21 @@ import (
 
 const ollamaURL = "http://127.0.0.1:11434"
 
-// in ordine di preferenza: piccoli, buoni in italiano, girano su un PC normale
-var preferredModels = []string{"gemma3:4b", "qwen3:4b", "llama3.2:3b", "qwen2.5:3b", "gemma3:1b", "gemma2:2b"}
+// in ordine di preferenza: piccoli, solo testo (quelli che "vedono" le immagini su alcuni PC non partono),
+// buoni in italiano, girano su un PC normale
+var preferredModels = []string{"qwen2.5:3b", "llama3.2:3b", "qwen3:4b", "gemma2:2b", "qwen2.5:1.5b", "gemma3:4b", "gemma3:1b"}
 
-// il modello che scarica se non ce n'è nessuno (circa 3 GB)
-const defaultModel = "gemma3:4b"
+// il modello che scarica se non ce n'è nessuno (circa 2 GB)
+const defaultModel = "qwen2.5:3b"
+
+// brokenModel: l'errore dice che il modello non riesce a partire su questo PC (meglio cambiarlo)
+func brokenModel(err error) bool {
+	if err == nil {
+		return false
+	}
+	e := strings.ToLower(err.Error())
+	return strings.Contains(e, "clip") || strings.Contains(e, "llama-server") || strings.Contains(e, "no longer running") || strings.Contains(e, "unable to load model") || strings.Contains(e, "exit status")
+}
 
 type chatMsg struct {
 	Role    string `json:"role"`
@@ -61,8 +71,19 @@ func (a *AI) Detect(ctx context.Context) (ok bool, models []string) {
 }
 
 // pickModel: il preferito tra quelli scaricati (altrimenti il primo che c'è; "" se nessuno)
-func pickModel(models []string, want string) string {
+func pickModel(models []string, want string, bad ...string) string {
 	has := map[string]bool{}
+	skip := map[string]bool{}
+	for _, b := range bad {
+		skip[b], skip[strings.TrimSuffix(b, ":latest")] = true, true
+	}
+	var ok []string
+	for _, m := range models {
+		if !skip[m] && !skip[strings.TrimSuffix(m, ":latest")] {
+			ok = append(ok, m)
+		}
+	}
+	models = ok
 	for _, m := range models {
 		has[m] = true
 		has[strings.TrimSuffix(m, ":latest")] = true
@@ -120,6 +141,15 @@ func (a *AI) Pull(ctx context.Context, model string, progress func(float64, stri
 		return err
 	}
 	return fmt.Errorf("download interrotto")
+}
+
+// Delete: toglie un modello da Ollama (quelli che su questo PC non partono: liberano spazio)
+func (a *AI) Delete(ctx context.Context, model string) {
+	body, _ := json.Marshal(map[string]string{"model": model})
+	req, _ := http.NewRequestWithContext(ctx, "DELETE", a.URL+"/api/delete", bytes.NewReader(body))
+	if res, err := a.client.Do(req); err == nil {
+		res.Body.Close()
+	}
 }
 
 // Chat: la risposta arriva a pezzi in onToken; restituisce il testo intero
@@ -207,6 +237,7 @@ func systemPrompt(now time.Time, ctx Context, live bool, nextLive string) string
 	b.WriteString("Sei Silver, il compagno sul desktop di uno streamer italiano. Rispondi SEMPRE in italiano, in modo chiaro e utile. ")
 	b.WriteString("Carattere: un po' spigoloso ma elegante, mai volgare; una battuta ogni tanto, senza esagerare. ")
 	b.WriteString("Vai dritto al punto: di solito 1-4 frasi. Se ti chiede un testo da usare (titolo, messaggio, post, elenco), scrivilo pronto da copiare, senza giri di parole. ")
+	b.WriteString("Non puoi navigare in internet, cercare o vedere immagini: se te lo chiede dillo in breve e aiuta comunque (parole chiave da cercare, siti adatti, idee). ")
 	b.WriteString("Non usare Markdown (niente asterischi o #): solo testo semplice, elenchi con •. ")
 	fmt.Fprintf(&b, "Adesso: %s %s.", weekdays[now.Weekday()], now.Format("02/01/2006 15:04"))
 	if ctx.Name != "" {

@@ -3,7 +3,8 @@
 package main
 
 // La finestra per scrivere a Silver (Ctrl+Alt+S o dal menu): sopra la barra delle applicazioni, accanto a lui.
-// Sopra la conversazione (si può selezionare e copiare), sotto la riga dove scrivi: Invio manda, Esc chiude.
+// È disegnata come il fumetto (chatview.go); l'unico pezzo di Windows è la riga dove scrivi (un campo vero:
+// tastiera, incolla, accenti funzionano come sempre). Invio manda, Esc chiude, la rotellina scorre.
 
 import (
 	"strings"
@@ -19,12 +20,12 @@ var (
 	pSetWindowText     = user32.NewProc("SetWindowTextW")
 	pGetWindowTextLen  = user32.NewProc("GetWindowTextLengthW")
 	pSetFocus          = user32.NewProc("SetFocus")
-	pIsDialogMessage   = user32.NewProc("IsDialogMessageW")
 	pIsWindowVisible   = user32.NewProc("IsWindowVisible")
 	pMoveWindow        = user32.NewProc("MoveWindow")
 	pBeginPaint        = user32.NewProc("BeginPaint")
 	pEndPaint          = user32.NewProc("EndPaint")
-	pGetClientRect     = user32.NewProc("GetClientRect")
+	pReleaseDC         = user32.NewProc("ReleaseDC")
+	pSetWindowRgn      = user32.NewProc("SetWindowRgn")
 	pRegisterHotKey    = user32.NewProc("RegisterHotKey")
 	pOpenClipboard     = user32.NewProc("OpenClipboard")
 	pEmptyClipboard    = user32.NewProc("EmptyClipboard")
@@ -34,47 +35,38 @@ var (
 	pCreateFont        = gdi32.NewProc("CreateFontW")
 	pSetTextColor      = gdi32.NewProc("SetTextColor")
 	pSetBkColor        = gdi32.NewProc("SetBkColor")
-	pSetBkMode         = gdi32.NewProc("SetBkMode")
-	pTextOut           = gdi32.NewProc("TextOutW")
+	pSetDIBitsToDevice = gdi32.NewProc("SetDIBitsToDevice")
+	pCreateRoundRgn    = gdi32.NewProc("CreateRoundRectRgn")
 	pGlobalAlloc       = kernel32.NewProc("GlobalAlloc")
 	pGlobalLock        = kernel32.NewProc("GlobalLock")
 	pGlobalUnlock      = kernel32.NewProc("GlobalUnlock")
 	pMoveMemory        = kernel32.NewProc("RtlMoveMemory")
 	pShellExecute      = shell32.NewProc("ShellExecuteW")
+	pDwmSetWindowAttr  = windows.NewLazySystemDLL("dwmapi.dll").NewProc("DwmSetWindowAttribute")
 	pSetWindowSubclass = windows.NewLazySystemDLL("comctl32.dll").NewProc("SetWindowSubclass")
 	pDefSubclassProc   = windows.NewLazySystemDLL("comctl32.dll").NewProc("DefSubclassProc")
 	panelProcCallback  = windows.NewCallback(panelProc)
 	inputSubclassCbk   = windows.NewCallback(inputSubclass)
 	panelClassName, _  = windows.UTF16PtrFromString("SilverChat")
 	editClass, _       = windows.UTF16PtrFromString("EDIT")
-	buttonClass, _     = windows.UTF16PtrFromString("BUTTON")
 )
 
 const (
 	wsChild        = 0x40000000
 	wsVisible      = 0x10000000
-	wsVScroll      = 0x00200000
-	wsTabStop      = 0x00010000
-	wsBorder       = 0x00800000
-	wsExCtrlParent = 0x00010000
-	esMultiline    = 0x0004
-	esAutoVScroll  = 0x0040
+	wsClipChildren = 0x02000000
 	esAutoHScroll  = 0x0080
-	esReadOnly     = 0x0800
-	bsDefPush      = 0x0001
-	emSetSel       = 0x00B1
-	emScrollCaret  = 0x00B7
 	emSetMargins   = 0x00D3
 	emSetCueBanner = 0x1501
 	wmSetFont      = 0x0030
-	wmCommand      = 0x0111
 	wmPaint        = 0x000F
 	wmClose        = 0x0010
+	wmEraseBkgnd   = 0x0014
 	wmKeyDown      = 0x0100
 	wmChar         = 0x0102
 	wmHotkey       = 0x0312
+	wmMouseWheel   = 0x020A
 	wmCtlColorEdit = 0x0133
-	wmCtlColorStat = 0x0138
 	swHide         = 0
 	swShow         = 5
 	modAlt         = 0x1
@@ -82,18 +74,8 @@ const (
 	modNoRepeat    = 0x4000
 	cfUnicodeText  = 13
 	gmemMoveable   = 0x2
-	idSend         = 1 // IDOK: Invio
-	idClose        = 2 // IDCANCEL: Esc
-	idCopy         = 3
-)
-
-// colori (COLORREF: 0x00BBGGRR)
-const (
-	crBg     = 0x00211A16 // #161A21
-	crField  = 0x002C231E // #1E232C
-	crText   = 0x00EFE9E6
-	crMuted  = 0x00A6968D
-	crAccent = 0x00B0D35F
+	crText         = 0x00EFE9E6 // COLORREF 0x00BBGGRR: come cText
+	crField        = 0x002C231E // come cCard
 )
 
 type paintStruct struct {
@@ -106,68 +88,60 @@ type paintStruct struct {
 }
 
 type panel struct {
-	hwnd, out, in, send, copy, close uintptr
-	font, bold                       uintptr
-	fieldBrush                       uintptr
-	log                              []string // righe della conversazione
-	dirty                            bool
-	lastAnswer                       string
-	scale                            float64
+	hwnd, in   uintptr
+	font       uintptr
+	fieldBrush uintptr
+	scale      float64
+	hits       []ChatHit
+	tracking   bool
+	sig        string // cosa c'era nell'ultimo disegno (si ridisegna solo se cambia)
+	bgra       []byte // l'ultimo disegno, pronto per Windows
+	w, h       int
+	dwmRound   bool
 }
 
 func (a *app) createPanel() {
 	p := &panel{}
 	a.panel = p
-	bg, _, _ := pCreateSolidBrush.Call(crBg)
 	p.fieldBrush, _, _ = pCreateSolidBrush.Call(crField)
 	cursor, _, _ := pLoadCursor.Call(0, idcArrow)
-	wc := wndClassEx{WndProc: panelProcCallback, Instance: a.inst, ClassName: panelClassName, Cursor: cursor, Background: bg, Icon: a.tray.Icon, IconSm: a.tray.Icon}
+	wc := wndClassEx{WndProc: panelProcCallback, Instance: a.inst, ClassName: panelClassName, Cursor: cursor, Icon: a.tray.Icon, IconSm: a.tray.Icon}
 	wc.Size = uint32(unsafe.Sizeof(wc))
 	pRegisterClassEx.Call(uintptr(unsafe.Pointer(&wc)))
 	title, _ := windows.UTF16PtrFromString("Chiedi a Silver")
-	p.hwnd, _, _ = pCreateWindowEx.Call(wsExTopmost|wsExToolWindow|wsExCtrlParent, uintptr(unsafe.Pointer(panelClassName)), uintptr(unsafe.Pointer(title)), wsPopup|wsBorder, 0, 0, 10, 10, 0, 0, uintptr(a.inst), 0)
-	child := func(class *uint16, text string, style, id uintptr) uintptr {
-		t, _ := windows.UTF16PtrFromString(text)
-		h, _, _ := pCreateWindowEx.Call(0, uintptr(unsafe.Pointer(class)), uintptr(unsafe.Pointer(t)), wsChild|wsVisible|style, 0, 0, 10, 10, p.hwnd, id, uintptr(a.inst), 0)
-		return h
+	p.hwnd, _, _ = pCreateWindowEx.Call(wsExTopmost|wsExToolWindow, uintptr(unsafe.Pointer(panelClassName)), uintptr(unsafe.Pointer(title)), wsPopup|wsClipChildren, 0, 0, 10, 10, 0, 0, uintptr(a.inst), 0)
+	// angoli arrotondati: Windows 11 li fa da sé (morbidi); su Windows 10 si taglia la finestra
+	pref := uint32(2) // DWMWCP_ROUND
+	if r, _, _ := pDwmSetWindowAttr.Call(p.hwnd, 33, uintptr(unsafe.Pointer(&pref)), 4); r == 0 {
+		p.dwmRound = true
+		a.chat.Radius = 8
 	}
-	p.out = child(editClass, "", wsVScroll|esMultiline|esReadOnly|esAutoVScroll, 10)
-	p.in = child(editClass, "", wsTabStop|esAutoHScroll, 11)
-	p.send = child(buttonClass, "Invia", wsTabStop|bsDefPush, idSend)
-	p.copy = child(buttonClass, "Copia risposta", wsTabStop, idCopy)
-	p.close = child(buttonClass, "✕", wsTabStop, idClose)
-	cue, _ := windows.UTF16PtrFromString("Scrivi qui (es. \"ricordami tra 20 minuti di bere\")")
+	empty, _ := windows.UTF16PtrFromString("")
+	p.in, _, _ = pCreateWindowEx.Call(0, uintptr(unsafe.Pointer(editClass)), uintptr(unsafe.Pointer(empty)), wsChild|wsVisible|esAutoHScroll, 0, 0, 10, 10, p.hwnd, 11, uintptr(a.inst), 0)
+	cue, _ := windows.UTF16PtrFromString("Scrivi qui… (es. \"ricordami tra 20 minuti di bere\")")
 	pSendMessage.Call(p.in, emSetCueBanner, 1, uintptr(unsafe.Pointer(cue)))
-	// Invio nella riga: lo intercettiamo noi (IsDialogMessage lo farebbe, ma così funziona sempre)
-	pSetWindowSubclass.Call(p.in, inputSubclassCbk, 1, 0)
-	p.layout(a.scale)
+	pSetWindowSubclass.Call(p.in, inputSubclassCbk, 1, 0) // Invio manda, Esc chiude
+	p.layout(a)
 }
 
-func (p *panel) layout(scale float64) {
-	p.scale = scale
-	s := func(v float64) int32 { return int32(v * scale) }
+func (p *panel) layout(a *app) {
+	p.scale = a.scale
+	s := a.scale
+	p.w, p.h = int(chatW*s+0.999), int(chatH*s+0.999)
 	if p.font != 0 {
 		pDeleteObject.Call(p.font)
-		pDeleteObject.Call(p.bold)
 	}
 	face, _ := windows.UTF16PtrFromString("Segoe UI")
-	p.font, _, _ = pCreateFont.Call(uintptr(-s(15)), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, uintptr(unsafe.Pointer(face)))
-	p.bold, _, _ = pCreateFont.Call(uintptr(-s(15)), 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 5, 0, uintptr(unsafe.Pointer(face)))
-	for _, h := range []uintptr{p.out, p.in, p.send, p.copy, p.close} {
-		pSendMessage.Call(h, wmSetFont, p.font, 1)
+	p.font, _, _ = pCreateFont.Call(uintptr(-int32(15*s)), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, uintptr(unsafe.Pointer(face)))
+	pSendMessage.Call(p.in, wmSetFont, p.font, 1)
+	f := a.chat.Field(s)
+	pMoveWindow.Call(p.in, uintptr(int32(f.x)), uintptr(int32(f.y)), uintptr(int32(f.w)), uintptr(int32(f.h)), 1)
+	if !p.dwmRound {
+		d := uintptr(int32(2 * a.chat.Radius * s))
+		rgn, _, _ := pCreateRoundRgn.Call(0, 0, uintptr(p.w+1), uintptr(p.h+1), d, d)
+		pSetWindowRgn.Call(p.hwnd, rgn, 1)
 	}
-	m := uintptr(s(6))
-	pSendMessage.Call(p.out, emSetMargins, 3, m|m<<16)
-	pSendMessage.Call(p.in, emSetMargins, 3, m|m<<16)
-	w, h := s(420), s(340)
-	move := func(hw uintptr, x, y, cw, ch int32) {
-		pMoveWindow.Call(hw, uintptr(x), uintptr(y), uintptr(cw), uintptr(ch), 1)
-	}
-	move(p.close, w-s(40), s(8), s(30), s(26))
-	move(p.copy, w-s(40)-s(118), s(8), s(112), s(26))
-	move(p.out, s(12), s(42), w-s(24), h-s(42)-s(56))
-	move(p.in, s(12), h-s(44), w-s(24)-s(78), s(30))
-	move(p.send, w-s(12)-s(70), h-s(44), s(70), s(30))
+	p.sig = ""
 }
 
 // show: accanto a Silver, sopra la barra delle applicazioni
@@ -177,16 +151,13 @@ func (a *app) showPanel() {
 	}
 	p := a.panel
 	if p.scale != a.scale {
-		p.layout(a.scale)
+		p.layout(a)
 	}
-	w, h := int32(420*a.scale), int32(340*a.scale)
 	x := a.pos.X + int32((winW-8)*a.scale)
-	y := a.pos.Y + int32(a.bh) - h - int32(6*a.scale)
-	pMoveWindow.Call(p.hwnd, uintptr(x), uintptr(y), uintptr(w), uintptr(h), 1)
-	if len(p.log) == 0 {
-		p.add("Silver: Dimmi. (Scrivi \"aiuto\" per vedere cosa so fare.)")
-	}
-	p.flush()
+	y := a.pos.Y + int32(a.bh) - int32(p.h) - int32(6*a.scale)
+	pMoveWindow.Call(p.hwnd, uintptr(x), uintptr(y), uintptr(p.w), uintptr(p.h), 1)
+	p.sig = ""
+	a.paintPanel(time.Now())
 	pShowWindow.Call(p.hwnd, swShow)
 	pSetForegroundWindow.Call(p.hwnd)
 	pSetFocus.Call(p.in)
@@ -206,45 +177,60 @@ func (a *app) panelVisible() bool {
 	return v != 0
 }
 
-// add: una riga nuova nella conversazione
-func (p *panel) add(line string) {
-	p.log = append(p.log, line)
-	if len(p.log) > 200 {
-		p.log = p.log[len(p.log)-200:]
-	}
-	p.dirty = true
-}
-
-// appendLast: la risposta che arriva a pezzi
-func (p *panel) appendLast(s string) {
-	if len(p.log) == 0 {
-		p.log = append(p.log, "")
-	}
-	p.log[len(p.log)-1] += s
-	p.dirty = true
-}
-
-func (p *panel) setLast(s string) {
-	if len(p.log) == 0 {
-		p.log = append(p.log, "")
-	}
-	p.log[len(p.log)-1] = s
-	p.dirty = true
-}
-
-// flush: aggiorna il testo (al massimo una volta per fotogramma) e va in fondo
-func (p *panel) flush() {
-	if !p.dirty || p.hwnd == 0 {
+// paintPanel: ridisegna se qualcosa è cambiato (o se i puntini "ci penso" si muovono)
+func (a *app) paintPanel(now time.Time) {
+	p := a.panel
+	if p == nil || !a.panelVisible() && p.sig != "" {
 		return
 	}
-	p.dirty = false
-	text := strings.ReplaceAll(strings.Join(p.log, "\n\n"), "\r", "")
-	text = strings.ReplaceAll(text, "\n", "\r\n")
-	t, _ := windows.UTF16PtrFromString(text)
-	pSetWindowText.Call(p.out, uintptr(unsafe.Pointer(t)))
-	n, _, _ := pGetWindowTextLen.Call(p.out)
-	pSendMessage.Call(p.out, emSetSel, n, n)
-	pSendMessage.Call(p.out, emScrollCaret, 0, 0)
+	v := a.chat
+	last := ""
+	if n := len(v.Msgs); n > 0 {
+		last = v.Msgs[n-1].Text
+	}
+	sig := strings.Join([]string{itoaInt(len(v.Msgs)), itoaInt(len(last)), v.Thinking, v.HoverID, itoaInt(int(v.Scroll)), itoaInt(v.Copied), boolS(v.Busy), boolS(now.Sub(v.CopiedAt) < 2*time.Second)}, "|")
+	if sig == p.sig && v.Thinking == "" {
+		return
+	}
+	p.sig = sig
+	img, hits := v.Render(a.r, now, now.Sub(a.start).Seconds())
+	p.hits = hits
+	if len(p.bgra) != len(img.Pix) {
+		p.bgra = make([]byte, len(img.Pix))
+	}
+	src := img.Pix
+	for i := 0; i+3 < len(src); i += 4 {
+		p.bgra[i], p.bgra[i+1], p.bgra[i+2], p.bgra[i+3] = src[i+2], src[i+1], src[i], 255
+	}
+	p.w, p.h = img.Rect.Dx(), img.Rect.Dy()
+	dc, _, _ := pGetDC.Call(p.hwnd)
+	p.blit(dc)
+	pReleaseDC.Call(p.hwnd, dc)
+}
+
+func boolS(b bool) string {
+	if b {
+		return "1"
+	}
+	return "0"
+}
+
+func (p *panel) blit(dc uintptr) {
+	if len(p.bgra) == 0 {
+		return
+	}
+	bi := bitmapInfoHeader{Width: int32(p.w), Height: -int32(p.h), Planes: 1, BitCount: 32}
+	bi.Size = uint32(unsafe.Sizeof(bi))
+	pSetDIBitsToDevice.Call(dc, 0, 0, uintptr(p.w), uintptr(p.h), 0, 0, 0, uintptr(p.h), uintptr(unsafe.Pointer(&p.bgra[0])), uintptr(unsafe.Pointer(&bi)), 0)
+}
+
+func (p *panel) hitAt(x, y float64) string {
+	for _, h := range p.hits {
+		if h.R.has(x, y) {
+			return h.ID
+		}
+	}
+	return ""
 }
 
 func (p *panel) takeInput() string {
@@ -254,6 +240,33 @@ func (p *panel) takeInput() string {
 	empty, _ := windows.UTF16PtrFromString("")
 	pSetWindowText.Call(p.in, uintptr(unsafe.Pointer(empty)))
 	return strings.TrimSpace(windows.UTF16ToString(buf))
+}
+
+// clickPanel: pulsanti disegnati (chiudi, manda, copia, suggerimenti)
+func (a *app) clickPanel(id string) {
+	switch {
+	case id == "close":
+		a.hidePanel()
+	case id == "send":
+		a.submitPanel()
+	case strings.HasPrefix(id, "copy:"):
+		i := 0
+		for _, c := range id[5:] {
+			i = i*10 + int(c-'0')
+		}
+		if i < len(a.chat.Msgs) && copyText(a.panel.hwnd, a.chat.Msgs[i].Text) {
+			a.chat.Copied, a.chat.CopiedAt = i, time.Now()
+		}
+	case strings.HasPrefix(id, "chip:"):
+		text := id[5:]
+		if text == "un titolo per la live" {
+			text = "Scrivimi tre idee di titolo per la mia prossima live"
+		}
+		a.chat.Add("me", text)
+		a.handleInput(text)
+	}
+	pSetFocus.Call(a.panel.hwnd)
+	pSetFocus.Call(a.panel.in)
 }
 
 func copyText(owner uintptr, text string) bool {
@@ -311,39 +324,56 @@ func panelProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 		return r
 	}
 	p := a.panel
+	x := float64(int16(lparam & 0xffff))
+	y := float64(int16((lparam >> 16) & 0xffff))
 	switch uint32(msg) {
-	case wmCommand:
-		switch wparam & 0xffff {
-		case idSend:
-			a.submitPanel()
-		case idClose:
-			a.hidePanel()
-		case idCopy:
-			if p.lastAnswer != "" && copyText(hwnd, p.lastAnswer) {
-				a.brain.Reply(time.Now(), "Copiato. Incolla dove vuoi.")
-			}
-		}
-		return 0
-	case wmClose:
-		a.hidePanel()
-		return 0
-	case wmCtlColorEdit, wmCtlColorStat:
-		pSetTextColor.Call(wparam, crText)
-		pSetBkColor.Call(wparam, crField)
-		return p.fieldBrush
+	case wmEraseBkgnd:
+		return 1 // il fondo lo disegniamo noi (niente sfarfallio)
 	case wmPaint:
 		var ps paintStruct
 		dc, _, _ := pBeginPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
-		pSetBkMode.Call(dc, 1) // trasparente
-		pSelectObject.Call(dc, p.bold)
-		pSetTextColor.Call(dc, crAccent)
-		t := utf16.Encode([]rune("SILVER"))
-		pTextOut.Call(dc, uintptr(int32(12*p.scale)), uintptr(int32(12*p.scale)), uintptr(unsafe.Pointer(&t[0])), uintptr(len(t)))
-		pSelectObject.Call(dc, p.font)
-		pSetTextColor.Call(dc, crMuted)
-		t = utf16.Encode([]rune("Ctrl+Alt+S"))
-		pTextOut.Call(dc, uintptr(int32(78*p.scale)), uintptr(int32(12*p.scale)), uintptr(unsafe.Pointer(&t[0])), uintptr(len(t)))
+		p.blit(dc)
 		pEndPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
+		return 0
+	case wmMouseMove:
+		if !p.tracking {
+			tme := trackMouseEvent{Flags: tmeLeave, Track: hwnd}
+			tme.Size = uint32(unsafe.Sizeof(tme))
+			pTrackMouseEvent.Call(uintptr(unsafe.Pointer(&tme)))
+			p.tracking = true
+		}
+		a.chat.HoverID = p.hitAt(x, y)
+		a.paintPanel(time.Now())
+		return 0
+	case wmMouseLeave:
+		p.tracking = false
+		a.chat.HoverID = ""
+		a.paintPanel(time.Now())
+		return 0
+	case wmSetCursor:
+		if a.chat.HoverID != "" {
+			c, _, _ := pLoadCursor.Call(0, idcHand)
+			pSetCursor.Call(c)
+			return 1
+		}
+	case wmLButtonUp:
+		if id := p.hitAt(x, y); id != "" {
+			a.clickPanel(id)
+			a.paintPanel(time.Now())
+		} else {
+			pSetFocus.Call(p.in)
+		}
+		return 0
+	case wmMouseWheel:
+		a.chat.Wheel(float64(int16(wparam>>16)) / 120 * 48 * a.scale)
+		a.paintPanel(time.Now())
+		return 0
+	case wmCtlColorEdit:
+		pSetTextColor.Call(wparam, crText)
+		pSetBkColor.Call(wparam, crField)
+		return p.fieldBrush
+	case wmClose:
+		a.hidePanel()
 		return 0
 	}
 	r, _, _ := pDefWindowProc.Call(hwnd, msg, wparam, lparam)
