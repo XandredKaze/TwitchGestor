@@ -17,6 +17,7 @@ import { parseKofi, parseGenericDonation } from './sources/webhooks.js';
 import { createLogger } from './logger.js';
 import { createOverlayFolder } from './overlayFolder.js';
 import { createMusicFolder } from './musicFolder.js';
+import * as silverAssets from './silverAssets.js';
 
 const log = createLogger('server');
 const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
@@ -269,12 +270,25 @@ export function createServer(app) {
       // il lupo caricato in Howl-UP (Annunci): lo usa anche l'immagine della settimana nello stile del canale
       if (route === 'GET /howlup-mascot.png') return serveStatic(res, '/mascot.png', path.join(DATA_DIR, 'howlup'));
       // Musicante Player: lettore per ascoltare la musica sul PC (pagina, e programma per Windows da scaricare)
+      // Silver (il compagno sul desktop del PC): se sei in live e cosa suona. Pubblico: sono cose che si vedono in live.
+      if (route === 'GET /silver/state') {
+        const t = app.music?.player?.current;
+        return send(res, 200, { live: Boolean(await app.isLive?.()), song: t ? t.name.replace(/\.[a-z0-9]+$/i, '') : '', assets: silverAssets.versions() });
+      }
+      // la sua immagine e la sua voce (caricate da te in ⚙ Sistema → Tools; restano solo sul Raspberry)
+      if (route === 'GET /silver/asset/image' || route === 'GET /silver/asset/voice') {
+        const a = silverAssets.get(path.basename(url.pathname));
+        if (!a) return send(res, 404, 'Non ancora caricato');
+        res.writeHead(200, { 'Content-Type': a.type, 'Content-Length': fs.statSync(a.file).size, 'Cache-Control': 'no-store' });
+        return fs.createReadStream(a.file).pipe(res);
+      }
       if (route === 'GET /player') return serveStatic(res, '/player.html');
       if (route === 'GET /player/ping') return send(res, 200, 'musicante-player', { 'Access-Control-Allow-Origin': '*' });
-      if (route === 'GET /scarica/MusicantePlayer.exe') {
-        const exe = path.join(ROOT_DIR, 'windows', 'MusicantePlayer.exe');
+      // programmi per Windows da scaricare (Musicante Player e Silver)
+      if (route === 'GET /scarica/MusicantePlayer.exe' || route === 'GET /scarica/Silver.exe') {
+        const exe = path.join(ROOT_DIR, 'windows', path.basename(url.pathname));
         if (!fs.existsSync(exe)) return send(res, 404, 'Programma non ancora disponibile');
-        res.writeHead(200, { 'Content-Type': 'application/vnd.microsoft.portable-executable', 'Content-Length': fs.statSync(exe).size, 'Content-Disposition': 'attachment; filename="MusicantePlayer.exe"' });
+        res.writeHead(200, { 'Content-Type': 'application/vnd.microsoft.portable-executable', 'Content-Length': fs.statSync(exe).size, 'Content-Disposition': `attachment; filename="${path.basename(url.pathname)}"` });
         return fs.createReadStream(exe).pipe(res);
       }
       if (route === 'GET /favicon.ico') return serveStatic(res, '/images/twitchgestor.png'); // icona di TwitchGestor
@@ -701,6 +715,10 @@ export function createServer(app) {
           if (route === 'POST /api/overlay/restore') return send(res, 200, await overlay.restore(String(body.name ?? '')));
           return send(res, 404, { error: 'Non trovato' });
         }
+        // Silver: immagine e voce
+        if (route === 'GET /api/silver') return send(res, 200, silverAssets.versions());
+        if (route === 'POST /api/silver/asset') return send(res, 200, await silverAssets.save(req, url.searchParams.get('kind')));
+        if (route === 'POST /api/silver/asset/delete') return send(res, 200, silverAssets.remove(url.searchParams.get('kind')));
         if (route === 'POST /api/upload') {
           const saved = await saveUpload(req, url.searchParams.get('kind'), req.headers['x-filename'] && decodeURIComponent(req.headers['x-filename']));
           return send(res, 200, { path: saved, media: listMedia() });

@@ -6,3 +6,4 @@ dist-demo/
 dist-howlup/
 dist-musicante/
 windows/player/*.syso
+windows/silver/*.syso

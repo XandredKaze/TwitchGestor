@@ -199,6 +199,10 @@
     { id: 'howlup', name: 'Howl-UP', icon: '🐺', port: 3100, desc: 'L\'agenda dei tuoi impegni: live, lavoro, vita personale, note e annunci per la community.' },
     { id: 'musicante', name: 'Musicante', icon: '🎵', port: 3200, desc: 'Scarica la musica in MP3 (anche playlist e mix divisi per capitoli) nella musica di TwitchGestor.' },
   ];
+  const WIN_APPS = [
+    { file: 'Silver.exe', name: 'Silver', icon: '🦔', desc: 'Il tuo compagno sul desktop: commenta quello che fai, finge di lavorare, sta zitto in live. Parte con Windows.' },
+    { file: 'MusicantePlayer.exe', name: 'Musicante Player', icon: '💻', desc: 'Ascolta sul PC la musica del Raspberry, con le stesse playlist.' },
+  ];
   const toolUrl = (t) => `http://${location.hostname}:${t.port}/${window.TG.token() ? `?token=${encodeURIComponent(window.TG.token())}` : ''}`;
   function renderTools() {
     const list = $('sys-tools-list');
@@ -214,7 +218,43 @@
         el('span', { className: 'sys-tool-icon', 'aria-hidden': 'true' }, t.icon),
         el('span', { className: 'sys-tool-text' }, el('b', {}, t.name, ' ', dot), el('span', { className: 'small muted' }, t.desc)),
         el('span', { className: 'sys-tool-go', 'aria-hidden': 'true' }, '↗'));
-    }));
+    }),
+    // programmi per Windows (si scaricano e si aprono sul PC)
+    el('p', { className: 'small muted sys-tools-sub' }, 'Programmi per il PC (Windows)'),
+    ...WIN_APPS.map((t) => el('a', { className: 'sys-tool', href: `/scarica/${t.file}`, download: t.file },
+      el('span', { className: 'sys-tool-icon', 'aria-hidden': 'true' }, t.icon),
+      el('span', { className: 'sys-tool-text' }, el('b', {}, t.name), el('span', { className: 'small muted' }, t.desc)),
+      el('span', { className: 'sys-tool-go', 'aria-hidden': 'true' }, '⬇'))),
+    el('p', { className: 'small muted' }, 'La prima volta Windows avvisa che è un programma "non riconosciuto": clicca Ulteriori informazioni → Esegui comunque.'),
+    silverBox());
+  }
+
+  // Silver: la sua immagine e la sua voce stanno solo qui sul Raspberry (non dentro Silver.exe):
+  // le carichi una volta, Silver le scarica da sé e le tiene sul PC
+  function silverBox() {
+    const box = el('div', { className: 'sys-silver' });
+    const row = (kind, label, accept, have) => {
+      const input = el('input', { type: 'file', accept, hidden: true });
+      input.onchange = async () => {
+        const file = input.files[0];
+        input.value = '';
+        if (!file) return;
+        const res = await api(`/api/silver/asset?kind=${kind}`, { body: file });
+        if (res) draw(res);
+      };
+      return el('div', { className: 'sys-silver-row' },
+        el('span', {}, have ? '✅ ' : '◻ ', label, have ? '' : el('span', { className: 'muted' }, ' — non ancora caricata')),
+        input,
+        el('button', { type: 'button', className: 'small-btn', onclick: () => input.click() }, have ? 'Cambia…' : 'Carica…'),
+        have ? el('button', { type: 'button', className: 'small-btn', onclick: async () => { const res = await api(`/api/silver/asset/delete?kind=${kind}`); if (res) draw(res); } }, 'Togli') : null);
+    };
+    const draw = (v) => box.replaceChildren(
+      el('b', {}, '🦔 Silver: immagine e voce'),
+      el('span', { className: 'small muted' }, 'Restano solo sul Raspberry. Silver le prende da qui (anche quando le cambi).'),
+      row('image', 'Immagine (PNG/WEBP con sfondo trasparente)', 'image/png,image/webp,image/jpeg', v.image),
+      row('voice', 'Voce (MP3, un borbottio di un paio di secondi)', 'audio/mpeg,.mp3', v.voice));
+    api('/api/silver', { method: 'GET', quiet: true }).then((v) => v && draw(v));
+    return box;
   }
   $('sys-tools-btn').onclick = () => {
     const box = $('sys-tools');

@@ -695,6 +695,16 @@ const app = {
     },
   },
   chatFeed,
+  // in live? (per Silver sul PC: niente voce durante la live) — OBS che trasmette, oppure il canale online
+  async isLive() {
+    if (obs.state().stream?.active) return true;
+    if (!auth.user) return false;
+    try {
+      return Boolean(await autoShoutout.liveSince());
+    } catch {
+      return false;
+    }
+  },
   /** In live adesso? (OBS sta trasmettendo o Twitch ti mostra in live): lo script di aggiornamento aspetta. */
   async isBusy() {
     if (obs.state().stream?.active) return true;
