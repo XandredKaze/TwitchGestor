@@ -65,6 +65,12 @@ test('comandi di Silver: scena per nome parziale e nota in Howl-UP', async () =>
   assert.equal(sent.body.note.title, 'comprare il microfono');
   assert.equal(sent.h['x-howlup'], '1');
   assert.equal((await s.feed(0)).agenda.events[0].title, 'Palestra'); // l'agenda di Howl-UP arriva a Silver
+  // impegno creato parlando con Silver: va a Howl-UP così com'è
+  const fetch2 = async (url, opts) => { sent = { url, body: JSON.parse(opts.body), method: opts.method }; return { ok: true, json: async () => ({ event: { id: 'e1' } }) }; };
+  const s2 = createSilverLink({ obs }, { file: tmp(), howlupPort: 3999, fetchFn: fetch2 });
+  const r = await s2.run({ action: 'event', event: { title: 'Dentista', date: '2026-10-30', time: '16:00' } });
+  assert.equal(r.text, "Salvato nell'agenda di Howl-UP.");
+  assert.deepEqual([sent.url, sent.method, sent.body.event.title], ['http://127.0.0.1:3999/api/events', 'PUT', 'Dentista']);
 });
 
 test('immagine e voce di Silver: si riconoscono dal contenuto', () => {

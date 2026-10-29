@@ -426,6 +426,7 @@ export function upcoming({ events = [], tasks = [], categories = DEFAULT_CATEGOR
   const cat = (id) => categories.find((c) => c.id === id)?.name ?? '';
   return {
     today: from,
+    categories: categories.map((c) => ({ id: c.id, name: c.name })),
     events: occurrences(events, from, addDays(from, Math.min(Math.max(days, 1), 31))).slice(0, 60)
       .map((o) => ({ day: o.day, time: o.allDay ? '' : o.time, endTime: o.endTime || '', title: o.title, category: cat(o.category), notes: String(o.notes ?? '').slice(0, 200) })),
     tasks: tasks.filter((t) => !t.done).sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999')).slice(0, 30)

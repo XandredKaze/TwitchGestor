@@ -145,6 +145,19 @@ export function createSilverLink(app, { file = KEYS_FILE, howlupPort = Number(pr
           if (!res?.ok) return { text: 'Howl-UP non risponde: la nota non è salvata.' };
           return { text: 'Segnato nelle note di Howl-UP.' };
         }
+        // impegni, cose da fare e live creati parlando con Silver (li salva Howl-UP, che li controlla)
+        case 'event':
+        case 'task':
+        case 'live': {
+          const key = body.action;
+          const path = { event: '/api/events', task: '/api/tasks', live: '/api/lives' }[key];
+          const res = await howlup(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [key]: body[key] ?? {} }) });
+          if (!res) return { text: 'Howl-UP non risponde: non ho salvato niente.' };
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) return { text: `Howl-UP non l'ha salvato: ${data.error ?? res.status}.` };
+          agendaCache.at = 0; // la prossima volta l'agenda è già aggiornata
+          return { text: { event: 'Salvato nell\'agenda di Howl-UP.', task: 'Aggiunto alle cose da fare.', live: 'Live aggiunta alla Programmazione.' }[key], id: data[key]?.id };
+        }
         default:
           throw Object.assign(new Error('Comando sconosciuto'), { status: 400 });
       }

@@ -322,6 +322,8 @@ type app struct {
 	pairing       bool
 	listen        *listening // il microfono è acceso (listen_windows.go)
 	installingEar bool
+	draft         *Draft // impegno da confermare (assist_windows.go)
+	draftAt       time.Time
 	wantPanel     bool
 	openPanel     func()    // = showPanel (messo all'avvio: evita un giro di inizializzazioni)
 	wake          wakeState // "Ehi Silver" (wake_windows.go)

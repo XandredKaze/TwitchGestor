@@ -32,8 +32,9 @@ type Feed struct {
 
 // Agenda: i prossimi giorni di Howl-UP (impegni, anche quelli che si ripetono, e cose da fare)
 type Agenda struct {
-	Today  string `json:"today"`
-	Events []struct {
+	Today      string     `json:"today"`
+	Categories []Category `json:"categories"`
+	Events     []struct {
 		Day      string `json:"day"`
 		Time     string `json:"time"` // "" = tutto il giorno
 		EndTime  string `json:"endTime"`

@@ -215,6 +215,11 @@ func (a *app) onAction(choice string) {
 		openURL("https://ollama.com/download")
 	case "x:pull":
 		a.pullModel()
+	case "x:draftsave":
+		a.saveDraft()
+	case "x:draftcancel":
+		a.draft = nil
+		a.reply("Va bene, non salvo niente.")
 	case "x:whisper":
 		a.installEar()
 	case "x:nowhisper":
@@ -244,6 +249,26 @@ func (a *app) reply(text string) {
 
 func (a *app) handleInput(text string) {
 	now := time.Now()
+	// c'è una scheda da confermare: sì / no / una correzione ("no, alle 17", "spostalo a venerdì")
+	if a.draft != nil && now.Sub(a.draftAt) < 15*time.Minute {
+		switch {
+		case isYes(text):
+			a.saveDraft()
+			return
+		case isNo(text):
+			a.draft = nil
+			a.reply("Va bene, non salvo niente.")
+			return
+		}
+		if !IsCreateRequest(text, now) {
+			if corr := ParseDraft(text, now, a.categories()); corr.Changes() {
+				d := a.draft.Merge(corr)
+				a.draft, a.draftAt = &d, now
+				a.showDraft("Corretto.")
+				return
+			}
+		}
+	}
 	c := ParseCommand(text, now)
 	switch c.Kind { // fa qualcosa: la posa d'azione (se hai caricato le pose)
 	case "remind", "clear", "note", "music", "scene", "open":
@@ -279,6 +304,15 @@ func (a *app) handleInput(text string) {
 		} else {
 			a.reply("Nessuna live in programma. Aggiungine una in Programmazione (o in Howl-UP).")
 		}
+	case "create":
+		if a.cfg.Key == "" {
+			a.reply(needPair)
+			a.pair(false)
+			return
+		}
+		d := ParseDraft(text, now, a.categories())
+		a.draft, a.draftAt = &d, now
+		a.showDraft("")
 	case "agenda":
 		if a.feed == nil {
 			if a.cfg.Key == "" {
@@ -476,6 +510,74 @@ func (a *app) pullModel() {
 				a.askAI(q)
 			} else {
 				a.brain.Reply(time.Now(), "Fatto. Adesso puoi chiedermi quello che vuoi.")
+			}
+		}
+	}()
+}
+
+// ---------- impegni, cose da fare e live per Howl-UP ----------
+
+// categories: quelle di Howl-UP (arrivano con l'agenda), altrimenti quelle di base
+func (a *app) categories() []Category {
+	if a.feed != nil && a.feed.Agenda != nil && len(a.feed.Agenda.Categories) > 0 {
+		return a.feed.Agenda.Categories
+	}
+	return defaultCategories
+}
+
+// showDraft: la scheda con tutti i dettagli, da confermare (o correggere)
+func (a *app) showDraft(intro string) {
+	d := a.draft
+	sum := d.Summary(a.categories())
+	if intro != "" {
+		sum = intro + "\n" + sum
+	}
+	if m := d.Missing(); m != "" {
+		a.chat.Add("silver", sum+"\n\nMi manca "+m+". Dimmelo e aggiorno la scheda.")
+		a.brain.Alert(time.Now(), sum+"\nMi manca "+m+".", []Action{{"Annulla", "x:draftcancel"}})
+		return
+	}
+	a.chat.Add("silver", sum+"\n\nSalvo? Puoi anche correggere (es. \"no, alle 17\", \"spostalo a venerdì\", \"categoria lavoro\").")
+	a.brain.Alert(time.Now(), sum, []Action{{"Salva", "x:draftsave"}, {"Annulla", "x:draftcancel"}})
+}
+
+// saveDraft: in Howl-UP (passando da Gestor)
+func (a *app) saveDraft() {
+	d := a.draft
+	if d == nil {
+		return
+	}
+	if m := d.Missing(); m != "" {
+		a.reply("Prima mi serve " + m + ".")
+		return
+	}
+	base, key := a.gestorBase(), a.cfg.Key
+	if base == "" || key == "" {
+		a.reply(needPair)
+		return
+	}
+	a.draft = nil
+	action, body := d.Payload()
+	a.brain.Act(time.Now())
+	go func() {
+		var r struct {
+			Text  string `json:"text"`
+			Error string `json:"error"`
+		}
+		code, err := gestorCall(base, key, "POST", "/silver/do", map[string]any{"action": action, action: body}, &r)
+		a.post <- func() {
+			switch {
+			case err != nil:
+				a.draft = d // si può riprovare con "salva"
+				a.reply(noGestor)
+			case code == 401:
+				a.cfg.Key = ""
+				a.cfg.save()
+				a.reply(needPair)
+			case r.Error != "":
+				a.reply(r.Error)
+			default:
+				a.reply(r.Text)
 			}
 		}
 	}()

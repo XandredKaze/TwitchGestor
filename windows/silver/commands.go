@@ -89,6 +89,10 @@ func ParseCommand(text string, now time.Time) Command {
 	case strings.Contains(low, "prossima live") || strings.Contains(low, "quando vado in live") || low == "live":
 		return Command{Kind: "nextlive"}
 	}
+	// creare un impegno, una cosa da fare o una live in Howl-UP ("domani alle 15 ho il dentista")
+	if IsCreateRequest(t, now) {
+		return Command{Kind: "create", Text: t}
+	}
 	// agenda di Howl-UP (fatti non domande lunghe: "impegni di domani", "cosa ho oggi", "cose da fare")
 	if len([]rune(low)) <= 45 {
 		has := func(w ...string) bool {
@@ -272,6 +276,7 @@ const helpText = `Posso:
 • La musica della live: aggiungi "della live" (es. "pausa della live", "avanti in live")
 • "scena Gioco" (cambia scena in OBS)
 • "prossimo impegno" · "impegni di oggi" / "di domani" / "della settimana" · "cose da fare" (da Howl-UP)
+• Nuovi impegni come li diresti a una persona: "domani alle 15 ho il dentista", "cena con Marco venerdì dalle 20 alle 23, avvisami un'ora prima", "ogni martedì alle 18 palestra fino a dicembre", "tra le cose da fare: comprare il microfono entro sabato", "live di Elden Ring venerdì alle 21". Ti mostro la scheda: Salva, Annulla o correggi ("no, alle 17").
 • "prossima live" · "apri Gestor" · "apri Howl-UP" · "apri Musicante"
 • Con la voce: tieni premuto Ctrl+Alt+V e parla (o premi il microfono qui sotto), oppure chiamami con "Ehi Silver" (si attiva dal mio menu)
 • Qualsiasi altra cosa: ti rispondo io (con l'IA sul tuo PC).`
