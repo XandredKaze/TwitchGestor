@@ -214,6 +214,9 @@ func (a *app) onAction(choice string) {
 		openURL("https://ollama.com/download")
 	case "x:pull":
 		a.pullModel()
+	case "x:whisper":
+		a.installEar()
+	case "x:nowhisper":
 	case "x:nopull":
 		a.pendingQ = ""
 	}

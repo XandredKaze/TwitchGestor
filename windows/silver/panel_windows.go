@@ -188,7 +188,7 @@ func (a *app) paintPanel(now time.Time) {
 	if n := len(v.Msgs); n > 0 {
 		last = v.Msgs[n-1].Text
 	}
-	sig := strings.Join([]string{itoaInt(len(v.Msgs)), itoaInt(len(last)), v.Thinking, v.HoverID, itoaInt(int(v.Scroll)), itoaInt(v.Copied), boolS(v.Busy), boolS(now.Sub(v.CopiedAt) < 2*time.Second)}, "|")
+	sig := strings.Join([]string{boolS(v.Listening), itoaInt(len(v.Msgs)), itoaInt(len(last)), v.Thinking, v.HoverID, itoaInt(int(v.Scroll)), itoaInt(v.Copied), boolS(v.Busy), boolS(now.Sub(v.CopiedAt) < 2*time.Second)}, "|")
 	if sig == p.sig && v.Thinking == "" {
 		return
 	}
@@ -249,6 +249,8 @@ func (a *app) clickPanel(id string) {
 		a.hidePanel()
 	case id == "send":
 		a.submitPanel()
+	case id == "mic":
+		a.startListening(false, true)
 	case strings.HasPrefix(id, "copy:"):
 		i := 0
 		for _, c := range id[5:] {

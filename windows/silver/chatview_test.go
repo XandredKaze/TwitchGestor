@@ -51,6 +51,8 @@ func TestFinestraChat(t *testing.T) {
 	if copies == 0 || v.maxScr <= 0 || v.Scroll != v.maxScr {
 		t.Fatal("copia / scorrimento", copies, v.maxScr, v.Scroll)
 	}
+	v.Listening = true
+	save("chat-3-microfono", v)
 	v.Wheel(10000) // in cima
 	if v.Scroll != 0 || v.stick {
 		t.Fatal("rotellina")

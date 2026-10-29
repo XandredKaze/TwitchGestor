@@ -302,22 +302,24 @@ type app struct {
 	trayIcon uintptr
 
 	// le cose utili (assist_windows.go)
-	panel     *panel
-	chat      *ChatView
-	ai        *AI
-	aiBusy    bool
-	history   []chatMsg
-	pendingQ  string
-	feed      *Feed
-	watch     Watch
-	base      atomic.Value // indirizzo di Gestor trovato
-	feedKey   atomic.Value // la chiave, letta dal filo degli avvisi
-	lastAlert string
-	rnd       *rand.Rand
-	pairing   bool
-	lastRem   time.Time
-	quitAt    time.Time
-	hoverHand bool
+	panel         *panel
+	chat          *ChatView
+	ai            *AI
+	aiBusy        bool
+	history       []chatMsg
+	pendingQ      string
+	feed          *Feed
+	watch         Watch
+	base          atomic.Value // indirizzo di Gestor trovato
+	feedKey       atomic.Value // la chiave, letta dal filo degli avvisi
+	lastAlert     string
+	rnd           *rand.Rand
+	pairing       bool
+	listen        *listening // il microfono è acceso (listen_windows.go)
+	installingEar bool
+	lastRem       time.Time
+	quitAt        time.Time
+	hoverHand     bool
 }
 
 var theApp *app
@@ -407,6 +409,8 @@ func main() {
 	go a.watchFeed()
 	// Ctrl+Alt+S: la finestra per scrivergli
 	pRegisterHotKey.Call(a.hwnd, 1, modControl|modAlt|modNoRepeat, 'S')
+	// Ctrl+Alt+V: parla con Silver
+	pRegisterHotKey.Call(a.hwnd, 2, modControl|modAlt|modNoRepeat, 'V')
 	a.brain.later(time.Now(), 1200*time.Millisecond, func(now time.Time) {
 		if a.r.HasSprite() {
 			a.brain.Say(now, greeting, "", "", nil)
@@ -682,6 +686,7 @@ func (a *app) tick() {
 		a.lastRem = now
 		a.checkReminders(now)
 	}
+	a.tickListening(now)
 	a.chat.Thinking, a.chat.Busy = a.brain.Thinking, a.aiBusy
 	a.paintPanel(now)
 	a.brain.Tick(now, a.userIdle())
@@ -744,6 +749,7 @@ func (a *app) menu() {
 		cmdLots
 		cmdQuit
 		cmdAsk
+		cmdListen
 		cmdPair
 		cmdOllama
 	)
@@ -763,6 +769,7 @@ func (a *app) menu() {
 	add(sub, check(a.cfg.Chattiness >= 0.6), cmdLots, "Tanto")
 	m, _, _ := pCreatePopupMenu.Call()
 	add(m, 0, cmdAsk, "Chiedi a Silver…\tCtrl+Alt+S")
+	add(m, 0, cmdListen, "Parla con Silver\tCtrl+Alt+V")
 	if a.cfg.Key == "" {
 		add(m, 0, cmdPair, "Collega a TwitchGestor")
 	}
@@ -813,6 +820,8 @@ func (a *app) menu() {
 		a.brain.Chattiness = a.cfg.Chattiness
 	case cmdAsk:
 		a.showPanel()
+	case cmdListen:
+		a.startListening(false, false)
 	case cmdPair:
 		a.cfg.PairDenied = false
 		a.pair(true)
@@ -894,6 +903,10 @@ func wndProc(hwnd, message, wparam, lparam uintptr) uintptr {
 		a.menu()
 		return 0
 	case wmHotkey:
+		if wparam == 2 {
+			a.startListening(true, false)
+			return 0
+		}
 		if a.panelVisible() {
 			a.hidePanel()
 		} else {

@@ -28,16 +28,17 @@ type ChatMsg struct {
 }
 
 type ChatView struct {
-	Msgs     []ChatMsg
-	Thinking string // "Ci penso…" mentre risponde (nuvoletta con i puntini)
-	Scroll   float64
-	stick    bool // resta in fondo quando arriva testo nuovo
-	HoverID  string
-	Copied   int // messaggio appena copiato (per un attimo dice "Copiato")
-	CopiedAt time.Time
-	Busy     bool    // l'IA sta rispondendo: il pulsante manda diventa grigio
-	Radius   float64 // angoli della finestra (Windows 11 li arrotonda da sé a 8)
-	maxScr   float64
+	Msgs      []ChatMsg
+	Thinking  string // "Ci penso…" mentre risponde (nuvoletta con i puntini)
+	Scroll    float64
+	stick     bool // resta in fondo quando arriva testo nuovo
+	HoverID   string
+	Copied    int // messaggio appena copiato (per un attimo dice "Copiato")
+	CopiedAt  time.Time
+	Busy      bool    // l'IA sta rispondendo: il pulsante manda diventa grigio
+	Listening bool    // il microfono è acceso (pulsante rosso)
+	Radius    float64 // angoli della finestra (Windows 11 li arrotonda da sé a 8)
+	maxScr    float64
 }
 
 type ChatHit struct {
@@ -111,7 +112,7 @@ func wrapHard(f font.Face, text string, maxW float64) []string {
 
 // Field: dove va il campo di Windows per scrivere (in pixel della finestra)
 func (v *ChatView) Field(s float64) rectF {
-	return rectF{(14 + 12) * s, (chatH - footH + 12 + 9) * s, (chatW - 28 - 52 - 24) * s, 22 * s}
+	return rectF{(14 + 12) * s, (chatH - footH + 12 + 9) * s, (chatW - 28 - 104 - 24) * s, 22 * s}
 }
 
 // Render: la finestra intera (w×h pixel = chat×scala)
@@ -254,7 +255,7 @@ func (v *ChatView) Render(r *Renderer, now time.Time, mono float64) (*image.RGBA
 	// --- intestazione ---
 	fillRoundRect(img, rectF{1 * s, headH*s - 1*s, W - 2*s, 1 * s}, 0, cLine, 1)
 	drawTextSpaced(img, r.face("bold", 11), 18*s, 28*s, "SILVER", cAccent, 1, 2*s)
-	drawText(img, fSmall, 82*s, 28*s, "Ctrl+Alt+S", cMuted, 1)
+	drawText(img, fSmall, 82*s, 28*s, "Ctrl+Alt+S · voce: Ctrl+Alt+V", cMuted, 1)
 	cr := rectF{W - 40*s, 9 * s, 28 * s, 28 * s}
 	if v.HoverID == "close" {
 		fillRoundRect(img, cr, 8*s, cCard, 1)
@@ -266,7 +267,7 @@ func (v *ChatView) Render(r *Renderer, now time.Time, mono float64) (*image.RGBA
 
 	// --- dove scrivi ---
 	fillRoundRect(img, rectF{1 * s, bottom, W - 2*s, 1 * s}, 0, cLine, 1)
-	fr := rectF{14 * s, bottom + 12*s, W - 28*s - 52*s, 40 * s}
+	fr := rectF{14 * s, bottom + 12*s, W - 28*s - 104*s, 40 * s}
 	fillRoundRect(img, fr, 12*s, cLine, 1)
 	fillRoundRect(img, rectF{fr.x + 1*s, fr.y + 1*s, fr.w - 2*s, fr.h - 2*s}, 11*s, cCard, 1)
 	sb := rectF{W - 14*s - 44*s, bottom + 12*s, 44 * s, 40 * s}
@@ -282,6 +283,26 @@ func (v *ChatView) Render(r *Renderer, now time.Time, mono float64) (*image.RGBA
 	fillTriangle(img, ax-6*s, ay-7*s, ax+8*s, ay, ax-6*s, ay+7*s, cBg, 1)
 	fillTriangle(img, ax-6*s, ay-7*s, ax-2*s, ay, ax-6*s, ay+7*s, sc, 1)
 	hits = append(hits, ChatHit{"send", sb})
+	// microfono: premi e parla (rosso mentre ascolta)
+	mb := rectF{sb.x - 52*s, sb.y, 44 * s, 40 * s}
+	mc, ic := cCard, cText
+	if v.Listening {
+		mc, ic = color.NRGBA{214, 64, 84, 255}, color.NRGBA{255, 255, 255, 255}
+	} else if v.HoverID == "mic" {
+		ic = cAccent
+	}
+	border := cLine
+	if v.HoverID == "mic" && !v.Listening {
+		border = cAccent
+	}
+	fillRoundRect(img, mb, 12*s, border, 1)
+	fillRoundRect(img, rectF{mb.x + 1*s, mb.y + 1*s, mb.w - 2*s, mb.h - 2*s}, 11*s, mc, 1)
+	mx, my := mb.x+mb.w/2, mb.y+mb.h/2
+	fillRoundRect(img, rectF{mx - 4*s, my - 11*s, 8 * s, 14 * s}, 4*s, ic, 1)       // capsula
+	drawArc(img, mx, my-1*s, 7*s, 1.6*s, 0, math.Pi, ic)                            // supporto
+	fillRoundRect(img, rectF{mx - 0.8*s, my + 6*s, 1.6 * s, 4 * s}, 0.8*s, ic, 1)   // asta
+	fillRoundRect(img, rectF{mx - 4.5*s, my + 9.5*s, 9 * s, 1.6 * s}, 0.8*s, ic, 1) // base
+	hits = append(hits, ChatHit{"mic", mb})
 	return img, hits
 }
 
