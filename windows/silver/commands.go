@@ -372,6 +372,12 @@ const helpText = `Posso:
 • Qualsiasi altra cosa: ti rispondo io (con l'IA sul tuo PC).`
 
 var (
+	rePCVolWord = regexp.MustCompile(`(?:^|[\s'])(?:volume|audio)(?:\s|$)`)
+	rePCWord    = regexp.MustCompile(`(?:^|\s)(?:pc|computer|sistema|windows|generale|casse)(?:\s|$)`)
+	rePCVolMax  = regexp.MustCompile(`(?:al|a)\s+(?:massimo|tutto|max)`)
+	rePCVolMin  = regexp.MustCompile(`(?:al|a)\s+(?:minimo|zero|min)`)
+	rePCVolBy   = regexp.MustCompile(`(?:^|\s)di\s+(\d{1,3})\s*%?(?:\s|$)`)
+	rePCVolTo   = regexp.MustCompile(`(?:^|\s)(?:al|a|allo)\s+(\d{1,3})\s*%?(?:\s|$)`)
 	rePCVolUp   = regexp.MustCompile(`^(?:alza|aumenta|più alto|piu alto)\s+(?:il\s+|l')?(?:volume|audio)\s+(?:del|di|al)\s+(?:pc|computer|sistema|windows)`)
 	rePCVolDown = regexp.MustCompile(`^(?:abbassa|diminuisci|più basso|piu basso)\s+(?:il\s+|l')?(?:volume|audio)\s+(?:del|di|al)\s+(?:pc|computer|sistema|windows)`)
 	rePCVolSet  = regexp.MustCompile(`^(?:metti\s+)?(?:il\s+)?volume\s+(?:del|di)\s+(?:pc|computer|sistema|windows)\s+(?:a|al)\s+(\d{1,3})`)
@@ -386,11 +392,31 @@ var (
 // parsePC: comandi per il PC (Kind "pc", Text: volup | voldown | volset | mute | screenshot | lock | shutdown | restart | sleep)
 func parsePC(low string) Command {
 	low = strings.TrimSpace(strings.Trim(low, " .!?"))
+	// volume di Windows: serve dire "del pc / computer / sistema / windows" (senza, è la musica del Player)
+	if rePCVolWord.MatchString(low) && rePCWord.MatchString(low) {
+		switch {
+		case rePCVolMax.MatchString(low):
+			return Command{Kind: "pc", Text: "volset", Arg: "100"}
+		case rePCVolMin.MatchString(low):
+			return Command{Kind: "pc", Text: "volset", Arg: "0"}
+		}
+		if g := rePCVolBy.FindStringSubmatch(low); g != nil { // "alza il volume del pc di 20"
+			if regexp.MustCompile(`^(?:abbassa|diminuisci|riduci)`).MatchString(low) {
+				return Command{Kind: "pc", Text: "voldown", Arg: g[1]}
+			}
+			return Command{Kind: "pc", Text: "volup", Arg: g[1]}
+		}
+		if g := rePCVolTo.FindStringSubmatch(low); g != nil { // "… al 100", "… a 30%"
+			return Command{Kind: "pc", Text: "volset", Arg: g[1]}
+		}
+		switch {
+		case regexp.MustCompile(`^(?:alza|aumenta|più alto|piu alto|più forte|piu forte)`).MatchString(low):
+			return Command{Kind: "pc", Text: "volup"}
+		case regexp.MustCompile(`^(?:abbassa|diminuisci|riduci|più basso|piu basso|più piano|piu piano)`).MatchString(low):
+			return Command{Kind: "pc", Text: "voldown"}
+		}
+	}
 	switch {
-	case rePCVolUp.MatchString(low):
-		return Command{Kind: "pc", Text: "volup"}
-	case rePCVolDown.MatchString(low):
-		return Command{Kind: "pc", Text: "voldown"}
 	case rePCMute.MatchString(low):
 		return Command{Kind: "pc", Text: "mute"}
 	case rePCShot.MatchString(low) && len(strings.Fields(low)) <= 6:
@@ -403,9 +429,6 @@ func parsePC(low string) Command {
 		return Command{Kind: "pc", Text: "restart"}
 	case rePCSleep.MatchString(low):
 		return Command{Kind: "pc", Text: "sleep"}
-	}
-	if g := rePCVolSet.FindStringSubmatch(low); g != nil {
-		return Command{Kind: "pc", Text: "volset", Arg: g[1]}
 	}
 	return Command{}
 }

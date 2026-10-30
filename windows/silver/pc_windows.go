@@ -54,12 +54,18 @@ const (
 func (a *app) pcCmd(c Command) {
 	now := time.Now()
 	switch c.Text {
-	case "volup":
-		pressKey(vkVolUp, 5) // ogni tasto = 2%
-		a.reply("Volume del PC più alto.")
-	case "voldown":
-		pressKey(vkVolDown, 5)
-		a.reply("Volume del PC più basso.")
+	case "volup", "voldown":
+		step := 10 // ogni tasto del volume = 2%
+		if n, err := strconv.Atoi(c.Arg); err == nil && n > 0 {
+			step = min(100, n)
+		}
+		if c.Text == "volup" {
+			pressKey(vkVolUp, (step+1)/2)
+			a.reply(fmt.Sprintf("Volume del PC su di %d.", step))
+		} else {
+			pressKey(vkVolDown, (step+1)/2)
+			a.reply(fmt.Sprintf("Volume del PC giù di %d.", step))
+		}
 	case "volset":
 		v, _ := strconv.Atoi(c.Arg)
 		v = min(100, max(0, v))

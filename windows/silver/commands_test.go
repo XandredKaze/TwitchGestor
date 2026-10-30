@@ -54,6 +54,10 @@ func TestComandi(t *testing.T) {
 		{"alza il volume del pc", "pc", "volup", time.Time{}},
 		{"abbassa il volume del computer", "pc", "voldown", time.Time{}},
 		{"volume del pc al 30", "pc", "volset", time.Time{}},
+		{"alza volume del pc al 100", "pc", "volset", time.Time{}},
+		{"metti il volume del computer al massimo", "pc", "volset", time.Time{}},
+		{"abbassa l'audio del pc di 20", "pc", "voldown", time.Time{}},
+		{"alza il volume del pc", "pc", "volup", time.Time{}},
 		{"metti il pc in muto", "pc", "mute", time.Time{}},
 		{"fai uno screenshot", "pc", "screenshot", time.Time{}},
 		{"blocca il pc", "pc", "lock", time.Time{}},
@@ -114,6 +118,11 @@ func TestComandi(t *testing.T) {
 	}
 	if c := ParseCommand("avanti in live", now); c.Text != "next" || c.Where != "live" {
 		t.Errorf("%+v", c)
+	}
+	for in, arg := range map[string]string{"alza volume del pc al 100": "100", "metti il volume del computer al massimo": "100", "volume del pc a zero": "0", "abbassa l'audio del pc di 20": "20", "porta il volume di sistema al 45%": "45"} {
+		if c := ParseCommand(in, now); c.Kind != "pc" || c.Arg != arg {
+			t.Errorf("%q → %+v", in, c)
+		}
 	}
 	if c := ParseCommand("volume al 30%", now); c.Arg != "30" {
 		t.Errorf("%+v", c)
