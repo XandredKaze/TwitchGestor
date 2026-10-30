@@ -54,6 +54,7 @@ var (
 	reForget     = regexp.MustCompile(`(?i)^(?:dimentica|dimenticati|scordati|cancella dalla memoria)\s+(?:che\s+|di\s+)?(.+)$`)
 	reFolder     = regexp.MustCompile(`^(?:apri|aprimi|mostrami|vai (?:nella|alla))\s+(?:la\s+)?cartella\s+(?:dei\s+|delle\s+|degli\s+|di\s+|del\s+|della\s+|dello\s+)?(.+?)[\s.!?]*$`)
 	reLastFile   = regexp.MustCompile(`(?:^|\s)(?:l'|l )?ultim[oa]\s+(video|registrazione|screenshot|foto|immagine|download|file scaricato|file)(?:\s|$|[.!?])`)
+	reWebAny     = regexp.MustCompile(`(?i)^(?:cerca(?:mi)?|ricerca|ricercami|informati\s+(?:su|sul|sulla|di)|fai\s+una\s+ricerca\s+(?:su|sul|sulla)|trova(?:mi)?\s+(?:info|informazioni|notizie|news))\s+(.+)$`)
 	reFindFile   = regexp.MustCompile(`(?i)^(?:trova(?:mi)?|cerca(?:mi)?|dov'è|dove sta|dove si trova|apri)\s+(?:il\s+|la\s+|lo\s+|l'|i\s+|le\s+)?(file|documento|foto|immagine|video|grafica|pdf|cartella)\s+(?:di\s+|del\s+|della\s+|chiamat[oa]\s+|con\s+)?(.+)$`)
 	reClose      = regexp.MustCompile(`(?i)^(?:chiudi|chiudimi|termina|esci da|chiudere)\s+(?:il\s+|la\s+|lo\s+|l'|i\s+|gli\s+)?(?:programma\s+|gioco\s+|app\s+)?(.+?)[\s.!?]*$`)
 	reLaunch     = regexp.MustCompile(`(?i)^(?:apri|aprimi|apriti|avvia|avviami|lancia|lanciami|fai partire|esegui|accendi|fammi partire)\s+(?:il\s+|la\s+|lo\s+|l'|i\s+|gli\s+)?(?:programma\s+|gioco\s+|app\s+|applicazione\s+)?(.+?)[\s.!?]*$`)
@@ -282,6 +283,10 @@ func ParseCommand(text string, now time.Time) Command {
 	if g := reFindFile.FindStringSubmatch(t); g != nil {
 		return Command{Kind: "findfile", Text: strings.TrimSpace(strings.TrimRight(g[2], " .!?")), Arg: strings.ToLower(g[1])}
 	}
+	// "cerca …" detto in qualsiasi modo (dopo i file: "cerca la foto del gatto" resta sul PC)
+	if g := reWebAny.FindStringSubmatch(t); g != nil {
+		return Command{Kind: "web", Text: strings.TrimSpace(strings.Trim(g[1], " .!?:"))}
+	}
 	if g := reClose.FindStringSubmatch(t); g != nil && !reNotLaunch.MatchString(g[1]) {
 		return Command{Kind: "close", Text: cleanAppQuery(strings.TrimSpace(g[1]))}
 	}
@@ -376,7 +381,7 @@ const helpText = `Posso:
 • Nuovi impegni come li diresti a una persona: "domani alle 15 ho il dentista", "cena con Marco venerdì dalle 20 alle 23, avvisami un'ora prima", "ogni martedì alle 18 palestra fino a dicembre", "tra le cose da fare: comprare il microfono entro sabato", "live di Elden Ring venerdì alle 21". Ti mostro la scheda: Salva, Annulla o correggi ("no, alle 17").
 • Programmi e giochi del PC: "apri Discord" · "avvia OBS" · "lancia lol" · "apri Baldur's Gate 3"
 • Aggiornamenti: "aggiornati" · "aggiorna il player" · "aggiorna tutto" · "che versione sei?"
-• Internet: "cerca su internet …" · "notizie su …" · e le domande su cose recenti ("chi ha vinto ieri…", "quando esce…"): leggo i risultati e ti rispondo con le fonti
+• Internet: "cerca …" (o "cerca su internet …") · "notizie su …" · e le domande su cose recenti ("chi ha vinto ieri…", "quando esce…"): leggo i risultati e ti rispondo con le fonti
 • Live: "cambia il titolo in …" · "cambia il gioco in Elden Ring" · "shoutout a nome" · "scrivi in chat: …" · "fai un annuncio: …" · "metti un segnalibro" · "clippa questo" · "quanti spettatori ho?" · "raid a nome"
 • Modalità: "modalità live" · "fine live" · "crea la modalità studio: apri Discord, apri Spotify e metti la playlist Alf" · "che modalità ho?"
 • "buongiorno" (meteo, agenda, live, promemoria) · "che tempo fa?" · "che tempo farà domani?" · "la mia città è Roma"

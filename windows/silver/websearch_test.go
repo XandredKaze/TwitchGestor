@@ -31,9 +31,14 @@ func TestCercaOnline(t *testing.T) {
 		}
 	}
 	now := time.Date(2026, 10, 30, 10, 0, 0, 0, time.Local)
-	for in, want := range map[string]string{"cerca su internet ultime notizie su Silksong": "ultime notizie su Silksong", "cerca online il prezzo della PS5": "il prezzo della PS5", "googla ricetta carbonara": "ricetta carbonara", "notizie su Elden Ring": "Elden Ring", "cerca sul web: orari treni Roma Milano": "orari treni Roma Milano"} {
+	for in, want := range map[string]string{"cerca su internet ultime notizie su Silksong": "ultime notizie su Silksong", "cerca online il prezzo della PS5": "il prezzo della PS5", "googla ricetta carbonara": "ricetta carbonara", "notizie su Elden Ring": "Elden Ring", "cerca sul web: orari treni Roma Milano": "orari treni Roma Milano", "Cerca l'ultima notizia sul gioco di Francesco Cilurzo in arte Sidonia.": "l'ultima notizia sul gioco di Francesco Cilurzo in arte Sidonia", "cercami chi ha fatto Hollow Knight": "chi ha fatto Hollow Knight", "informati su Wonderful Neo Run Ballet": "Wonderful Neo Run Ballet"} {
 		if c := ParseCommand(in, now); c.Kind != "web" || c.Text != want {
 			t.Errorf("%q → %+v", in, c)
+		}
+	}
+	for _, in := range []string{"cerca la foto del gatto", "cerca il file grafica halloween"} {
+		if c := ParseCommand(in, now); c.Kind != "findfile" {
+			t.Errorf("%q: %+v", in, c)
 		}
 	}
 	if c := ParseCommand("chi ha vinto ieri la partita?", now); c.Kind != "web" {
