@@ -48,6 +48,7 @@ var (
 	reModeDel    = regexp.MustCompile(`(?i)^(?:cancella|elimina|togli|rimuovi)\s+(?:la\s+)?modalit[aà]\s+(.+)$`)
 	reModeList   = regexp.MustCompile(`^(?:che|quali) modalit[aà] (?:ho|ci sono|conosci)|^modalit[aà]$|^le mie modalit[aà]$`)
 	reModeRun    = regexp.MustCompile(`(?i)^(?:attiva|avvia|metti|passa a|passa alla|vai in|entra in)?\s*(?:la\s+)?modalit[aà]\s+(.+?)[\s.!?]*$`)
+	reWebSearch  = regexp.MustCompile(`(?i)^(?:cerca(?:mi)?|ricerca|guarda|controlla)\s+(?:su\s+internet|online|in\s+rete|sul\s+web|su\s+google|in\s+internet|su\s+duckduckgo)\s*:?\s*(.+)$|^(?:googla|googlami|ultime\s+notizie\s+su|notizie\s+(?:su|di|sul|sulla|sugli)|news\s+su)\s*:?\s*(.+)$`)
 	reRemember   = regexp.MustCompile(`(?i)^(?:silver[,\s]+)?(?:ricordati|ricorda|tieni a mente|memorizza|impara|segnati in memoria)\s+(?:che\s+|questo:\s*)?(.+)$`)
 	reMemories   = regexp.MustCompile(`^(?:cosa|che cosa|che) (?:sai di me|ti ricordi(?: di me)?|ricordi di me|hai in memoria)`)
 	reForget     = regexp.MustCompile(`(?i)^(?:dimentica|dimenticati|scordati|cancella dalla memoria)\s+(?:che\s+|di\s+)?(.+)$`)
@@ -261,6 +262,14 @@ func ParseCommand(text string, now time.Time) Command {
 		}
 		return Command{Kind: "open", Text: w}
 	}
+	// cercare su internet ("cerca su internet …", "notizie su …", e le domande su cose recenti)
+	if g := reWebSearch.FindStringSubmatch(t); g != nil {
+		q := g[1]
+		if q == "" {
+			q = g[2]
+		}
+		return Command{Kind: "web", Text: strings.TrimSpace(strings.Trim(q, " .!?:"))}
+	}
 	// cartelle e file
 	if g := reFolder.FindStringSubmatch(low); g != nil {
 		return Command{Kind: "folder", Text: strings.TrimSpace(g[1])}
@@ -328,6 +337,9 @@ func ParseCommand(text string, now time.Time) Command {
 			return Command{Kind: "remind", At: at, Text: what}
 		}
 	}
+	if WantsWeb(t) {
+		return Command{Kind: "web", Text: t}
+	}
 	return Command{Kind: "ask", Text: t}
 }
 
@@ -361,6 +373,7 @@ const helpText = `Posso:
 • "prossimo impegno" · "impegni di oggi" / "di domani" / "della settimana" · "cose da fare" (da Howl-UP)
 • Nuovi impegni come li diresti a una persona: "domani alle 15 ho il dentista", "cena con Marco venerdì dalle 20 alle 23, avvisami un'ora prima", "ogni martedì alle 18 palestra fino a dicembre", "tra le cose da fare: comprare il microfono entro sabato", "live di Elden Ring venerdì alle 21". Ti mostro la scheda: Salva, Annulla o correggi ("no, alle 17").
 • Programmi e giochi del PC: "apri Discord" · "avvia OBS" · "lancia lol" · "apri Baldur's Gate 3"
+• Internet: "cerca su internet …" · "notizie su …" · e le domande su cose recenti ("chi ha vinto ieri…", "quando esce…"): leggo i risultati e ti rispondo con le fonti
 • Live: "cambia il titolo in …" · "cambia il gioco in Elden Ring" · "shoutout a nome" · "scrivi in chat: …" · "fai un annuncio: …" · "metti un segnalibro" · "clippa questo" · "quanti spettatori ho?" · "raid a nome"
 • Modalità: "modalità live" · "fine live" · "crea la modalità studio: apri Discord, apri Spotify e metti la playlist Alf" · "che modalità ho?"
 • "buongiorno" (meteo, agenda, live, promemoria) · "che tempo fa?" · "che tempo farà domani?" · "la mia città è Roma"

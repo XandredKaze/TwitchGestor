@@ -340,6 +340,8 @@ type app struct {
 	cpuPrev       [3]uint64
 	wx            *Weather
 	modeRunning   bool
+	webResults    []WebResult // ultima ricerca online (web_windows.go)
+	webQuery      string
 	launchChoices []AppEntry
 	draft         *Draft // impegno da confermare (assist_windows.go)
 	draftAt       time.Time
