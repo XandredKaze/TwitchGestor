@@ -238,7 +238,8 @@ type config struct {
 	NoGuard        bool                `json:"noGuard"`        // avvisi automatici spenti
 	NoAutoBriefing bool                `json:"noAutoBriefing"` // niente buongiorno da solo
 	LastBriefing   string              `json:"lastBriefing"`
-	Modes          map[string][]string `json:"modes"` // le tue modalità (modes_windows.go)
+	OfferedUpdate  string              `json:"offeredUpdate"` // la versione nuova già proposta (una volta sola)
+	Modes          map[string][]string `json:"modes"`         // le tue modalità (modes_windows.go)
 }
 
 func dataDir() string {
@@ -315,52 +316,65 @@ type app struct {
 	trayIcon uintptr
 
 	// le cose utili (assist_windows.go)
-	panel         *panel
-	chat          *ChatView
-	ai            *AI
-	aiBusy        bool
-	history       []chatMsg
-	pendingQ      string
-	feed          *Feed
-	watch         Watch
-	base          atomic.Value // indirizzo di Gestor trovato
-	feedKey       atomic.Value // la chiave, letta dal filo degli avvisi
-	lastAlert     string
-	rnd           *rand.Rand
-	pairing       bool
-	listen        *listening // il microfono è acceso (listen_windows.go)
-	installingEar bool
-	apps          []AppEntry // programmi e giochi del PC (apps_windows.go)
-	lastPath      string     // ultimo file (screenshot, ultimo video…) per i pulsanti
-	fileHits      []fileHit  // risultati di "trova il file…"
-	closeExe      string     // programma da chiudere del tutto (se chiesto)
-	guard         Guard      // avvisi automatici (guard_windows.go)
-	lastGuard     time.Time
-	activeSince   time.Time
-	cpuPrev       [3]uint64
-	wx            *Weather
-	modeRunning   bool
-	webResults    []WebResult // ultima ricerca online (web_windows.go)
-	webQuery      string
-	launchChoices []AppEntry
-	draft         *Draft // impegno da confermare (assist_windows.go)
-	draftAt       time.Time
-	wantPanel     bool
-	openPanel     func()    // = showPanel (messo all'avvio: evita un giro di inizializzazioni)
-	wake          wakeState // "Ehi Silver" (wake_windows.go)
-	wakeRetry     time.Time
-	lastRem       time.Time
-	quitAt        time.Time
-	hoverHand     bool
+	panel                                    *panel
+	chat                                     *ChatView
+	ai                                       *AI
+	aiBusy                                   bool
+	history                                  []chatMsg
+	pendingQ                                 string
+	feed                                     *Feed
+	watch                                    Watch
+	base                                     atomic.Value // indirizzo di Gestor trovato
+	feedKey                                  atomic.Value // la chiave, letta dal filo degli avvisi
+	lastAlert                                string
+	rnd                                      *rand.Rand
+	pairing                                  bool
+	listen                                   *listening // il microfono è acceso (listen_windows.go)
+	installingEar                            bool
+	apps                                     []AppEntry // programmi e giochi del PC (apps_windows.go)
+	lastPath                                 string     // ultimo file (screenshot, ultimo video…) per i pulsanti
+	fileHits                                 []fileHit  // risultati di "trova il file…"
+	closeExe                                 string     // programma da chiudere del tutto (se chiesto)
+	guard                                    Guard      // avvisi automatici (guard_windows.go)
+	lastGuard                                time.Time
+	activeSince                              time.Time
+	cpuPrev                                  [3]uint64
+	wx                                       *Weather
+	modeRunning                              bool
+	webResults                               []WebResult // ultima ricerca online (web_windows.go)
+	webQuery                                 string
+	myHash, newSilver, newPlayer, newVersion string // aggiornamenti (update_windows.go)
+	updating                                 bool
+	launchChoices                            []AppEntry
+	draft                                    *Draft // impegno da confermare (assist_windows.go)
+	draftAt                                  time.Time
+	wantPanel                                bool
+	openPanel                                func()    // = showPanel (messo all'avvio: evita un giro di inizializzazioni)
+	wake                                     wakeState // "Ehi Silver" (wake_windows.go)
+	wakeRetry                                time.Time
+	lastRem                                  time.Time
+	quitAt                                   time.Time
+	hoverHand                                bool
 }
 
-var theApp *app
+var (
+	theApp      *app
+	mutexHandle windows.Handle // "una sola Silver": si lascia andare prima di riavviarsi aggiornato
+)
 
 func main() {
 	runtime.LockOSThread()
 	// una sola Silver alla volta
 	name, _ := windows.UTF16PtrFromString(`Local\SilverCompanion`)
-	if _, err := windows.CreateMutex(nil, false, name); err == windows.ERROR_ALREADY_EXISTS {
+	updated := len(os.Args) > 1 && os.Args[1] == "--updated"
+	h, err := windows.CreateMutex(nil, false, name)
+	for i := 0; updated && err == windows.ERROR_ALREADY_EXISTS && i < 30; i++ { // dopo l'aggiornamento: la versione vecchia si sta chiudendo
+		windows.CloseHandle(h)
+		time.Sleep(500 * time.Millisecond)
+		h, err = windows.CreateMutex(nil, false, name)
+	}
+	mutexHandle = h
+	if err == windows.ERROR_ALREADY_EXISTS {
 		// già acceso: riaprirlo mostra il suo menu (da lì si chiude con "Esci")
 		cls, _ := windows.UTF16PtrFromString("SilverCompanion")
 		if w, _, _ := pFindWindow.Call(uintptr(unsafe.Pointer(cls)), 0); w != 0 {
@@ -442,6 +456,7 @@ func main() {
 	}
 
 	go a.watchGestor()
+	go a.afterStart(updated)
 	go a.watchFeed()
 	go a.watchApps()
 	// Ctrl+Alt+S: la finestra per scrivergli
@@ -572,8 +587,13 @@ func (a *app) watchGestor() {
 				continue
 			}
 			var st struct {
-				Live   bool `json:"live"`
-				Assets struct {
+				Live bool `json:"live"`
+				Exe  struct {
+					Silver string `json:"silver"`
+					Player string `json:"player"`
+				} `json:"exe"`
+				Version string `json:"version"`
+				Assets  struct {
 					Image int64 `json:"image"`
 					Poses int64 `json:"poses"`
 					Voice int64 `json:"voice"`
@@ -582,6 +602,8 @@ func (a *app) watchGestor() {
 			_ = json.NewDecoder(res.Body).Decode(&st)
 			res.Body.Close()
 			a.live.Store(st.Live)
+			exe, ver := st.Exe, st.Version
+			a.post <- func() { a.onExeVersions(exe.Silver, exe.Player, ver) }
 			if a.gestorBase() == "" { // la prima volta: se non è collegato, chiede il permesso
 				a.base.Store(base)
 				a.post <- func() {

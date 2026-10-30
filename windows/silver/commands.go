@@ -99,6 +99,8 @@ func ParseCommand(text string, now time.Time) Command {
 		return Command{Kind: "reminders"}
 	case low == "cancella promemoria" || low == "cancella i promemoria" || low == "togli i promemoria" || low == "ferma timer" || low == "ferma il timer" || low == "cancella timer":
 		return Command{Kind: "clear"}
+	case parseUpdate(low).Kind != "":
+		return parseUpdate(low)
 	case reBriefing.MatchString(low):
 		return Command{Kind: "briefing"}
 	case reWeather.MatchString(low) && len(strings.Fields(low)) <= 8:
@@ -373,6 +375,7 @@ const helpText = `Posso:
 • "prossimo impegno" · "impegni di oggi" / "di domani" / "della settimana" · "cose da fare" (da Howl-UP)
 • Nuovi impegni come li diresti a una persona: "domani alle 15 ho il dentista", "cena con Marco venerdì dalle 20 alle 23, avvisami un'ora prima", "ogni martedì alle 18 palestra fino a dicembre", "tra le cose da fare: comprare il microfono entro sabato", "live di Elden Ring venerdì alle 21". Ti mostro la scheda: Salva, Annulla o correggi ("no, alle 17").
 • Programmi e giochi del PC: "apri Discord" · "avvia OBS" · "lancia lol" · "apri Baldur's Gate 3"
+• Aggiornamenti: "aggiornati" · "aggiorna il player" · "aggiorna tutto" · "che versione sei?"
 • Internet: "cerca su internet …" · "notizie su …" · e le domande su cose recenti ("chi ha vinto ieri…", "quando esce…"): leggo i risultati e ti rispondo con le fonti
 • Live: "cambia il titolo in …" · "cambia il gioco in Elden Ring" · "shoutout a nome" · "scrivi in chat: …" · "fai un annuncio: …" · "metti un segnalibro" · "clippa questo" · "quanti spettatori ho?" · "raid a nome"
 • Modalità: "modalità live" · "fine live" · "crea la modalità studio: apri Discord, apri Spotify e metti la playlist Alf" · "che modalità ho?"

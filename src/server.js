@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual, createHash } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { ROOT_DIR, DATA_DIR } from './config.js';
 import { NOTIFICATION_TYPES, testNotification } from './core/normalize.js';
@@ -215,6 +215,20 @@ async function saveUpload(req, kind, rawName, subfolder = '') {
  *   /ws           canale in tempo reale verso overlay e dashboard
  *   /webhooks/*   donazioni in arrivo da servizi esterni
  */
+// impronta (sha256) di un programma in windows/, ricalcolata solo quando il file cambia
+const exeHashes = new Map();
+function exeHash(name) {
+  const file = path.join(ROOT_DIR, 'windows', name);
+  let st;
+  try { st = fs.statSync(file); } catch { return ''; }
+  const key = `${st.size}:${st.mtimeMs}`;
+  const c = exeHashes.get(name);
+  if (c?.key === key) return c.hash;
+  const hash = createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  exeHashes.set(name, { key, hash });
+  return hash;
+}
+
 export function createServer(app) {
   const { env } = app;
   const isAuthorized = (req, url) => !env.DASHBOARD_TOKEN
@@ -275,7 +289,8 @@ export function createServer(app) {
       // Silver (il compagno sul desktop del PC): se sei in live e cosa suona. Pubblico: sono cose che si vedono in live.
       if (route === 'GET /silver/state') {
         const t = app.music?.player?.current;
-        return send(res, 200, { live: Boolean(await app.isLive?.()), song: t ? t.name.replace(/\.[a-z0-9]+$/i, '') : '', assets: silverAssets.versions() });
+        // exe: l'impronta dei programmi per Windows scaricabili, così Silver sa se c'è una versione nuova ("aggiornati")
+        return send(res, 200, { live: Boolean(await app.isLive?.()), song: t ? t.name.replace(/\.[a-z0-9]+$/i, '') : '', assets: silverAssets.versions(), exe: { silver: exeHash('Silver.exe'), player: exeHash('MusicantePlayer.exe') }, version: APP_VERSION });
       }
       // collegamento di Silver: il PC chiede, tu consenti in ⚙ Sistema → Tools; poi avvisi e comandi con la sua chiave
       if (route === 'POST /silver/pair') return send(res, 200, silver.request((await readBody(req, 2000)).pc, req.socket.remoteAddress));
