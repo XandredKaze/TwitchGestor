@@ -662,6 +662,7 @@ const app = {
   obs,
   testCommand,
   quickActions,
+  sendChat: (text) => sendChat(text), // per Silver: "scrivi in chat …"
   moderator,
   testModeration,
   autoShoutout,

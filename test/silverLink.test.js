@@ -79,3 +79,15 @@ test('immagine e voce di Silver: si riconoscono dal contenuto', () => {
   assert.equal(sniff(Buffer.from('ID3\u0004\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000')), 'mp3');
   assert.equal(sniff(Buffer.from('<html>ciao mondo</html>')), null);
 });
+
+test('la live a comando da Silver: titolo, gioco per nome, spettatori', async () => {
+  const calls = [];
+  const quickActions = { run: async (name, p) => { calls.push([name, p]); return name === 'categories' ? { categories: [{ id: '1', name: 'Elden Ring Nightreign' }, { id: '2', name: 'Elden Ring' }] } : { message: 'ok' }; } };
+  const liveStats = { current: { samples: [[1, 10], [2, 25], [3, 18]] } };
+  const s = createSilverLink({ quickActions, liveStats }, { file: tmp() });
+  assert.equal((await s.run({ action: 'twitch', what: 'title', value: 'Notte horror' })).text, 'Titolo della live: Notte horror');
+  assert.equal((await s.run({ action: 'twitch', what: 'game', value: 'elden ring' })).text, 'Categoria della live: Elden Ring.');
+  assert.deepEqual(calls.at(-1), ['info', { gameId: '2' }]);
+  assert.equal((await s.run({ action: 'twitch', what: 'viewers' })).text, 'Ora 18 spettatori (massimo finora 25).');
+  await assert.rejects(s.run({ action: 'twitch', what: 'chat', value: '' }));
+});

@@ -44,6 +44,10 @@ var (
 	reBriefing   = regexp.MustCompile(`^(?:buongiorno|buondì|buon giorno|briefing|riepilogo(?: della giornata| di oggi)?|com'è la giornata|come sarà la giornata|cosa mi aspetta oggi|cosa c'è oggi|che si fa oggi|aggiornami|fammi il punto)(?:\s+silver)?$`)
 	reWeather    = regexp.MustCompile(`(?:che tempo fa|che tempo farà|che tempo fara|meteo|piove|pioverà|piovera|fa freddo|fa caldo|farà freddo|farà caldo|temperatura fuori|serve l'ombrello)`)
 	reCity       = regexp.MustCompile(`(?i)^(?:la mia città è|la mia citta è|la mia città|abito a|vivo a|sono di|imposta la città(?: a)?|città:)\s+(.+)$`)
+	reModeDef    = regexp.MustCompile(`(?i)^(?:crea|definisci|imposta|salva|nuova)\s+(?:la\s+)?modalit[aà]\s+(.+?)\s*[:,]\s*(.+)$`)
+	reModeDel    = regexp.MustCompile(`(?i)^(?:cancella|elimina|togli|rimuovi)\s+(?:la\s+)?modalit[aà]\s+(.+)$`)
+	reModeList   = regexp.MustCompile(`^(?:che|quali) modalit[aà] (?:ho|ci sono|conosci)|^modalit[aà]$|^le mie modalit[aà]$`)
+	reModeRun    = regexp.MustCompile(`(?i)^(?:attiva|avvia|metti|passa a|passa alla|vai in|entra in)?\s*(?:la\s+)?modalit[aà]\s+(.+?)[\s.!?]*$`)
 	reRemember   = regexp.MustCompile(`(?i)^(?:silver[,\s]+)?(?:ricordati|ricorda|tieni a mente|memorizza|impara|segnati in memoria)\s+(?:che\s+|questo:\s*)?(.+)$`)
 	reMemories   = regexp.MustCompile(`^(?:cosa|che cosa|che) (?:sai di me|ti ricordi(?: di me)?|ricordi di me|hai in memoria)`)
 	reForget     = regexp.MustCompile(`(?i)^(?:dimentica|dimenticati|scordati|cancella dalla memoria)\s+(?:che\s+|di\s+)?(.+)$`)
@@ -111,6 +115,28 @@ func ParseCommand(text string, now time.Time) Command {
 		return Command{Kind: "time"}
 	case strings.Contains(low, "prossima live") || strings.Contains(low, "quando vado in live") || low == "live":
 		return Command{Kind: "nextlive"}
+	}
+	// modalità (sequenze di comandi) e la live a comando
+	if g := reModeDef.FindStringSubmatch(t); g != nil {
+		return Command{Kind: "modedef", Text: modeKey(g[1]), Arg: g[2]}
+	}
+	if g := reModeDel.FindStringSubmatch(t); g != nil {
+		return Command{Kind: "modedel", Text: modeKey(g[1])}
+	}
+	if regexp.MustCompile(`^(?:fine live|fine della live|finisco la live|chiudo la live|chiudiamo la live)$`).MatchString(low) {
+		return Command{Kind: "mode", Text: "fine live"}
+	}
+	if regexp.MustCompile(`^(?:si va in live|vado in live|andiamo in live|inizio la live|iniziamo la live|prepara la live|prepariamo la live)$`).MatchString(low) {
+		return Command{Kind: "mode", Text: "live"}
+	}
+	if reModeList.MatchString(low) {
+		return Command{Kind: "modelist"}
+	}
+	if g := reModeRun.FindStringSubmatch(t); g != nil {
+		return Command{Kind: "mode", Text: modeKey(g[1])}
+	}
+	if tw := parseTwitch(t); tw.Kind != "" {
+		return tw
 	}
 	// creare un impegno, una cosa da fare o una live in Howl-UP ("domani alle 15 ho il dentista")
 	if IsCreateRequest(t, now) {
@@ -335,6 +361,8 @@ const helpText = `Posso:
 • "prossimo impegno" · "impegni di oggi" / "di domani" / "della settimana" · "cose da fare" (da Howl-UP)
 • Nuovi impegni come li diresti a una persona: "domani alle 15 ho il dentista", "cena con Marco venerdì dalle 20 alle 23, avvisami un'ora prima", "ogni martedì alle 18 palestra fino a dicembre", "tra le cose da fare: comprare il microfono entro sabato", "live di Elden Ring venerdì alle 21". Ti mostro la scheda: Salva, Annulla o correggi ("no, alle 17").
 • Programmi e giochi del PC: "apri Discord" · "avvia OBS" · "lancia lol" · "apri Baldur's Gate 3"
+• Live: "cambia il titolo in …" · "cambia il gioco in Elden Ring" · "shoutout a nome" · "scrivi in chat: …" · "fai un annuncio: …" · "metti un segnalibro" · "clippa questo" · "quanti spettatori ho?" · "raid a nome"
+• Modalità: "modalità live" · "fine live" · "crea la modalità studio: apri Discord, apri Spotify e metti la playlist Alf" · "che modalità ho?"
 • "buongiorno" (meteo, agenda, live, promemoria) · "che tempo fa?" · "che tempo farà domani?" · "la mia città è Roma"
 • Il PC: "alza/abbassa il volume del pc" · "volume del pc al 30" · "metti il pc in muto" · "fai uno screenshot" · "blocca il pc" · "chiudi Discord" · "spegni/riavvia/sospendi il pc" (con conferma)
 • File: "apri la cartella download" · "apri la cartella condivisa" · "trova il file grafica halloween" · "cerca la foto del gatto" · "apri l'ultimo video" / "l'ultimo screenshot"
@@ -378,6 +406,51 @@ func parsePC(low string) Command {
 	}
 	if g := rePCVolSet.FindStringSubmatch(low); g != nil {
 		return Command{Kind: "pc", Text: "volset", Arg: g[1]}
+	}
+	return Command{}
+}
+
+var (
+	reTwTitle    = regexp.MustCompile(`(?i)^(?:cambia|metti|imposta|aggiorna|modifica)\s+(?:il\s+)?titolo(?:\s+della\s+(?:live|diretta))?\s*(?:in|a|con|:)?\s*["“]?(.+?)["”]?$`)
+	reTwGame     = regexp.MustCompile(`(?i)^(?:cambia|metti|imposta|aggiorna)\s+(?:il\s+gioco|la\s+categoria)(?:\s+della\s+(?:live|diretta))?\s*(?:in|a|con|:)?\s+(.+?)[\s.!]*$`)
+	reTwShout    = regexp.MustCompile(`(?i)^(?:fai\s+(?:uno\s+|lo\s+)?)?shout\s*-?\s*out\s+(?:a\s+|per\s+)?@?([\w]+)`)
+	reTwRaid     = regexp.MustCompile(`(?i)^(?:fai\s+(?:un\s+|il\s+)?)?raid\s+(?:a|ad|verso|su|da)\s+@?([\w]+)`)
+	reTwChat     = regexp.MustCompile(`(?i)^(?:scrivi|manda|invia|di'|dì|di)\s+(?:in|nella|alla)\s+chat\s*:?\s*(.+)$`)
+	reTwAnnounce = regexp.MustCompile(`(?i)^(?:fai\s+un\s+annuncio|annuncio|annuncia)(?:\s+in\s+chat)?\s*:?\s*(.+)$`)
+	reTwMarker   = regexp.MustCompile(`(?i)^(?:(?:metti|segna|aggiungi|fai)\s+un\s+)?(?:segnalibro|marker)(?:\s+(?:qui|adesso))?(?:\s*:\s*(.+))?$`)
+	reTwClip     = regexp.MustCompile(`(?i)^(?:clippa(?:\s+questo|\s+quello|\s+ora)?|(?:fai|crea)\s+(?:una\s+)?clip(?:\s+di questo|\s+ora)?)[\s.!]*$`)
+	reTwViewers  = regexp.MustCompile(`(?i)(?:quanti\s+(?:spettatori|viewer|viewers)|quante persone (?:mi )?(?:stanno guardando|guardano|ci sono)|quanti mi (?:stanno guardando|guardano)|quanta gente c'è)`)
+)
+
+// parseTwitch: la live a comando (Kind "twitch", Text: title | game | shoutout | raid | chat | announce | marker | clip | viewers)
+func parseTwitch(t string) Command {
+	t = strings.TrimSpace(t)
+	if g := reTwTitle.FindStringSubmatch(t); g != nil {
+		return Command{Kind: "twitch", Text: "title", Arg: strings.TrimSpace(g[1])}
+	}
+	if g := reTwGame.FindStringSubmatch(t); g != nil {
+		return Command{Kind: "twitch", Text: "game", Arg: strings.TrimSpace(g[1])}
+	}
+	if g := reTwShout.FindStringSubmatch(t); g != nil {
+		return Command{Kind: "twitch", Text: "shoutout", Arg: g[1]}
+	}
+	if g := reTwRaid.FindStringSubmatch(t); g != nil {
+		return Command{Kind: "twitch", Text: "raid", Arg: g[1]}
+	}
+	if g := reTwChat.FindStringSubmatch(t); g != nil {
+		return Command{Kind: "twitch", Text: "chat", Arg: strings.TrimSpace(g[1])}
+	}
+	if g := reTwAnnounce.FindStringSubmatch(t); g != nil {
+		return Command{Kind: "twitch", Text: "announce", Arg: strings.TrimSpace(g[1])}
+	}
+	if g := reTwMarker.FindStringSubmatch(t); g != nil {
+		return Command{Kind: "twitch", Text: "marker", Arg: strings.TrimSpace(g[1])}
+	}
+	if reTwClip.MatchString(t) {
+		return Command{Kind: "twitch", Text: "clip"}
+	}
+	if reTwViewers.MatchString(t) {
+		return Command{Kind: "twitch", Text: "viewers"}
 	}
 	return Command{}
 }

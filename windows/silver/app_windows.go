@@ -224,20 +224,21 @@ type config struct {
 	PosesVer int64 `json:"posesVer"` // il foglio delle pose (facoltativo)
 	VoiceVer int64 `json:"voiceVer"`
 	// collegamento con Gestor (la chiave la dà Gestor quando premi "Consenti")
-	Key            string     `json:"key"`
-	PairDenied     bool       `json:"pairDenied"`
-	PairHintShown  bool       `json:"pairHintShown"`
-	Reminders      []Reminder `json:"reminders"`
-	Model          string     `json:"model"`     // il modello dell'IA (Ollama)
-	BadModels      []string   `json:"badModels"` // modelli che su questo PC non partono
-	WakeWord       bool       `json:"wakeWord"`  // ascolta "Ehi Silver"
-	Memory         []string   `json:"memory"`    // "ricordati che…": cose su di te (l'IA le usa)
-	City           string     `json:"city"`      // per il meteo
-	Lat            float64    `json:"lat"`
-	Lon            float64    `json:"lon"`
-	NoGuard        bool       `json:"noGuard"`        // avvisi automatici spenti
-	NoAutoBriefing bool       `json:"noAutoBriefing"` // niente buongiorno da solo
-	LastBriefing   string     `json:"lastBriefing"`
+	Key            string              `json:"key"`
+	PairDenied     bool                `json:"pairDenied"`
+	PairHintShown  bool                `json:"pairHintShown"`
+	Reminders      []Reminder          `json:"reminders"`
+	Model          string              `json:"model"`     // il modello dell'IA (Ollama)
+	BadModels      []string            `json:"badModels"` // modelli che su questo PC non partono
+	WakeWord       bool                `json:"wakeWord"`  // ascolta "Ehi Silver"
+	Memory         []string            `json:"memory"`    // "ricordati che…": cose su di te (l'IA le usa)
+	City           string              `json:"city"`      // per il meteo
+	Lat            float64             `json:"lat"`
+	Lon            float64             `json:"lon"`
+	NoGuard        bool                `json:"noGuard"`        // avvisi automatici spenti
+	NoAutoBriefing bool                `json:"noAutoBriefing"` // niente buongiorno da solo
+	LastBriefing   string              `json:"lastBriefing"`
+	Modes          map[string][]string `json:"modes"` // le tue modalità (modes_windows.go)
 }
 
 func dataDir() string {
@@ -338,6 +339,7 @@ type app struct {
 	activeSince   time.Time
 	cpuPrev       [3]uint64
 	wx            *Weather
+	modeRunning   bool
 	launchChoices []AppEntry
 	draft         *Draft // impegno da confermare (assist_windows.go)
 	draftAt       time.Time

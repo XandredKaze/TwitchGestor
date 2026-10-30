@@ -145,6 +145,43 @@ export function createSilverLink(app, { file = KEYS_FILE, howlupPort = Number(pr
           if (!res?.ok) return { text: 'Howl-UP non risponde: la nota non è salvata.' };
           return { text: 'Segnato nelle note di Howl-UP.' };
         }
+        // la live a comando: titolo, gioco, shoutout, chat, annuncio, segnalibro, clip, raid, spettatori
+        case 'twitch': {
+          const qa = app.quickActions;
+          if (!qa) throw Object.assign(new Error('Twitch non è collegato a TwitchGestor'), { status: 400 });
+          const v = String(body.value ?? '').trim();
+          const need = (what) => { if (!v) throw Object.assign(new Error(`Manca ${what}`), { status: 400 }); };
+          switch (body.what) {
+            case 'title': need('il titolo'); await qa.run('info', { title: v }); return { text: `Titolo della live: ${v}` };
+            case 'game': {
+              need('il gioco');
+              const { categories } = await qa.run('categories', { query: v });
+              const pick = categories.find((c) => c.name.toLowerCase() === v.toLowerCase()) ?? categories[0];
+              if (!pick) return { text: `Non trovo "${v}" tra le categorie di Twitch.` };
+              await qa.run('info', { gameId: pick.id });
+              return { text: `Categoria della live: ${pick.name}.` };
+            }
+            case 'shoutout': need('il canale'); return { text: `${(await qa.run('shoutout', { channel: v })).message}.` };
+            case 'raid': need('il canale'); return { text: `${(await qa.run('raid', { channel: v })).message}.` };
+            case 'announce': need('il messaggio'); await qa.run('announce', { message: v }); return { text: 'Annuncio mandato in chat.' };
+            case 'chat':
+              need('il messaggio');
+              if (!app.sendChat) throw Object.assign(new Error('Chat non disponibile'), { status: 400 });
+              await app.sendChat(v);
+              return { text: 'Scritto in chat.' };
+            case 'marker': await qa.run('marker', { description: v || 'da Silver' }); return { text: 'Segnalibro messo: lo ritrovi nel video della live.' };
+            case 'clip': { const r = await qa.run('clip'); return { text: 'Clip creata.', url: r.url }; }
+            case 'viewers': {
+              const live = app.liveStats?.current;
+              const n = live?.samples?.at(-1)?.[1];
+              if (!live || !Number.isFinite(n)) return { text: 'Non sei in live (o Twitch non ha ancora contato gli spettatori).' };
+              const peak = Math.max(...live.samples.map((x) => x[1]));
+              return { text: `Ora ${n} spettatori (massimo finora ${peak}).` };
+            }
+            default:
+              throw Object.assign(new Error('Comando sconosciuto'), { status: 400 });
+          }
+        }
         // impegni, cose da fare e live creati parlando con Silver (li salva Howl-UP, che li controlla)
         case 'event':
         case 'task':
