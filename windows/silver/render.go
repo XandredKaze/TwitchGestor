@@ -579,12 +579,19 @@ func (r *Renderer) drawBubble(img *image.RGBA, bb *Bubble, now time.Time, mono f
 
 	cy := y + padY + 9*s
 	drawTextSpaced(img, fLabel, x+padX, cy, "SILVER", color.NRGBA{95, 211, 176, 255}, alpha, 2.2*s)
-	label := bb.Label
-	if p := bb.Page(); p != "" { // pagina 2/3
+	// l'etichetta (programma in primo piano, pagina) sta a destra di "SILVER" senza toccarlo: se è lunga
+	// (es. il titolo di un video) si accorcia con "…"
+	page := bb.Page()
+	room := bw - 2*padX - float64(font.MeasureString(fLabel, "SILVER").Ceil()) - 6*2.2*s - 14*s
+	if page != "" {
+		room -= float64(font.MeasureString(fSmall, " · "+page).Ceil())
+	}
+	label := fitText(fSmall, bb.Label, room-float64(font.MeasureString(fSmall, "· ").Ceil()))
+	if page != "" { // pagina 2/3
 		if label != "" {
 			label += " · "
 		}
-		label += p
+		label += page
 	}
 	if label != "" {
 		lw := float64(font.MeasureString(fSmall, "· "+label).Ceil())
@@ -799,4 +806,19 @@ func (r *Renderer) visibleBounds(img image.Image) image.Rectangle {
 	}
 	r.visible[img] = v
 	return v
+}
+
+// fitText: il testo accorciato con "…" perché stia in maxW pixel ("" se non c'è posto neanche per poco)
+func fitText(f font.Face, text string, maxW float64) string {
+	if text == "" || float64(font.MeasureString(f, text).Ceil()) <= maxW {
+		return text
+	}
+	r := []rune(text)
+	for n := len(r) - 1; n > 0; n-- {
+		t := strings.TrimRight(string(r[:n]), " -–—·|") + "…"
+		if float64(font.MeasureString(f, t).Ceil()) <= maxW {
+			return t
+		}
+	}
+	return ""
 }

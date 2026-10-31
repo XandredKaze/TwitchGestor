@@ -52,6 +52,10 @@ func classify(exe, title, class string, fullscreen bool) Context {
 		case strings.Contains(t, "youtube") && strings.Contains(t, "music"):
 			return Context{ID: "music", Name: "YouTube Music"}
 		}
+		// "Titolo del video - YouTube": basta il sito
+		if i := strings.LastIndex(page, " - "); i > 0 && len([]rune(page[i+3:])) <= 30 {
+			page = strings.TrimSpace(page[i+3:])
+		}
 		if page == "" {
 			page = "Browser"
 		}
