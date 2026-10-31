@@ -238,6 +238,7 @@ type config struct {
 	NoGuard        bool                `json:"noGuard"`        // avvisi automatici spenti
 	NoAutoBriefing bool                `json:"noAutoBriefing"` // niente buongiorno da solo
 	LastBriefing   string              `json:"lastBriefing"`
+	Away           bool                `json:"away"`          // gli hai detto "sparisci": acceso ma nascosto
 	OfferedUpdate  string              `json:"offeredUpdate"` // la versione nuova già proposta (una volta sola)
 	Modes          map[string][]string `json:"modes"`         // le tue modalità (modes_windows.go)
 }
@@ -396,6 +397,7 @@ func main() {
 	}
 	a.brain = NewBrain(time.Now().UnixNano())
 	a.brain.Enabled, a.brain.Voice, a.brain.Chattiness = a.cfg.Enabled, a.cfg.Voice, a.cfg.Chattiness
+	a.brain.Away = a.cfg.Away
 	a.brain.GameChoices = a.cfg.Games
 	a.brain.lastSpoke = time.Now() // appena acceso saluta, niente commenti sovrapposti
 	a.brain.OnChoicesChanged = func() { a.cfg.Games = a.brain.GameChoices; a.cfg.save() }
@@ -874,6 +876,7 @@ func (a *app) menu() {
 		cmdBriefing
 		cmdPair
 		cmdOllama
+		cmdAway
 	)
 	check := func(on bool) uintptr {
 		if on {
@@ -902,6 +905,11 @@ func (a *app) menu() {
 		add(m, 0, cmdOllama, "Scarica l'IA gratuita (Ollama)…")
 	}
 	add(m, mfSeparator, 0, "")
+	if a.cfg.Away {
+		add(m, 0, cmdAway, "Fai tornare Silver")
+	} else {
+		add(m, 0, cmdAway, "Fai sparire Silver (resta acceso)")
+	}
 	add(m, check(a.cfg.Enabled), cmdEnabled, "Silver attivo")
 	add(m, check(a.cfg.Voice), cmdVoice, "Voce")
 	add(m, mfPopup, sub, "Quanto parla da solo")
@@ -928,6 +936,10 @@ func (a *app) menu() {
 		a.cfg.Voice = !a.cfg.Voice
 		a.brain.Voice = a.cfg.Voice
 	case cmdTalk:
+		if a.cfg.Away {
+			a.cfg.Away = false
+			a.brain.SetAway(false)
+		}
 		if !a.cfg.Enabled {
 			a.cfg.Enabled = true
 			a.brain.SetEnabled(true)
@@ -943,6 +955,8 @@ func (a *app) menu() {
 	case cmdLittle, cmdNormal, cmdLots:
 		a.cfg.Chattiness = map[uintptr]float64{cmdLittle: 0.15, cmdNormal: 0.4, cmdLots: 0.75}[cmd]
 		a.brain.Chattiness = a.cfg.Chattiness
+	case cmdAway:
+		a.setAway(!a.cfg.Away)
 	case cmdAsk:
 		a.showPanel()
 	case cmdListen:

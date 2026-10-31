@@ -123,6 +123,7 @@ func (b *Bubble) Full() string { return string(b.runes) }
 
 type Brain struct {
 	Enabled    bool
+	Away       bool // gli hai detto "sparisci": acceso ma non si vede (finché non dici "torna")
 	Voice      bool
 	Chattiness float64 // 0..1: quanto parla da solo
 	Live       bool
@@ -158,7 +159,7 @@ func NewBrain(seed int64) *Brain {
 func (b *Brain) pick(list []string) string { return list[b.rnd.Intn(len(list))] }
 
 // Hidden: in un gioco hai chiesto di farlo sparire
-func (b *Brain) Hidden() bool { return b.GameMode == "hide" }
+func (b *Brain) Hidden() bool { return b.GameMode == "hide" || b.Away }
 
 // Visible: si disegna? (un promemoria si vede sempre, anche se è spento o nascosto)
 func (b *Brain) Visible() bool {
@@ -376,6 +377,13 @@ func (b *Brain) SetLive(now time.Time, live bool) {
 	if live {
 		b.Say(now, liveOn, "", "", nil)
 	}
+}
+
+// SetAway: sparisce (resta acceso: promemoria, avvisi, "Ehi Silver" e Ctrl+Alt+S funzionano) o torna
+func (b *Brain) SetAway(away bool) {
+	b.Away = away
+	b.Bubble = nil
+	b.exitIdle()
 }
 
 func (b *Brain) SetEnabled(on bool) {

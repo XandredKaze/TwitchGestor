@@ -349,6 +349,10 @@ func (a *app) handleInput(text string) {
 		a.diagnoseMusic()
 	case "launch":
 		a.launchCmd(c.Text)
+	case "away":
+		a.setAway(true)
+	case "back":
+		a.setAway(false)
 	case "update":
 		a.updateCmd(c.Text)
 	case "version":
@@ -626,4 +630,27 @@ func (a *app) saveDraft() {
 			}
 		}
 	}()
+}
+
+// setAway: "sparisci" (resta acceso e ti ascolta) / "torna"
+func (a *app) setAway(away bool) {
+	if !away && !a.brain.Away && a.cfg.Enabled && !a.brain.Hidden() {
+		a.reply("Sono qui, non sono andato da nessuna parte.")
+		return
+	}
+	a.cfg.Away = away
+	if !away {
+		a.cfg.Enabled = true
+		a.brain.SetEnabled(true)
+		if a.brain.GameMode == "hide" {
+			a.brain.GameMode = "talk"
+		}
+	}
+	a.cfg.save()
+	a.brain.SetAway(away)
+	if away {
+		a.reply(a.brain.pick([]string{"Va bene, sparisco. Se ti servo: \"Ehi Silver, torna\" o Ctrl+Alt+S.", "Agli ordini, mi eclisso. Per richiamarmi: \"torna\".", "Sparisco, ma resto in ascolto. I promemoria importanti te li porto lo stesso."}))
+		return
+	}
+	a.reply(a.brain.pick([]string{"Eccomi.", "Sono tornato. Ti sono mancato, ammettilo.", "Rieccomi qui."}))
 }
