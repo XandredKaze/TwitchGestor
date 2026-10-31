@@ -132,10 +132,12 @@ type Brain struct {
 	GameChoices map[string]string // gioco → "hide" | "quiet" | "talk"
 	GameMode    string
 
-	Bubble   *Bubble
-	Idle     bool
-	IdleTask string
-	IdlePct  int
+	Bubble    *Bubble
+	Idle      bool
+	IdleTask  string
+	IdleKind  string        // "work" (finge di lavorare) | "sleep" | "read" | "meditate"
+	IdleAfter time.Duration // dopo quanto che non tocchi niente parte la scenetta (0: 4 minuti)
+	NoIdle    bool          // scenette spente dal menu
 
 	Thinking string    // "Ci penso…": mentre l'IA risponde
 	actUntil time.Time // posa "in azione" (comandi, follow, donazioni)
@@ -145,7 +147,6 @@ type Brain struct {
 
 	rnd        *rand.Rand
 	lastSpoke  time.Time
-	idlePctAt  time.Time
 	nextCheck  time.Time
 	pending    func(now time.Time)
 	pendingAt  time.Time
@@ -405,9 +406,17 @@ func (b *Brain) enterIdle(now time.Time) {
 		return
 	}
 	b.Idle = true
-	b.IdleTask = b.pick(idleTasks) + "…"
-	b.IdlePct = b.rnd.Intn(30)
-	b.idlePctAt = now
+	b.IdleKind = b.pick([]string{"work", "work", "sleep", "read", "meditate"})
+	switch b.IdleKind {
+	case "sleep":
+		b.IdleTask = "Dormo"
+	case "read":
+		b.IdleTask = b.pick(idleReads) + "…"
+	case "meditate":
+		b.IdleTask = b.pick(idleMeditate) + "…"
+	default:
+		b.IdleTask = b.pick(idleTasks) + "…"
+	}
 }
 
 func (b *Brain) exitIdle() { b.Idle = false }
@@ -446,20 +455,22 @@ func (b *Brain) Tick(now time.Time, userIdle time.Duration) {
 			b.Bubble = nil
 		}
 	}
-	// idle: dopo 40 secondi senza toccare niente finge di lavorare; appena muovi il mouse torna normale
-	if b.Enabled {
-		if userIdle > 40*time.Second {
+	// idle: dopo qualche minuto senza toccare niente fa una scenetta (lavora, dorme, legge, medita);
+	// appena muovi il mouse torna normale
+	after := b.IdleAfter
+	if after <= 0 {
+		after = 4 * time.Minute
+	}
+	if b.Enabled && !b.NoIdle {
+		if userIdle > after {
 			b.enterIdle(now)
 		} else if b.Idle && userIdle < b.lastIdleIn {
 			b.exitIdle()
 		}
 	}
 	b.lastIdleIn = userIdle
-	if b.Idle && now.Sub(b.idlePctAt) > 1400*time.Millisecond {
-		b.idlePctAt = now
-		if b.IdlePct += b.rnd.Intn(7); b.IdlePct > 99 {
-			b.IdlePct = 99
-		}
+	if b.Idle && b.NoIdle {
+		b.exitIdle()
 	}
 	// ogni tanto parla da solo (raramente; non appena acceso, quando saluta)
 	if b.nextCheck.IsZero() {

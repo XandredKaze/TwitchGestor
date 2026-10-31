@@ -84,14 +84,31 @@ var quotes = []quote{
 	{"Sei troppo lento!", "Sonic Adventure 2", "Non è una mia battuta. Ma è vera."},
 }
 
-// quando non fai niente per un po' finge di lavorare
+// quando non fai niente per un po': legge…
+var idleReads = []string{
+	"Leggo il manuale dei Chaos Emerald",
+	"Leggo le note della patch",
+	"Ripasso il regolamento dei duelli",
+	"Sfoglio il Pokédex",
+	"Leggo un tomo di Winterhold",
+	"Leggo la chat di ieri",
+}
+
+// …medita…
+var idleMeditate = []string{
+	"Medito. Non disturbare",
+	"Inspira. Espira",
+	"Cerco la pace interiore",
+	"Svuoto la mente",
+}
+
+// …o finge di lavorare
 var idleTasks = []string{
 	"Riallineo i Chaos Emerald",
 	"Ricalibro la psicocinesi",
 	"Mi sistemo gli aculei",
 	"Controllo la linea temporale",
 	"Riordino i tuoi file (mentalmente)",
-	"Medito. Non disturbare",
 	"Mi riempio di DETERMINAZIONE",
 	"Cerco i pezzi di Exodia",
 	"Catturo Pokémon selvatici",

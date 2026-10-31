@@ -385,7 +385,11 @@ func (r *Renderer) Render(now time.Time, mono float64, b *Brain) (*image.RGBA, H
 	if b.Thinking != "" && b.Bubble == nil {
 		r.drawPill(img, b.Thinking, "", mono)
 	} else if b.Idle {
-		r.drawPill(img, b.IdleTask, strconv.Itoa(b.IdlePct)+"%", mono)
+		text := b.IdleTask
+		if b.IdleKind == "sleep" { // "Dormo z", "Dormo zz", "Dormo zzz"
+			text += " " + strings.Repeat("z", 1+int(mono/0.9)%3)
+		}
+		r.drawPill(img, text, "", mono)
 	}
 	if bb := b.Bubble; bb != nil {
 		// il fumetto si ridisegna solo quando cambia (lettera nuova, cursore, comparsa, casella)

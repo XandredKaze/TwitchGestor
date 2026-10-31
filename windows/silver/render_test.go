@@ -98,10 +98,21 @@ func TestFotogrammi(t *testing.T) {
 	b = NewBrain(4)
 	b.SetContext(t0, Context{ID: "music", Name: "Musicante Player"})
 	b.pending, b.Bubble = nil, nil // senza il commento sul cambio di programma (mentre parla non va in idle)
-	img, _ = frame(b, t0.Add(10*time.Second), 50*time.Second)
+	img, _ = frame(b, t0.Add(10*time.Second), 5*time.Minute)
 	save("4-idle-musica", img)
 	if !b.Idle {
 		t.Fatal("doveva andare in idle")
+	}
+	b = NewBrain(4)
+	b.pending, b.Bubble = nil, nil
+	b.Tick(t0.Add(10*time.Second), 90*time.Second)
+	if b.Idle {
+		t.Fatal("dopo un minuto e mezzo non deve ancora partire la scenetta")
+	}
+	b.NoIdle = true
+	b.Tick(t0.Add(11*time.Second), 10*time.Minute)
+	if b.Idle {
+		t.Fatal("scenette spente: niente idle")
 	}
 
 	// 4b. le pose con le icone

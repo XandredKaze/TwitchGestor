@@ -238,6 +238,7 @@ type config struct {
 	NoGuard        bool                `json:"noGuard"`        // avvisi automatici spenti
 	NoAutoBriefing bool                `json:"noAutoBriefing"` // niente buongiorno da solo
 	LastBriefing   string              `json:"lastBriefing"`
+	NoIdle         bool                `json:"noIdle"`        // niente scenette quando sei fermo
 	Away           bool                `json:"away"`          // gli hai detto "sparisci": acceso ma nascosto
 	OfferedUpdate  string              `json:"offeredUpdate"` // la versione nuova già proposta (una volta sola)
 	Modes          map[string][]string `json:"modes"`         // le tue modalità (modes_windows.go)
@@ -397,7 +398,7 @@ func main() {
 	}
 	a.brain = NewBrain(time.Now().UnixNano())
 	a.brain.Enabled, a.brain.Voice, a.brain.Chattiness = a.cfg.Enabled, a.cfg.Voice, a.cfg.Chattiness
-	a.brain.Away = a.cfg.Away
+	a.brain.Away, a.brain.NoIdle = a.cfg.Away, a.cfg.NoIdle
 	a.brain.GameChoices = a.cfg.Games
 	a.brain.lastSpoke = time.Now() // appena acceso saluta, niente commenti sovrapposti
 	a.brain.OnChoicesChanged = func() { a.cfg.Games = a.brain.GameChoices; a.cfg.save() }
@@ -877,6 +878,7 @@ func (a *app) menu() {
 		cmdPair
 		cmdOllama
 		cmdAway
+		cmdIdle
 	)
 	check := func(on bool) uintptr {
 		if on {
@@ -913,6 +915,7 @@ func (a *app) menu() {
 	add(m, check(a.cfg.Enabled), cmdEnabled, "Silver attivo")
 	add(m, check(a.cfg.Voice), cmdVoice, "Voce")
 	add(m, mfPopup, sub, "Quanto parla da solo")
+	add(m, check(!a.cfg.NoIdle), cmdIdle, "Scenette quando sei fermo (dorme, legge…)")
 	add(m, mfSeparator, 0, "")
 	add(m, 0, cmdTalk, "Dimmi qualcosa")
 	add(m, check(a.cfg.Autostart), cmdAutostart, "Avvia con Windows")
@@ -955,6 +958,9 @@ func (a *app) menu() {
 	case cmdLittle, cmdNormal, cmdLots:
 		a.cfg.Chattiness = map[uintptr]float64{cmdLittle: 0.15, cmdNormal: 0.4, cmdLots: 0.75}[cmd]
 		a.brain.Chattiness = a.cfg.Chattiness
+	case cmdIdle:
+		a.cfg.NoIdle = !a.cfg.NoIdle
+		a.brain.NoIdle = a.cfg.NoIdle
 	case cmdAway:
 		a.setAway(!a.cfg.Away)
 	case cmdAsk:
