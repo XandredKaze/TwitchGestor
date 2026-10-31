@@ -33,14 +33,13 @@ var assets embed.FS
 
 // dimensioni (in punti logici; sullo schermo si moltiplicano per la scala dello schermo)
 const (
-	winW   = 440
-	winH   = 360
-	boxX   = 14
-	boxW   = 112
-	boxH   = 168
-	bubX   = 116
-	bubW   = 300
-	bubGap = 176 // distanza del fondo del fumetto dal fondo della finestra
+	winW    = 440
+	winH    = 360
+	boxX    = 14
+	boxW    = 112
+	boxH    = 168
+	bubW    = 300
+	bubMinW = 250 // il fumetto più stretto (se Silver è largo)
 )
 
 type rectF struct{ x, y, w, h float64 }
@@ -78,10 +77,11 @@ type fonts struct{ regular, bold, italic *opentype.Font }
 type Renderer struct {
 	Scale float64
 
-	src      image.Image   // l'immagine di Silver (scaricata da Gestor); nil = sagoma di riserva
-	sprite   image.Image   // Silver già alla dimensione giusta
-	srcPoses []image.Image // le pose del foglio (se l'hai caricato)
-	poses    []image.Image // …già alla dimensione giusta
+	src      image.Image                     // l'immagine di Silver (scaricata da Gestor); nil = sagoma di riserva
+	sprite   image.Image                     // Silver già alla dimensione giusta
+	visible  map[image.Image]image.Rectangle // dove l'immagine non è trasparente (per il fumetto)
+	srcPoses []image.Image                   // le pose del foglio (se l'hai caricato)
+	poses    []image.Image                   // …già alla dimensione giusta
 	props    map[string]image.Image
 	fonts    fonts
 	faces    map[string]font.Face
@@ -392,9 +392,19 @@ func (r *Renderer) Render(now time.Time, mono float64, b *Brain) (*image.RGBA, H
 		r.drawPill(img, text, "", mono)
 	}
 	if bb := b.Bubble; bb != nil {
+		// il fumetto accanto alla testa di Silver, dove sta davvero la figura (senza l'oscillazione, così
+		// non balla): la codina punta all'altezza della testa
+		vis := r.visibleBounds(sprite)
+		figTop := oy - sh*fit + float64(vis.Min.Y)*fit
+		figH := float64(vis.Dy()) * fit
+		figRight := ox - sw*fit/2 + float64(vis.Max.X)*fit
+		// subito a destra della figura; se Silver è largo il fumetto si stringe un po' (mai sopra di lui)
+		bx := math.Max(70*s, math.Min(figRight+8*s, (winW-bubMinW-6)*s))
+		bw := math.Min(bubW*s, winW*s-bx-6*s)
+		bBottom := math.Min(figTop+figH*0.30+14*s, (winH-30)*s)
 		// il fumetto si ridisegna solo quando cambia (lettera nuova, cursore, comparsa, casella)
 		appearing := now.Sub(bb.shown) < 220*time.Millisecond
-		key := fmt.Sprintf("%p|%d|%d|%v|%v|%v", bb, bb.page, bb.typed, bb.Remember, !bb.Done() && math.Mod(mono, 0.8) < 0.4, bb.More() && math.Mod(mono, 1) < 0.6)
+		key := fmt.Sprintf("%p|%d|%d|%v|%v|%v|%.0f|%.0f|%.0f", bb, bb.page, bb.typed, bb.Remember, !bb.Done() && math.Mod(mono, 0.8) < 0.4, bb.More() && math.Mod(mono, 1) < 0.6, bx, bBottom, bw)
 		if appearing || key != r.bubKey || r.bubLayer == nil {
 			if r.bubLayer == nil {
 				r.bubLayer = image.NewRGBA(img.Bounds())
@@ -402,14 +412,14 @@ func (r *Renderer) Render(now time.Time, mono float64, b *Brain) (*image.RGBA, H
 				clear(r.bubLayer.Pix)
 			}
 			var bh Hits
-			r.drawBubble(r.bubLayer, bb, now, mono, &bh)
+			r.drawBubble(r.bubLayer, bb, now, mono, &bh, bx, bBottom, bw)
 			r.bubHits = bh
 			r.bubKey = key
 			if appearing {
 				r.bubKey = ""
 			}
 		}
-		br := image.Rect(int((bubX-12)*s), 0, int((bubX+bubW+8)*s), int((winH-bubGap+16)*s))
+		br := image.Rect(int(bx-12*s), 0, int(bx+bw+8*s), img.Rect.Max.Y)
 		draw.Draw(img, br, r.bubLayer, br.Min, draw.Over)
 		hits.Bubble, hits.Buttons, hits.Remember = r.bubHits.Bubble, r.bubHits.Buttons, r.bubHits.Remember
 	}
@@ -510,7 +520,7 @@ func wrap(f font.Face, text string, maxW float64) []string {
 	return out
 }
 
-func (r *Renderer) drawBubble(img *image.RGBA, bb *Bubble, now time.Time, mono float64, hits *Hits) {
+func (r *Renderer) drawBubble(img *image.RGBA, bb *Bubble, now time.Time, mono float64, hits *Hits, x, bottom, bw float64) {
 	s := r.Scale
 	appear := math.Min(1, now.Sub(bb.shown).Seconds()/0.2)
 	ease := 1 - math.Pow(1-appear, 3)
@@ -519,7 +529,7 @@ func (r *Renderer) drawBubble(img *image.RGBA, bb *Bubble, now time.Time, mono f
 	fLabel := r.face("bold", 10)
 	fSmall := r.face("regular", 11)
 	fSrc := r.face("italic", 11)
-	inner := bubW*s - 2*padX
+	inner := bw - 2*padX
 	// pulsanti, fonte e casella solo sull'ultima pagina
 	actions, source, remember := bb.Actions, bb.Source, bb.RememberLabel
 	if bb.More() {
@@ -552,16 +562,17 @@ func (r *Renderer) drawBubble(img *image.RGBA, bb *Bubble, now time.Time, mono f
 		}
 	}
 	h += padY - 4*s
-	x := bubX * s
-	bottom := (winH - bubGap) * s
+	if bottom-h < 4*s { // troppo alto per stare lì: scende quanto basta
+		bottom = h + 4*s
+	}
 	y := bottom - h + (1-ease)*8*s
 	alpha := ease
-	rect := rectF{x, y, bubW * s, h}
+	rect := rectF{x, y, bw, h}
 	hits.Bubble = rect
 
 	// ombra, bordo, sfondo e codina verso Silver
-	fillRoundRect(img, rectF{x + 2*s, y + 8*s, bubW * s, h}, 16*s, color.NRGBA{0, 0, 0, 70}, alpha)
-	fillRoundRect(img, rectF{x - 1*s, y - 1*s, bubW*s + 2*s, h + 2*s}, 15*s, color.NRGBA{58, 66, 80, 255}, alpha)
+	fillRoundRect(img, rectF{x + 2*s, y + 8*s, bw, h}, 16*s, color.NRGBA{0, 0, 0, 70}, alpha)
+	fillRoundRect(img, rectF{x - 1*s, y - 1*s, bw + 2*s, h + 2*s}, 15*s, color.NRGBA{58, 66, 80, 255}, alpha)
 	fillRoundRect(img, rect, 14*s, color.NRGBA{22, 26, 33, 250}, alpha)
 	fillTriangle(img, x-7*s, bottom-14*s+(1-ease)*8*s, x+1*s, bottom-22*s+(1-ease)*8*s, x+1*s, bottom-6*s+(1-ease)*8*s, color.NRGBA{58, 66, 80, 255}, alpha)
 	fillTriangle(img, x-5*s, bottom-14*s+(1-ease)*8*s, x+2*s, bottom-20*s+(1-ease)*8*s, x+2*s, bottom-8*s+(1-ease)*8*s, color.NRGBA{22, 26, 33, 250}, alpha)
@@ -577,11 +588,11 @@ func (r *Renderer) drawBubble(img *image.RGBA, bb *Bubble, now time.Time, mono f
 	}
 	if label != "" {
 		lw := float64(font.MeasureString(fSmall, "· "+label).Ceil())
-		drawText(img, fSmall, x+bubW*s-padX-lw, cy, "· "+label, color.NRGBA{141, 150, 166, 255}, alpha)
+		drawText(img, fSmall, x+bw-padX-lw, cy, "· "+label, color.NRGBA{141, 150, 166, 255}, alpha)
 	}
 	// continua: il triangolino che lampeggia in basso a destra (come nei giochi)
 	if bb.More() && bb.Done() && math.Mod(mono, 1) < 0.6 {
-		tx, tyy := x+bubW*s-padX-6*s, y+h-padY+2*s
+		tx, tyy := x+bw-padX-6*s, y+h-padY+2*s
 		fillTriangle(img, tx-5*s, tyy-6*s, tx+5*s, tyy-6*s, tx, tyy, color.NRGBA{95, 211, 176, 255}, alpha)
 	}
 	// testo scritto fin qui (lettera per lettera) e il cursore che lampeggia
@@ -763,4 +774,29 @@ func drawTextSpaced(img *image.RGBA, f font.Face, x, y float64, text string, c c
 		drawText(img, f, x, y, string(ch), c, alpha)
 		x += float64(font.MeasureString(f, string(ch)).Ceil()) + spacing
 	}
+}
+
+// visibleBounds: il rettangolo dei pixel non trasparenti (le immagini spesso hanno bordi vuoti)
+func (r *Renderer) visibleBounds(img image.Image) image.Rectangle {
+	if v, ok := r.visible[img]; ok {
+		return v
+	}
+	b := img.Bounds()
+	v := image.Rectangle{}
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			if _, _, _, a := img.At(x, y).RGBA(); a > 0x2000 {
+				v = v.Union(image.Rect(x, y, x+1, y+1))
+			}
+		}
+	}
+	if v.Empty() {
+		v = b
+	}
+	v = v.Sub(b.Min)
+	if r.visible == nil || len(r.visible) > 32 {
+		r.visible = map[image.Image]image.Rectangle{}
+	}
+	r.visible[img] = v
+	return v
 }
