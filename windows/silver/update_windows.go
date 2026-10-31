@@ -113,8 +113,18 @@ func (a *app) updateCmd(what string) {
 	a.updating = true
 	a.brain.Thinking = "Controllo gli aggiornamenti…"
 	wantSilver, wantPlayer := a.newSilver, a.newPlayer // le impronte dichiarate da Gestor
+	key := a.cfg.Key
 	go func() {
 		var msgs []string
+		// prima TwitchGestor sul Raspberry: se su GitHub c'è una versione nuova si aggiorna lui,
+		// e poi da lì arriva anche la versione nuova di Silver e del Player
+		s, p, note := a.updateGestorFirst(base, key)
+		if s != "" {
+			wantSilver, wantPlayer = s, p
+		}
+		if note != "" {
+			msgs = append(msgs, note)
+		}
 		restart := false
 		var playerErr, silverErr error
 		if what == "player" || what == "all" {
@@ -221,4 +231,47 @@ func updatePlayer(base, want string) (string, error) {
 	}
 	_ = os.Remove(conf.Exe + ".old")
 	return "Musicante Player aggiornato (" + filepath.Base(conf.Exe) + ").", nil
+}
+
+// updateGestorFirst: chiede a TwitchGestor di aggiornarsi da GitHub e aspetta che riparta (al massimo 6 minuti).
+// Restituisce le impronte nuove di Silver e del Player (vuote se Gestor non si è aggiornato) e una nota da dire.
+func (a *app) updateGestorFirst(base, key string) (silver, player, note string) {
+	var r struct {
+		Available bool   `json:"available"`
+		Requested bool   `json:"requested"`
+		Text      string `json:"text"`
+	}
+	if code, err := gestorCall(base, key, "POST", "/silver/do", map[string]any{"action": "gestor-update"}, &r); err != nil || code != 200 {
+		return "", "", "" // Gestor vecchio o non risponde: si scarica quello che c'è
+	}
+	if !r.Requested {
+		return "", "", r.Text
+	}
+	before := ""
+	type state struct {
+		Version string `json:"version"`
+		Exe     struct {
+			Silver string `json:"silver"`
+			Player string `json:"player"`
+		} `json:"exe"`
+	}
+	var st state
+	if gestorCall(base, "", "GET", "/silver/state", nil, &st); st.Version != "" {
+		before = st.Version
+	}
+	a.post <- func() { a.brain.Thinking = "Aggiorno prima TwitchGestor sul Raspberry…" }
+	deadline := time.Now().Add(6 * time.Minute)
+	for time.Now().Before(deadline) {
+		time.Sleep(5 * time.Second)
+		var now state
+		if code, err := gestorCall(base, "", "GET", "/silver/state", nil, &now); err != nil || code != 200 || now.Version == "" {
+			continue // sta ripartendo
+		}
+		if now.Version != before {
+			a.post <- func() { a.brain.Thinking = "Controllo gli aggiornamenti…" }
+			return now.Exe.Silver, now.Exe.Player, "TwitchGestor aggiornato alla " + now.Version + "."
+		}
+	}
+	a.post <- func() { a.brain.Thinking = "Controllo gli aggiornamenti…" }
+	return "", "", "TwitchGestor ci sta mettendo tanto ad aggiornarsi: riprova tra qualche minuto."
 }

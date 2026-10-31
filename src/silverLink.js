@@ -6,6 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { DATA_DIR } from './config.js';
 import { fromLocal } from './core/schedule.js';
+import { checkForUpdates, isManaged, requestUpdate } from './updates.js';
 
 const KEYS_FILE = path.join(DATA_DIR, 'silver', 'keys.json');
 const hash = (k) => crypto.createHash('sha256').update(String(k)).digest('hex');
@@ -194,6 +195,16 @@ export function createSilverLink(app, { file = KEYS_FILE, howlupPort = Number(pr
           if (!res.ok) return { text: `Howl-UP non l'ha salvato: ${data.error ?? res.status}.` };
           agendaCache.at = 0; // la prossima volta l'agenda è già aggiornata
           return { text: { event: 'Salvato nell\'agenda di Howl-UP.', task: 'Aggiunto alle cose da fare.', live: 'Live aggiunta alla Programmazione.' }[key], id: data[key]?.id };
+        }
+        // "aggiornati": prima TwitchGestor stesso (Silver scarica da qui la sua versione nuova)
+        case 'gestor-update': {
+          const c = await checkForUpdates({ force: true });
+          if (c.error) return { available: false, text: c.error };
+          if (!c.available) return { available: false };
+          if (!isManaged()) return { available: true, text: 'TwitchGestor ha una versione nuova, ma qui va aggiornato a mano.' };
+          if (await app.isLive?.()) return { available: true, text: 'Sei in live: aggiorno TwitchGestor quando hai finito.' };
+          requestUpdate();
+          return { available: true, requested: true };
         }
         default:
           throw Object.assign(new Error('Comando sconosciuto'), { status: 400 });
