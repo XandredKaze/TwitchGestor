@@ -92,6 +92,12 @@ var idleTasks = []string{
 	"Controllo la linea temporale",
 	"Riordino i tuoi file (mentalmente)",
 	"Medito. Non disturbare",
+	"Mi riempio di DETERMINAZIONE",
+	"Cerco i pezzi di Exodia",
+	"Catturo Pokémon selvatici",
+	"Proteggo il mio ginocchio dalle frecce",
+	"Preparo un Salto della fede",
+	"Ripasso le combo di Yasuo",
 }
 
 const (

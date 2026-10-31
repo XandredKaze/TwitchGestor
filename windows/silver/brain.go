@@ -251,7 +251,13 @@ func (b *Brain) Talk(now time.Time, asked bool) {
 		b.Say(now, b.pick(liveLines), "", "", nil)
 		return
 	}
-	if b.rnd.Float64() < 0.3 {
+	// stai giocando a uno dei giochi delle citazioni: spesso cita proprio quello
+	if gq := gameQuotes(b.Ctx); len(gq) > 0 && b.rnd.Float64() < 0.6 {
+		q := gq[b.rnd.Intn(len(gq))]
+		b.Say(now, "“"+q.text+"”", q.source, q.note, nil)
+		return
+	}
+	if b.rnd.Float64() < 0.4 {
 		q := quotes[b.rnd.Intn(len(quotes))]
 		b.Say(now, "“"+q.text+"”", q.source, q.note, nil)
 		return
