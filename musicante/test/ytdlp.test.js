@@ -18,7 +18,7 @@ test('argomenti di yt-dlp: MP3, playlist sì o no, il link sempre dopo --', () =
   assert.equal(a[a.indexOf('-o') + 1], '/d/lavoro/1/%(title).150B.%(ext)s');
   assert.ok(!a.includes('--split-chapters'));
   const c = downloadArgs({ url: 'https://x.y', work: '/w', split: true });
-  assert.ok(c.includes('--split-chapters') && c.includes('chapter:/w/capitoli/%(section_title).150B.%(ext)s'));
+  assert.ok(c.includes('--split-chapters') && c.includes('chapter:/w/capitoli/%(section_number)03d %(section_title).150B.%(ext)s'));
   assert.ok(downloadArgs({ url: 'https://x.y', work: '/m' }).includes('--no-playlist'));
 });
 

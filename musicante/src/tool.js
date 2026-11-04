@@ -7,8 +7,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn, execFile } from 'node:child_process';
-import { probeArgs, parseProbe, downloadArgs, friendlyError, parseLine, FILE_MARK } from './core/ytdlp.js';
+import { spawn, execFile, execFileSync } from 'node:child_process';
+import { probeArgs, parseProbe, downloadArgs, friendlyError, parseLine, chapterName, retagArgs, FILE_MARK } from './core/ytdlp.js';
 
 const RELEASE_URL = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp';
 
@@ -34,6 +34,27 @@ export function createTool({ dataDir, binPath = process.env.MUSICANTE_YTDLP, log
     return dest;
   }
   let state = { ytdlp: '', ffmpeg: false, busy: '', error: '', updatedAt: 0 };
+
+  /**
+   * Un capitolo appena diviso ("001 Pioggia.mp3"): dentro il file il titolo è ancora quello del video intero,
+   * e il player mostrerebbe lo stesso nome per tutti. Si scrivono titolo del capitolo, numero e mix (album),
+   * e il file si chiama solo "Pioggia.mp3".
+   */
+  function nameChapter(file, total, album) {
+    const c = chapterName(path.basename(file));
+    if (!c) return file;
+    const dest = path.join(path.dirname(file), `${c.title}${path.extname(file)}`);
+    const tmp = path.join(path.dirname(file), `.tag-${c.n}${path.extname(file)}`);
+    try {
+      execFileSync('ffmpeg', retagArgs({ input: file, output: tmp, title: c.title, track: c.n, total, album }), { timeout: 60000, stdio: 'ignore' });
+      fs.rmSync(file, { force: true });
+      fs.renameSync(tmp, dest);
+    } catch {
+      fs.rmSync(tmp, { force: true }); // senza ffmpeg: almeno il nome giusto
+      fs.renameSync(file, dest);
+    }
+    return dest;
+  }
 
   const exec = (file, args, timeout = 30000) => new Promise((resolve, reject) => {
     execFile(file, args, { timeout, maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) => {
@@ -109,7 +130,8 @@ export function createTool({ dataDir, binPath = process.env.MUSICANTE_YTDLP, log
   function run(job, { onLine, signal, dir }) {
     return new Promise((resolve, reject) => {
       if (!state.ytdlp) { reject(new Error('yt-dlp non è pronto')); return; }
-      // dir: cartella fissa, oppure funzione (file) => cartella (download "per artista")
+      // dir: cartella fissa, oppure funzione (file, mix) => cartella (download "per artista"; mix: il titolo del video
+      // diviso per capitoli, che diventa la playlist)
       const dirFor = typeof dir === 'function' ? dir : () => dir;
       if (typeof dir !== 'function') fs.mkdirSync(dir, { recursive: true });
       const work = path.join(workRoot, job.id);
@@ -122,7 +144,8 @@ export function createTool({ dataDir, binPath = process.env.MUSICANTE_YTDLP, log
         try {
           const chapters = job.split ? audio(chapDir) : [];
           if (chapters.length) {
-            for (const c of chapters) { onLine(`${FILE_MARK}${moveInto(c, dirFor(c))}`); moved += 1; }
+            const album = main ? path.basename(main, path.extname(main)) : '';
+            for (const c of chapters.sort()) { onLine(`${FILE_MARK}${moveInto(nameChapter(c, chapters.length, album), dirFor(c, album))}`); moved += 1; }
             if (main) fs.rmSync(main, { force: true });
           } else if (main && fs.existsSync(main)) {
             onLine(`${FILE_MARK}${moveInto(main, dirFor(main))}`);

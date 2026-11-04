@@ -39,5 +39,10 @@ export function scanLibrary(dir) {
     }
   };
   walk('', 0);
+  // mix divisi per capitoli con una versione vecchia di Musicante: dentro ogni file c'è il titolo del video intero.
+  // Se lo stesso titolo è dentro 3 o più brani della stessa cartella, si usa il nome del file (quello del capitolo).
+  const same = new Map();
+  for (const t of out) if (t.title) { const k = `${path.dirname(t.id)}\n${t.title}`; same.set(k, (same.get(k) ?? 0) + 1); }
+  for (const t of out) if (t.title && same.get(`${path.dirname(t.id)}\n${t.title}`) >= 3) t.title = '';
   return out.sort((a, b) => a.id.localeCompare(b.id, 'it'));
 }

@@ -71,6 +71,26 @@ test('libreria: i file audio della cartella, le sottocartelle diventano playlist
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('libreria: i capitoli di un mix con dentro il titolo del video intero mostrano il nome del capitolo', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const { scanLibrary } = await import('../src/musiclib.js');
+  // MP3 con il solo titolo (ID3v2.3, frame TIT2)
+  const mp3 = (title) => {
+    const text = Buffer.concat([Buffer.from([0]), Buffer.from(title, 'latin1')]);
+    const frame = Buffer.concat([Buffer.from('TIT2'), Buffer.from([0, 0, 0, text.length, 0, 0]), text]);
+    return Buffer.concat([Buffer.from('ID3'), Buffer.from([3, 0, 0, 0, 0, 0, frame.length]), frame, Buffer.alloc(16)]);
+  };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tg-music-'));
+  fs.mkdirSync(path.join(dir, 'Mix'));
+  for (const n of ['Intro', 'Pioggia', 'Notte']) fs.writeFileSync(path.join(dir, 'Mix', `${n}.mp3`), mp3('Mix lo-fi di un ora'));
+  fs.writeFileSync(path.join(dir, 'Mix', 'Altro.mp3'), mp3('Brano vero'));
+  const lib = scanLibrary(dir);
+  assert.deepEqual(lib.map((t) => t.title), ['Brano vero', '', '', '']);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('impostazioni della musica: abbassamento durante gli alert', async () => {
   const { sanitizeConfig } = await import('../src/core/schema.js');
   const fs = await import('node:fs');

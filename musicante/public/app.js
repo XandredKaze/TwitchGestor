@@ -153,7 +153,7 @@ function downloadCard() {
   return el('section', { className: 'card' }, el('h2', {}, 'Scarica'),
     el('div', { className: 'url-row' }, url, paste),
     el('label', { className: 'switch' }, el('span', {}, 'Playlist intera', el('span', { className: 'hint', style: { display: 'block', fontWeight: 400 } }, 'Spento: solo il brano del link')), pl),
-    el('label', { className: 'switch' }, el('span', {}, 'Dividi per capitoli', el('span', { className: 'hint', style: { display: 'block', fontWeight: 400 } }, 'Un MP3 per ogni minutaggio della descrizione (per i mix lunghi)')), sp),
+    el('label', { className: 'switch' }, el('span', {}, 'Dividi per capitoli', el('span', { className: 'hint', style: { display: 'block', fontWeight: 400 } }, 'Un MP3 per ogni minutaggio, col nome del capitolo; con «Per artista» vanno in una playlist col nome del video')), sp),
     el('label', { className: 'field' }, el('span', {}, 'Dove salvarla'), sel, newName),
     previewBox,
     el('div', { className: 'row' }, probeBtn, go),

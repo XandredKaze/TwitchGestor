@@ -37,7 +37,7 @@ const next = () => {
   fs.writeFileSync(file, 'mp3');
   if (split) {
     CHAPTERS.forEach((c, k) => {
-      const cf = path.join(path.dirname(file), 'capitoli', `${c.title}.mp3`);
+      const cf = path.join(path.dirname(file), 'capitoli', `${String(k + 1).padStart(3, '0')} ${c.title}.mp3`);
       fs.mkdirSync(path.dirname(cf), { recursive: true });
       fs.writeFileSync(cf, 'mp3');
       if (!quiet) console.log(`[SplitChapters] Chapter ${String(k + 1).padStart(3, '0')}; Destination: ${cf}`);

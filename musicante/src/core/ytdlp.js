@@ -35,7 +35,8 @@ export const MAIN_MARK = 'MUSICANTE_MAIN '; // file completo nella cartella di l
  * Argomenti di yt-dlp per scaricare l'audio in MP3.
  * work: cartella di lavoro (i file finiti li sposta Musicante nella musica, così lì non c'è mai niente a metà);
  * archive: file che ricorda i brani già scaricati (non li riscarica);
- * split: un MP3 per ogni capitolo del video (i minutaggi della descrizione), in work/capitoli.
+ * split: un MP3 per ogni capitolo del video (i minutaggi della descrizione), in work/capitoli, come "001 Titolo.mp3"
+ *   (il numero serve per l'ordine e il numero di traccia; Musicante poi lo toglie dal nome).
  */
 /**
  * Opzioni per YouTube: jsRuntime = Node.js del Raspberry (yt-dlp lo usa per leggere le pagine di YouTube),
@@ -60,7 +61,7 @@ export function downloadArgs({ url, playlist = false, work, archive, split = fal
     ...(archive ? ['--download-archive', archive] : []),
     '--windows-filenames',
     '-o', `${work}/%(title).150B.%(ext)s`,
-    ...(split ? ['--split-chapters', '-o', `chapter:${work}/capitoli/%(section_title).150B.%(ext)s`] : []),
+    ...(split ? ['--split-chapters', '-o', `chapter:${work}/capitoli/%(section_number)03d %(section_title).150B.%(ext)s`] : []),
     '--progress-template', `download:${PROGRESS_MARK}%(progress._percent_str)s|%(info.playlist_index)s|%(info.n_entries)s|%(info.title)s`,
     '--print', `after_move:${MAIN_MARK}%(filepath)s`,
     '--', url,
@@ -133,4 +134,17 @@ export function formatDuration(sec) {
   const m = Math.floor((s % 3600) / 60);
   const pad = (n) => String(n).padStart(2, '0');
   return h ? `${h}:${pad(m)}:${pad(s % 60)}` : `${m}:${pad(s % 60)}`;
+}
+
+/** "001 Pioggia sul vetro.mp3" → { n: 1, title: 'Pioggia sul vetro' } (null se non ha il numero davanti). */
+export function chapterName(file) {
+  const m = /^(\d{3}) (.+)\.[a-z0-9]+$/i.exec(file);
+  return m ? { n: Number(m[1]), title: m[2].trim() } : null;
+}
+
+/** Argomenti di ffmpeg per scrivere dentro il capitolo il suo titolo, il numero e il mix da cui viene. */
+export function retagArgs({ input, output, title, track, total, album }) {
+  return ['-y', '-v', 'error', '-i', input, '-map', '0', '-c', 'copy', '-id3v2_version', '3',
+    '-metadata', `title=${title}`, '-metadata', `track=${total ? `${track}/${total}` : track}`,
+    ...(album ? ['-metadata', `album=${album}`] : []), output];
 }

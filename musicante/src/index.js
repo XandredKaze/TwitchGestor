@@ -61,7 +61,14 @@ const downloads = new Downloads({
   onChange: () => { rev = Date.now(); },
   log,
   // "per artista": ogni brano nella playlist del suo artista (o in "Varie"), come il riordino di TwitchGestor
-  run: (job, opts) => tool.run(job, { ...opts, dir: job.byArtist ? (file) => placeNewTrack(MUSIC, file) : folderPath(job.folder) }).finally(() => { if (!env.MUSICANTE_TEST) rescanTwitchGestor(); }),
+  // diviso per capitoli senza una cartella scelta: la playlist prende il nome del video, i brani quello dei capitoli
+  run: (job, opts) => {
+    const normal = job.byArtist ? (file) => placeNewTrack(MUSIC, file) : folderPath(job.folder);
+    const dir = job.split && (job.byArtist || !job.folder)
+      ? (file, mix) => (mix ? folderPath(mix) : typeof normal === 'function' ? normal(file) : normal)
+      : normal;
+    return tool.run(job, { ...opts, dir }).finally(() => { if (!env.MUSICANTE_TEST) rescanTwitchGestor(); });
+  },
 });
 
 /** Sottocartelle della musica (le playlist di TwitchGestor). */

@@ -91,6 +91,10 @@ test('mix con i minutaggi: anteprima dei capitoli e un MP3 per capitolo (il file
   assert.deepEqual((await waitDone(one.job.id)).files, ['Brano singolo.mp3']);
   const again = await (await post('/api/downloads', { url: 'https://www.youtube.com/watch?v=mix&x=2', folder: 'Mix' })).json();
   assert.deepEqual((await waitDone(again.job.id)).files, ['Brano singolo (2).mp3']);
+  // "per artista" (nessuna cartella scelta): la playlist prende il nome del video, i brani quello dei capitoli
+  const auto = await waitDone((await (await post('/api/downloads', { url: 'https://www.youtube.com/watch?v=mix&z=1', split: true, byArtist: true })).json()).job.id);
+  assert.deepEqual(auto.files.sort(), ['Intro.mp3', 'Pioggia sul vetro.mp3']);
+  assert.deepEqual(fs.readdirSync(path.join(music, 'Brano singolo')).sort(), ['Intro.mp3', 'Pioggia sul vetro.mp3']);
   // nella cartella di lavoro non resta niente
   assert.deepEqual(fs.readdirSync(path.join(dir, 'data', 'lavoro')), []);
 });
