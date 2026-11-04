@@ -14,14 +14,26 @@ Object.assign(process.env, {
 let base;
 let srv;
 let tool;
+// TwitchGestor finto (per "Aggiorna ora"): ricorda le richieste ricevute
+const tgCalls = [];
+let fakeTg;
 before(async () => {
+  const http = await import('node:http');
+  fakeTg = http.createServer((req, res) => {
+    tgCalls.push(`${req.method} ${req.url} ${req.headers['x-dashboard-token']}`);
+    const body = req.url === '/api/system' ? { version: '9.9.0' } : { managed: true, pending: false, check: { available: true, behind: 2, changes: [{ text: 'Novità A' }, { text: 'Novità B' }] } };
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(body));
+  });
+  await new Promise((r) => fakeTg.listen(0, '127.0.0.1', r));
+  process.env.PORT = String(fakeTg.address().port);
   const mod = await import('../src/index.js');
   srv = mod.server;
   tool = mod.tool;
   base = `http://127.0.0.1:${await mod.ready}`;
   await tool.ensure();
 });
-after(() => { srv.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+after(() => { srv.close(); fakeTg.close(); fs.rmSync(dir, { recursive: true, force: true }); });
 
 const h = { 'x-musicante': '1', 'x-dashboard-token': 'pw', 'Content-Type': 'application/json' };
 const post = (p, body) => fetch(`${base}${p}`, { method: 'POST', headers: h, body: JSON.stringify(body ?? {}) });
@@ -145,4 +157,12 @@ test('download "per artista": senza artista il brano va in Varie', async () => {
   const done = await waitDone(r.job.id);
   assert.equal(done.status, 'done');
   assert.ok(fs.readdirSync(path.join(music, 'Varie')).length >= 1);
+});
+
+test('aggiornamenti: versione e novità da TwitchGestor, "Aggiorna ora" glielo chiede', async () => {
+  const u = await (await fetch(`${base}/api/update`, { headers: h })).json();
+  assert.deepEqual([u.version, u.available, u.behind, u.changes], ['9.9.0', true, 2, ['Novità A', 'Novità B']]);
+  const r = await post('/api/update');
+  assert.equal(r.status, 200);
+  assert.ok(tgCalls.includes('POST /api/update pw'));
 });

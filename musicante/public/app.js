@@ -259,6 +259,56 @@ function infoCard() {
       }, '↻ Aggiorna yt-dlp')));
 }
 
+// ---------- aggiornamenti (li fa TwitchGestor: Musicante è nello stesso pacchetto) ----------
+let upd = null; // stato degli aggiornamenti
+let updating = false; // premuto "Aggiorna ora": si aspetta che Musicante riparta, poi la pagina si ricarica
+async function loadUpdate(check = false) {
+  const r = await api(check ? '/api/update/check' : '/api/update', check ? { method: 'POST' } : {});
+  if (r) { upd = r; render(); }
+}
+function updateCard() {
+  const u = upd;
+  const box = el('section', { className: `card${u?.available ? ' warn' : ''}` }, el('h2', {}, 'Aggiornamenti'));
+  if (!u) return box.append(el('p', { className: 'hint' }, 'Controllo…')), box;
+  if (u.error && !u.version) return box.append(el('p', { className: 'hint' }, u.error)), box;
+  if (updating) return box.append(el('p', { className: 'hint' }, '⏳ Aggiornamento in corso: Musicante si riavvia e la pagina si ricarica da sola (1-3 minuti).')), box;
+  const status = u.available
+    ? `⬆ C'è una versione nuova${u.behind ? ` (${u.behind} novità)` : ''}`
+    : u.error || '✓ Hai l\'ultima versione';
+  box.append(...[
+    el('div', { className: 'row' },
+      el('span', { className: 'hint grow' }, `Musicante ${u.version || ''} · ${status}`),
+      el('button', { type: 'button', className: 'btn small', onclick: async (e) => { e.target.disabled = true; e.target.textContent = '⏳'; await loadUpdate(true); toast(upd?.available ? 'C\'è una versione nuova' : 'Nessuna versione nuova'); } }, '↻ Controlla'),
+      u.available && u.managed
+        ? el('button', {
+          type: 'button', className: 'btn small primary',
+          onclick: async (e) => {
+            e.target.disabled = true;
+            const r = await api('/api/update', { method: 'POST' });
+            if (!r) { e.target.disabled = false; return; }
+            updating = true;
+            render();
+            waitRestart(u.version);
+          },
+        }, '⬇ Aggiorna ora')
+        : null),
+    u.available && u.changes?.length ? el('ul', { className: 'hint' }, u.changes.map((c) => el('li', {}, c))) : null,
+    u.available && !u.managed ? el('p', { className: 'hint' }, 'Questa copia non è sul Raspberry: aggiornala a mano.') : null,
+  ].filter(Boolean));
+  return box;
+}
+// dopo "Aggiorna ora": quando risponde con una versione diversa (o dopo 6 minuti) si ricarica la pagina
+function waitRestart(before) {
+  const t0 = Date.now();
+  const tick = async () => {
+    const res = await fetch('/api/update', { headers: { 'x-musicante': '1', ...(token ? { 'x-dashboard-token': token } : {}) } }).catch(() => null);
+    const d = res?.ok ? await res.json().catch(() => null) : null;
+    if ((d?.version && d.version !== before) || Date.now() - t0 > 6 * 60000) { location.reload(); return; }
+    setTimeout(tick, 5000);
+  };
+  setTimeout(tick, 8000);
+}
+
 // ---------- disegno ----------
 function render() {
   if (!data) return;
@@ -270,15 +320,17 @@ function render() {
   const formNode = v.querySelector('[data-part="form"]');
   if (typing && formNode) {
     while (formNode.nextSibling) formNode.nextSibling.remove();
-    v.append(jobsCard(), cookiesCard(), infoCard());
+    v.append(jobsCard(), cookiesCard(), updateCard(), infoCard());
     return;
   }
   const f = downloadCard();
   f.dataset.part = 'form';
-  v.replaceChildren(f, jobsCard(), cookiesCard(), infoCard());
+  v.replaceChildren(f, jobsCard(), cookiesCard(), updateCard(), infoCard());
 }
 
 load(true);
+loadUpdate();
+setInterval(() => { if (!document.hidden && !updating) loadUpdate(); }, 10 * 60000);
 // mentre scarica si aggiorna spesso, altrimenti ogni tanto
 setInterval(() => { if (!document.hidden && data?.jobs.some((j) => j.status === 'running' || j.status === 'queued')) load(); }, 1500);
 setInterval(() => { if (!document.hidden) load(); }, 10000);

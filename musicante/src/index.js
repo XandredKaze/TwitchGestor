@@ -56,6 +56,39 @@ async function rescanTwitchGestor() {
   } catch { /* TwitchGestor ricontrolla comunque la cartella ogni minuto */ }
 }
 
+// chiamata a TwitchGestor (stesso Raspberry): { ok, data } oppure { ok: false, error }
+async function tg(pathname, method = 'GET', timeout = 15000) {
+  try {
+    const res = await fetch(`http://127.0.0.1:${TG_PORT}${pathname}`, {
+      method,
+      headers: { 'x-twitchgestor': '1', 'Content-Type': 'application/json', ...(env.DASHBOARD_TOKEN ? { 'x-dashboard-token': env.DASHBOARD_TOKEN } : {}) },
+      body: method === 'GET' ? undefined : '{}',
+      signal: AbortSignal.timeout(timeout),
+    });
+    const data = await res.json().catch(() => ({}));
+    return res.ok ? { ok: true, data } : { ok: false, error: data.error || `TwitchGestor: ${res.status}` };
+  } catch {
+    return { ok: false, error: 'TwitchGestor non risponde' };
+  }
+}
+
+/** Versione installata e se su GitHub ce n'è una nuova (per il pulsante "Aggiorna ora"). */
+async function updateInfo() {
+  const [u, sys] = await Promise.all([tg('/api/update'), tg('/api/system')]);
+  if (!u.ok) return { error: u.error };
+  const d = u.data;
+  return {
+    version: sys.data?.version ?? '',
+    managed: Boolean(d.managed),
+    available: Boolean(d.check?.available),
+    behind: d.check?.behind ?? 0,
+    changes: (d.check?.changes ?? []).slice(0, 8).map((c) => c.text),
+    pending: Boolean(d.pending),
+    last: d.last ?? null,
+    error: d.check?.error ?? '',
+  };
+}
+
 const downloads = new Downloads({
   store: { load: () => readJson(JOBS_FILE, []), save: (list) => writeJson(JOBS_FILE, list) },
   onChange: () => { rev = Date.now(); },
@@ -126,6 +159,16 @@ const server = http.createServer(async (req, res) => {
     }
     if (!authorized(req, url)) return send(res, 401, { error: 'Password mancante o sbagliata' });
     if (req.method !== 'GET' && (req.headers['x-musicante'] !== '1' || !sameOrigin(req))) return send(res, 403, { error: 'Richiesta non consentita' });
+
+    // aggiornamenti: li fa TwitchGestor (Musicante è nello stesso pacchetto); qui si chiede a lui
+    if (route === 'GET /api/update') return send(res, 200, await updateInfo());
+    if (route === 'POST /api/update/check') { await tg('/api/update/check', 'POST', 90000); return send(res, 200, await updateInfo()); }
+    if (route === 'POST /api/update') {
+      if (downloads.list().some((j) => j.status === 'running' || j.status === 'queued')) return send(res, 409, { error: 'Aspetta che finiscano i download: l\'aggiornamento riavvia Musicante' });
+      const r = await tg('/api/update', 'POST');
+      if (!r.ok) return send(res, 502, { error: r.error });
+      return send(res, 200, { requested: true });
+    }
 
     // TwitchGestor lo chiede prima di aggiornarsi: durante un download l'aggiornamento aspetta
     if (route === 'GET /api/busy') return send(res, 200, { busy: downloads.list().some((j) => j.status === 'running' || j.status === 'queued') });
