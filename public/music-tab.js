@@ -161,7 +161,7 @@
     fill($('mu-playlists'),
       el('h2', {}, 'Playlist'),
       el('div', { className: 'mu-pl-list' }, ...data.playlists.map((x) => el('button', {
-        type: 'button', className: `mu-pl${x.id === pl?.id ? ' active' : ''}`,
+        type: 'button', className: `mu-pl${x.id === pl?.id ? ' active' : ''}`, title: x.name,
         'aria-pressed': x.id === pl?.id ? 'true' : 'false',
         onclick: () => { shown = x.id; renderLibrary(); },
       },

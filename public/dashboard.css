@@ -1273,7 +1273,7 @@ html:root[data-ui="brutal"] {
 .mu-warn-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .mu-next { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* playlist a sinistra, brani a destra */
-.mu-lib-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 12px; align-items: start; }
+.mu-lib-layout { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 12px; align-items: start; }
 @media (max-width: 800px) { .mu-lib-layout { grid-template-columns: minmax(0, 1fr); } }
 .mu-playlists h2 { margin: 0 0 8px; }
 .mu-pl-list { display: grid; gap: 2px; }
@@ -1281,7 +1281,11 @@ html:root[data-ui="brutal"] {
 .mu-pl { display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; padding: 7px 10px; border-radius: 9px; border: 1px solid transparent; background: transparent; font: inherit; color: inherit; }
 .mu-pl:hover { background: var(--inset); border-color: var(--border); }
 .mu-pl.active { background: var(--inset); border-color: var(--accent); font-weight: 600; }
-.mu-pl-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mu-pl-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* i nomi lunghi si accorciano con "…" invece di uscire dalla colonna e finire sotto i brani */
+.mu-playlists, .mu-lib-panel { min-width: 0; }
+.mu-pl { min-width: 0; max-width: 100%; }
+.mu-pl-count { flex: none; }
 .mu-pl-on { color: var(--accent); }
 .mu-pl-count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .mu-pl-new { margin-top: 10px; }
