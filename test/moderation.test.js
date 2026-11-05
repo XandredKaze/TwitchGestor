@@ -25,6 +25,12 @@ test('riconosce le parole anche scritte in modo diverso, senza falsi allarmi', (
   assert.equal(hit('brutta, parola'), 'brutta parola');
   assert.equal(hit('c a c c a'), 'cacca');
   assert.equal(hit('pizzacacca'), 'cacca');
+  // spam con lettere "travestite": russe/greche uguali alle latine, grassetto, a larghezza piena
+  const spam = [{ text: 'streamboo', action: 'ban' }];
+  for (const t of ['Best viewers with streamboo .com', 'Best viewers with strеаmbоо .com', 'Best viewers on 𝐬𝐭𝐫𝐞𝐚𝐦𝐛𝐨𝐨 .com', 'ｓｔｒｅａｍｂｏｏ', 'ѕtrеamboo']) {
+    assert.equal(findBanned(t, spam)?.text, 'streamboo', t);
+  }
+  assert.equal(findBanned('Привет, как дела?', spam), null); // un messaggio in russo normale non è spam
   for (const ok of ['classe stupenda', 'ciao!', 'gg 2024', 'stupida idea? no', 'pidocchio']) assert.equal(hit(ok), null, ok);
   assert.equal(normalizeText('Ciào   Mondo!!!'), 'ciao mondo');
   assert.equal(describeAction({ action: 'timeout', duration: 600 }), 'timeout 10 min');

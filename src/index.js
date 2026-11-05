@@ -876,6 +876,13 @@ function startEventSub() {
         .catch((err) => log.warn(`Messaggio della chat non gestito: ${err.message}`));
       return;
     }
+    // utente limitato da Twitch (probabile elusione del ban): il suo messaggio non arriva in chat, ma si controlla lo stesso
+    if (type === 'channel.suspicious_user.message') {
+      if (payload.low_trust_status !== 'restricted') return; // gli "osservati" scrivono in chat: li controlla già il messaggio normale
+      const msg = { id: payload.message?.message_id, text: payload.message?.text, user: { id: payload.user_id, login: payload.user_login, name: payload.user_name }, badges: [] };
+      moderator.handle(msg).catch((err) => log.warn(`Messaggio di un utente limitato non gestito: ${err.message}`));
+      return;
+    }
     if (type === 'stream.online') { recordLiveStart(payload.started_at).catch((err) => log.warn(`Storico dei titoli: ${err.message}`)); return; }
     if (type === 'stream.offline') { liveEnded().catch((err) => log.warn(`Fine live: ${err.message}`)); return; }
     if (type === 'channel.update') { titleLog.update({ title: payload.title, game: payload.category_name, gameId: payload.category_id }); return; }

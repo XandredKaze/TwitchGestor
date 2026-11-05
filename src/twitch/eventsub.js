@@ -22,6 +22,9 @@ export function subscriptionsFor(userId) {
     { type: 'channel.chat.message_delete', version: '1', condition: { ...me, user_id: userId } },
     { type: 'channel.chat.clear_user_messages', version: '1', condition: { ...me, user_id: userId } },
     { type: 'channel.chat.clear', version: '1', condition: { ...me, user_id: userId } },
+    // messaggi di chi Twitch ha "limitato" (probabile elusione del ban): li vedono solo i moderatori e non
+    // arrivano con gli altri, ma le parole bannate valgono anche per loro
+    { type: 'channel.suspicious_user.message', version: '1', condition: { ...me, moderator_user_id: userId } },
     // inizio e fine della live, cambi di titolo e categoria: per lo storico dei titoli
     { type: 'stream.online', version: '1', condition: me },
     { type: 'stream.offline', version: '1', condition: me },

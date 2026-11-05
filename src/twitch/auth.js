@@ -21,6 +21,7 @@ export const SCOPES = [
   'user:read:chat', // comandi della chat (!discord, !uptime...)
   ...QUICK_ACTION_SCOPES, // azioni rapide (titolo, clip, raid, sondaggi, chat...)
   'moderator:manage:banned_users', // parole bannate: timeout e ban (se non c'è un account bot)
+  'moderator:read:suspicious_users', // parole bannate anche per gli utenti limitati da Twitch (elusione del ban)
   'channel:manage:schedule', // programmazione: calendario delle live su Twitch (facoltativo)
 ];
 

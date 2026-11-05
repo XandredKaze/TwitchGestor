@@ -3,7 +3,8 @@
  * Non dipende da Node: lo usa anche la versione demo nel browser.
  *
  * Il confronto non si lascia ingannare facilmente: maiuscole, accenti, lettere sostituite da
- * numeri o simboli (5tup1d0, $tupido) e lettere ripetute (stuuupido) contano come la parola.
+ * numeri o simboli (5tup1d0, $tupido), lettere ripetute (stuuupido), lettere "decorate" (𝐬𝐭𝐮𝐩𝐢𝐝𝐨)
+ * e lettere russe o greche identiche a quelle latine contano come la parola.
  */
 
 export const MOD_ACTIONS = ['delete', 'timeout', 'ban'];
@@ -15,9 +16,17 @@ const LEET = { 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't', 8: 'b', '@': 'a',
  * Testo "pulito" per il confronto: minuscolo, senza accenti e caratteri invisibili, punteggiatura → spazio,
  * lettere ripetute una volta sola. Con leet anche numeri e simboli diventano lettere (5tup1d0 → stupido).
  */
+// lettere di altri alfabeti identiche a quelle latine: gli spammer le usano per non farsi trovare ("strеamboo" con la е russa)
+const LOOKALIKE = {
+  а: 'a', в: 'b', е: 'e', ё: 'e', з: '3', і: 'i', ї: 'i', ј: 'j', к: 'k', м: 'm', н: 'h', о: 'o', р: 'p', с: 'c', т: 't', у: 'y', х: 'x', ѕ: 's', ԁ: 'd', ԛ: 'q', ԝ: 'w', ӏ: 'l', ɡ: 'g', ɑ: 'a', ʀ: 'r',
+  α: 'a', β: 'b', ε: 'e', η: 'n', ι: 'i', κ: 'k', ν: 'v', ο: 'o', ρ: 'p', τ: 't', υ: 'u', χ: 'x', ω: 'w',
+};
+
 export function normalizeText(text, { leet = false } = {}) {
   let t = String(text ?? '')
+    .normalize('NFKC') // lettere "decorate" (𝐬𝐭𝐫𝐞𝐚𝐦, ｓｔｒｅａｍ, ⓢⓣⓡ) → normali
     .toLowerCase()
+    .replace(/[\u0370-\u03ff\u0400-\u052f\u0250-\u02af]/g, (c) => LOOKALIKE[c] ?? c)
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // accenti
     .replace(/[\u200b-\u200f\u2060\ufeff]/g, ''); // caratteri invisibili
   if (leet) {
