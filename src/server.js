@@ -582,7 +582,7 @@ export function createServer(app) {
             if (action === 'move') result = musicFolder.move(body.ids, body.folder ?? '', { skip });
             else if (action === 'delete') result = musicFolder.remove(body.ids, { skip });
             else if (action === 'trash') result = musicFolder.trash(body.ids, { skip });
-            else if (action === 'rename-playlist') result = musicFolder.renameFolder(body.from, body.to, { skip });
+            else if (action === 'rename-playlist') { result = musicFolder.renameFolder(body.from, body.to, { skip }); p.renamedPlaylist?.(body.from, body.to); }
             else if (action === 'organize-preview') return send(res, 200, musicFolder.preview(body.folder ?? null));
             else result = musicFolder.organize(body.folder ?? null, { skip });
             app.music.rescan();
@@ -594,6 +594,7 @@ export function createServer(app) {
           else if (action === 'next') p.next();
           else if (action === 'prev') p.prev();
           else if (action === 'volume') p.setVolume(body.volume);
+          else if (action === 'first') p.setFirst(body.playlist, body.trackId);
           else if (action === 'shuffle') p.setShuffle(body.on);
           else if (action === 'rescan') app.music.rescan();
           else if (action === 'settings') app.config.save({ ...app.config.get(), music: { ...app.config.get().music, ...body } });

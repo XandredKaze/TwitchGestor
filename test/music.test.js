@@ -99,3 +99,26 @@ test('impostazioni della musica: abbassamento durante gli alert', async () => {
   assert.deepEqual(sanitizeConfig({ music: { duck: false, duckLevel: 7 } }, defaults).music, { duck: false, duckLevel: 1 });
   assert.deepEqual(sanitizeConfig({ music: { duck: 'sì', duckLevel: 'x' } }, defaults).music, { duck: true, duckLevel: 0.3 });
 });
+
+test('brano iniziale della playlist: parte sempre per primo, anche in ordine casuale', () => {
+  let saved = null;
+  const store = { load: () => saved, save: (d) => { saved = d; } };
+  for (const r of [0, 0.5, 0.99]) {
+    const { p } = setup({ store, random: () => r });
+    p.setShuffle(true);
+    p.setFirst('Chill', 'Chill/Notte.mp3');
+    p.play({ playlist: 'Chill' });
+    assert.equal(p.current.id, 'Chill/Notte.mp3', `casuale ${r}`);
+  }
+  // ricordato, e un brano scelto a mano vince
+  const q = new MusicPlayer({ getLibrary: () => LIB, store });
+  assert.deepEqual(q.snapshot().firsts, { Chill: 'Chill/Notte.mp3' });
+  q.play({ playlist: 'Chill', trackId: 'Chill/Lofi Girl - Pioggia.mp3' });
+  assert.equal(q.current.id, 'Chill/Lofi Girl - Pioggia.mp3');
+  // brano di un'altra playlist: rifiutato; vuoto: tolto
+  q.setFirst('Chill', 'Gaming/Boss_fight.ogg');
+  assert.deepEqual(q.state.firsts, {});
+  q.setFirst('Chill', 'Chill/Notte.mp3');
+  q.renamedPlaylist('Chill', 'Relax');
+  assert.deepEqual(q.state.firsts, { Relax: 'Relax/Notte.mp3' });
+});

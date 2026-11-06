@@ -28,10 +28,11 @@ export function infoOf(t) {
 export class MusicPlayer {
   constructor({ getLibrary, send, store, onChange, random = Math.random } = {}) {
     Object.assign(this, { getLibrary, send, store, onChange, random });
-    this.state = { playlist: ALL, shuffle: true, volume: 0.6, playing: false, order: [], index: -1, position: 0, duration: 0 };
+    // firsts: playlist → brano con cui inizia sempre (anche in ordine casuale)
+    this.state = { playlist: ALL, shuffle: true, volume: 0.6, playing: false, order: [], index: -1, position: 0, duration: 0, firsts: {} };
     try {
       const saved = store?.load?.();
-      if (saved) Object.assign(this.state, { playlist: saved.playlist ?? ALL, shuffle: saved.shuffle !== false, volume: Number.isFinite(saved.volume) ? saved.volume : 0.6 });
+      if (saved) Object.assign(this.state, { playlist: saved.playlist ?? ALL, shuffle: saved.shuffle !== false, volume: Number.isFinite(saved.volume) ? saved.volume : 0.6, firsts: saved.firsts && typeof saved.firsts === 'object' ? saved.firsts : {} });
     } catch { /* prima volta */ }
   }
 
@@ -68,6 +69,8 @@ export class MusicPlayer {
   #buildOrder(startId) {
     let ids = this.tracksOf().map((t) => t.id);
     if (this.state.shuffle) ids = this.#shuffle(ids);
+    // senza un brano scelto: quello iniziale della playlist, se è impostato
+    if (!startId && ids.includes(this.state.firsts[this.state.playlist])) startId = this.state.firsts[this.state.playlist];
     if (startId && ids.includes(startId)) ids = [startId, ...ids.filter((id) => id !== startId)];
     this.state.order = ids;
     this.state.index = ids.length ? 0 : -1;
@@ -127,6 +130,25 @@ export class MusicPlayer {
     this.onChange?.(false);
   }
 
+  /** Brano con cui la playlist inizia sempre (trackId vuoto: nessuno). */
+  setFirst(playlist, trackId) {
+    const pl = String(playlist ?? '');
+    if (!this.playlists().some((p) => p.id === pl)) return;
+    if (trackId && this.tracksOf(pl).some((t) => t.id === trackId)) this.state.firsts = { ...this.state.firsts, [pl]: trackId };
+    else { const { [pl]: _, ...rest } = this.state.firsts; this.state.firsts = rest; }
+    this.#save();
+    this.onChange?.(false);
+  }
+
+  /** La playlist ha cambiato nome: il suo brano iniziale la segue. */
+  renamedPlaylist(from, to) {
+    const f = this.state.firsts[from];
+    if (!f) return;
+    const { [from]: _, ...rest } = this.state.firsts;
+    this.state.firsts = { ...rest, [to]: `${to}/${f.split('/').pop()}` };
+    this.#save();
+  }
+
   setVolume(v) {
     const n = Number(v);
     if (!Number.isFinite(n)) return;
@@ -165,7 +187,7 @@ export class MusicPlayer {
     const upNext = this.state.order.slice(this.state.index + 1, this.state.index + 6).map((id) => lib.find((x) => x.id === id)).filter(Boolean);
     return {
       track: t ? { id: t.id, folder: t.folder, ...infoOf(t) } : null,
-      playing: this.state.playing, volume: this.state.volume, shuffle: this.state.shuffle, playlist: this.state.playlist,
+      playing: this.state.playing, volume: this.state.volume, shuffle: this.state.shuffle, playlist: this.state.playlist, firsts: this.state.firsts,
       position: this.state.position, duration: this.state.duration,
       upNext: upNext.map((x) => ({ id: x.id, ...infoOf(x) })),
     };
@@ -182,7 +204,11 @@ export class MusicPlayer {
   #push(newTrack) {
     if (newTrack) this.state.duration = 0;
     this.send?.(this.pageState());
-    try { this.store?.save?.({ playlist: this.state.playlist, shuffle: this.state.shuffle, volume: this.state.volume }); } catch { /* non importante */ }
+    this.#save();
     this.onChange?.(true);
+  }
+
+  #save() {
+    try { this.store?.save?.({ playlist: this.state.playlist, shuffle: this.state.shuffle, volume: this.state.volume, firsts: this.state.firsts }); } catch { /* non importante */ }
   }
 }

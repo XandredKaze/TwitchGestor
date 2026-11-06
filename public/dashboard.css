@@ -1524,3 +1524,11 @@ html:root[data-ui="brutal"] {
 .mu-dup-maybe { opacity: .75; }
 .mu-dup-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; }
 [data-ui="brutal"] .mu-dup { border-radius: 0; }
+
+/* ⚙ impostazioni della playlist */
+.mu-pl-wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: stretch; min-width: 0; }
+.mu-pl-gear { width: 34px; padding: 0; border-radius: 9px; border: 1px solid transparent; background: transparent; color: var(--muted); font: inherit; cursor: pointer; opacity: .55; }
+.mu-pl-wrap:hover .mu-pl-gear, .mu-pl-gear:focus-visible, .mu-pl-gear.on { opacity: 1; }
+.mu-pl-gear:hover, .mu-pl-gear.on { border-color: var(--border); background: var(--inset); color: inherit; }
+[data-ui="brutal"] .mu-pl-gear { border-radius: 0; }
+@media (max-width: 800px) { .mu-pl-wrap { display: flex; } }

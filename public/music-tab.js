@@ -156,21 +156,25 @@
   // ---------- playlist e libreria ----------
   function renderLibrary() {
     const playing = data.player?.playlist ?? '*';
+    const firsts = data.player?.firsts ?? {};
     const sel = shown ?? playing;
     const pl = data.playlists.find((x) => x.id === sel) ?? data.playlists[0];
     fill($('mu-playlists'),
       el('h2', {}, 'Playlist'),
-      el('div', { className: 'mu-pl-list' }, ...data.playlists.map((x) => el('button', {
+      el('div', { className: 'mu-pl-list' }, ...data.playlists.map((x) => el('div', { className: 'mu-pl-wrap' }, el('button', {
         type: 'button', className: `mu-pl${x.id === pl?.id ? ' active' : ''}`,
         'aria-pressed': x.id === pl?.id ? 'true' : 'false', title: `${x.name} (doppio clic per suonarla)`,
-        onclick: () => { shown = x.id; renderLibrary(); },
+        onclick: () => { shown = x.id; plSettings = null; renderLibrary(); },
         ondblclick: () => { shown = null; cmd('play', { playlist: x.id }); }, // doppio clic: la suona subito
       },
       el('span', { className: 'mu-pl-name' }, x.id === playing ? el('span', { className: 'mu-pl-on', title: 'In riproduzione' }, '♪ ') : null, x.name),
-      el('span', { className: 'mu-pl-count' }, String(x.count))))),
+      el('span', { className: 'mu-pl-count' }, firsts[x.id] ? el('span', { title: 'Ha un brano iniziale' }, '⭐ ') : null, String(x.count))),
+      el('button', { type: 'button', className: `mu-pl-gear${plSettings === x.id ? ' on' : ''}`, title: `Impostazioni di ${x.name}`, 'aria-label': `Impostazioni di ${x.name}`,
+        onclick: () => { shown = x.id; plSettings = plSettings === x.id ? null : x.id; plFilter = ''; renderLibrary(); } }, '⚙')))),
       el('button', { type: 'button', className: 'small-btn mu-pl-new', onclick: () => showView('add') }, '➕ Nuova playlist'));
 
     if (sorting) { renderSort(); return; }
+    if (plSettings && pl) { renderPlSettings(pl, firsts[pl.id]); return; }
     if (dups) { renderDups(); return; }
     const q = search.trim().toLowerCase();
     const current = data.player?.track?.id;
@@ -363,6 +367,29 @@
     else used = false;
     if (used) e.preventDefault();
   });
+
+  // ---------- ⚙ impostazioni della playlist: il brano con cui inizia sempre ----------
+  let plSettings = null; // playlist di cui stai guardando le impostazioni
+  let plFilter = '';
+  function renderPlSettings(pl, first) {
+    const tracks = data.tracks.filter((t) => pl.id === '*' || t.folder === pl.id);
+    const firstTrack = tracks.find((t) => t.id === first);
+    const name = (t) => { const i = { ...info(t.name), ...(t.title ? { title: t.title } : {}), ...(t.artist ? { artist: t.artist } : {}) }; return i.artist ? `${i.artist} – ${i.title}` : i.title; };
+    const setFirst = async (trackId) => { await cmd('first', { playlist: pl.id, trackId }); };
+    fill($('mu-lib-title'), el('h2', {}, `⚙ ${pl.name}`), el('button', { type: 'button', className: 'small-btn primary', onclick: () => { plSettings = null; renderLibrary(); } }, '✓ Fine'));
+    const q = plFilter.trim().toLowerCase();
+    const list = tracks.filter((t) => !q || `${t.name} ${t.title} ${t.artist}`.toLowerCase().includes(q));
+    const filter = el('input', { type: 'search', placeholder: 'Cerca il brano…', value: plFilter, 'aria-label': 'Cerca il brano iniziale',
+      oninput: (e) => { plFilter = e.target.value; const pos = e.target.selectionStart; renderLibrary(); const i2 = $('mu-library').querySelector('input[type=search]'); i2?.focus(); i2?.setSelectionRange(pos, pos); } });
+    fill($('mu-library'), el('div', { className: 'mu-sort' },
+      el('p', {}, el('b', {}, 'Brano iniziale: '), firstTrack ? name(firstTrack) : el('span', { className: 'muted' }, 'nessuno (parte un brano qualsiasi)')),
+      el('p', { className: 'muted small' }, 'Quando questa playlist parte (anche in ordine casuale) suona sempre prima questo brano; poi continua come al solito.'),
+      firstTrack ? el('div', { className: 'mu-sort-row' }, el('button', { type: 'button', className: 'small-btn', onclick: () => setFirst('') }, '✕ Togli il brano iniziale')) : null,
+      filter,
+      el('div', { className: 'mu-library' }, ...list.slice(0, 300).map((t) => el('button', {
+        type: 'button', className: `mu-item${t.id === first ? ' current' : ''}`, onclick: () => setFirst(t.id === first ? '' : t.id),
+      }, el('span', { className: 'mu-item-icon', 'aria-hidden': 'true' }, t.id === first ? '⭐' : '☆'), el('span', { className: 'mu-item-text' }, el('b', {}, name(t))))))));
+  }
 
   // ---------- 🔍 doppioni ----------
   // identici = stesso file (copia); stesso brano = stesso artista e titolo (versioni diverse: decidi tu)
