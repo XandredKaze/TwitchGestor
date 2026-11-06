@@ -161,9 +161,10 @@
     fill($('mu-playlists'),
       el('h2', {}, 'Playlist'),
       el('div', { className: 'mu-pl-list' }, ...data.playlists.map((x) => el('button', {
-        type: 'button', className: `mu-pl${x.id === pl?.id ? ' active' : ''}`, title: x.name,
-        'aria-pressed': x.id === pl?.id ? 'true' : 'false',
+        type: 'button', className: `mu-pl${x.id === pl?.id ? ' active' : ''}`,
+        'aria-pressed': x.id === pl?.id ? 'true' : 'false', title: `${x.name} (doppio clic per suonarla)`,
         onclick: () => { shown = x.id; renderLibrary(); },
+        ondblclick: () => { shown = null; cmd('play', { playlist: x.id }); }, // doppio clic: la suona subito
       },
       el('span', { className: 'mu-pl-name' }, x.id === playing ? el('span', { className: 'mu-pl-on', title: 'In riproduzione' }, '♪ ') : null, x.name),
       el('span', { className: 'mu-pl-count' }, String(x.count))))),
@@ -208,7 +209,8 @@
         }
         return el('button', {
           type: 'button', className: `mu-item${t.id === current ? ' current' : ''}`,
-          onclick: () => cmd('play', { trackId: t.id }),
+          // il brano parte dentro la playlist che stai guardando (poi continua con i suoi brani, non con tutta la musica)
+          onclick: () => { shown = null; cmd('play', { playlist: pl?.id ?? '*', trackId: t.id }); },
         },
         el('span', { className: 'mu-item-icon', 'aria-hidden': 'true' }, t.id === current ? '♪' : '▶'),
         text, badge);
