@@ -170,6 +170,7 @@
       el('button', { type: 'button', className: 'small-btn mu-pl-new', onclick: () => showView('add') }, '➕ Nuova playlist'));
 
     if (sorting) { renderSort(); return; }
+    if (dups) { renderDups(); return; }
     const q = search.trim().toLowerCase();
     const current = data.player?.track?.id;
     const inList = data.tracks.filter((t) => !pl || pl.id === '*' || t.folder === pl.id);
@@ -180,6 +181,7 @@
         : el('h2', {}, pl?.name ?? 'Libreria'),
       !organizing && pl && pl.id !== playing && pl.count ? el('button', { type: 'button', className: 'small-btn primary', onclick: () => { shown = null; cmd('play', { playlist: pl.id }); } }, '▶ Suona questa playlist') : null,
       !organizing && pl && pl.count ? el('button', { type: 'button', className: 'small-btn', title: 'Ascolta i brani uno alla volta e decidi dove metterli', onclick: () => startSort(pl) }, '🎧 Smista') : null,
+      !organizing && data.tracks.length > 1 ? el('button', { type: 'button', className: 'small-btn', title: 'Cerca i brani doppi in tutta la musica', onclick: startDups }, '🔍 Doppioni') : null,
       data.tracks.length ? el('button', {
         type: 'button', className: `small-btn${organizing ? ' primary' : ''}`, 'aria-pressed': organizing ? 'true' : 'false',
         onclick: () => { organizing = !organizing; selected.clear(); plan = null; renaming = false; renderLibrary(); },
@@ -359,6 +361,69 @@
     else used = false;
     if (used) e.preventDefault();
   });
+
+  // ---------- 🔍 doppioni ----------
+  // identici = stesso file (copia); stesso brano = stesso artista e titolo (versioni diverse: decidi tu)
+  let dups = null; // { groups, loading, playing, note }
+  const dupAudio = new Audio();
+  dupAudio.onended = () => { if (dups) { dups.playing = ''; renderDups(); } };
+  async function startDups() {
+    dups = { groups: [], loading: true, playing: '', note: '' };
+    sortAudio.pause();
+    renderLibrary();
+    const r = await api('/api/music/duplicates', { method: 'GET' });
+    if (!dups) return;
+    dups.loading = false;
+    dups.groups = r?.groups ?? [];
+    renderDups();
+  }
+  function stopDups() { dupAudio.pause(); dups = null; load(); }
+  function dupPlay(t) {
+    if (dups.playing === t.id) { dupAudio.pause(); dups.playing = ''; renderDups(); return; }
+    const url = t.url || `/media/music/${String(t.id).split('/').map(encodeURIComponent).join('/')}`;
+    dupAudio.src = new URL(mediaUrl(url), location.href).href;
+    dupAudio.onloadedmetadata = () => { if (dupAudio.duration > 60) dupAudio.currentTime = dupAudio.duration / 3; };
+    dupAudio.play().catch(() => {});
+    dups.playing = t.id;
+    renderDups();
+  }
+  async function dupTrash(ids) {
+    const r = await api('/api/music/trash', { body: { ids } });
+    if (!r || !dups) return;
+    const gone = new Set(Object.keys(r.to ?? {}));
+    if (gone.has(dups.playing)) { dupAudio.pause(); dups.playing = ''; }
+    for (const g of dups.groups) g.tracks = g.tracks.filter((t) => !gone.has(t.id));
+    dups.groups = dups.groups.filter((g) => g.tracks.length > 1);
+    dups.note = `${gone.size} ${gone.size === 1 ? 'brano spostato' : 'brani spostati'} nel cestino (si svuota da solo dopo 30 giorni).${r.skipped?.length ? ' Quello che suona in live è rimasto.' : ''}`;
+    renderDups();
+  }
+  const mb = (n) => (n ? `${(n / 1048576).toFixed(1)} MB` : '');
+  function renderDups() {
+    if (!dups || !data) return;
+    fill($('mu-lib-title'), el('h2', {}, '🔍 Doppioni'), el('button', { type: 'button', className: 'small-btn primary', onclick: stopDups }, '✓ Fine'));
+    if (dups.loading) { fill($('mu-library'), el('p', { className: 'muted' }, 'Controllo tutta la musica…')); return; }
+    const exact = dups.groups.filter((g) => g.kind === 'identici');
+    const extra = exact.flatMap((g) => g.tracks.slice(1).map((t) => t.id));
+    fill($('mu-library'), el('div', { className: 'mu-sort' },
+      dups.groups.length
+        ? el('p', {}, el('b', {}, `${dups.groups.length} ${dups.groups.length === 1 ? 'gruppo' : 'gruppi'} di doppioni. `),
+          el('span', { className: 'muted small' }, '"Identici" sono copie dello stesso file; "stesso brano" ha artista e titolo uguali ma può essere una versione diversa: ascolta e decidi.'))
+        : el('p', {}, '✓ Nessun doppione trovato.'),
+      extra.length ? el('div', { className: 'mu-sort-row' },
+        el('button', { type: 'button', className: 'small-btn danger', onclick: () => { if (confirm(`Spostare nel cestino ${extra.length} copie identiche (ne resta una per gruppo)?`)) dupTrash(extra); } },
+          `🗑 Togli tutte le copie identiche (${extra.length})`)) : null,
+      dups.note ? el('p', { className: 'small muted' }, dups.note) : null,
+      ...dups.groups.slice(0, 200).map((g) => el('div', { className: 'mu-dup' },
+        el('span', { className: `sc-badge${g.kind === 'identici' ? '' : ' mu-dup-maybe'}` }, g.kind),
+        ...g.tracks.map((t) => {
+          const i = { ...info(t.name), ...(t.title ? { title: t.title } : {}), ...(t.artist ? { artist: t.artist } : {}) };
+          return el('div', { className: 'mu-dup-row' },
+            el('button', { type: 'button', className: 'small-btn', title: 'Ascolta (solo qui)', onclick: () => dupPlay(t) }, dups.playing === t.id ? '⏸' : '▶'),
+            el('span', { className: 'mu-item-text' }, el('b', {}, i.title), el('small', {}, [i.artist, `📁 ${t.folder || 'principale'}`, mb(t.size)].filter(Boolean).join(' · '))),
+            el('button', { type: 'button', className: 'small-btn danger', title: 'Nel cestino', onclick: () => dupTrash([t.id]) }, '🗑'));
+        }))),
+      dups.groups.length > 200 ? el('p', { className: 'muted small' }, 'Ne mostro 200: togli questi e ricontrolla.') : null));
+  }
 
   // ---------- organizza ----------
   async function organizeCall(action, body) {
@@ -570,7 +635,7 @@
 
   $('mu-search').oninput = (e) => { search = e.target.value; if (data) renderLibrary(); };
   window.addEventListener('tab:music', () => { open = true; load(); });
-  document.addEventListener('click', (e) => { if (e.target.closest?.('.tab') && !e.target.closest('[data-tab="music"]')) { open = false; sortAudio.pause(); } });
+  document.addEventListener('click', (e) => { if (e.target.closest?.('.tab') && !e.target.closest('[data-tab="music"]')) { open = false; sortAudio.pause(); dupAudio.pause(); } });
   window.addEventListener('tg:music', (e) => {
     if (!open || !data) return;
     if (e.detail.library) return load(); // brani aggiunti o tolti dalla cartella

@@ -5,9 +5,11 @@
  */
 
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { readId3 } from './core/id3.js';
 import { cleanPlaylist, planByArtist, summarizePlan, artistOf, VARIE } from './core/musicOrganize.js';
+import { findDuplicates } from './core/duplicates.js';
 
 const AUDIO = /\.(mp3|ogg|wav|m4a|flac|opus)$/i;
 const TRASH = '.cestino'; // brani eliminati dallo smistamento (si possono rimettere a posto)
@@ -212,5 +214,38 @@ export function createMusicFolder({ dir }) {
     }
   }
 
-  return { move, remove, trash, renameFolder, preview, organize, folders };
+  // impronta del contenuto: inizio e fine del file (basta per riconoscere le copie, e su centinaia di MP3 è veloce)
+  const prints = new Map();
+  function printOf(file) {
+    let st;
+    try { st = fs.statSync(file); } catch { return null; }
+    const key = `${st.size}:${st.mtimeMs}`;
+    const hit = prints.get(file);
+    if (hit?.key === key) return { size: st.size, print: hit.print };
+    const fd = fs.openSync(file, 'r');
+    try {
+      const n = Math.min(st.size, 128 * 1024);
+      const a = Buffer.alloc(n);
+      const b = Buffer.alloc(n);
+      fs.readSync(fd, a, 0, n, 0);
+      fs.readSync(fd, b, 0, n, Math.max(0, st.size - n));
+      const print = crypto.createHash('sha1').update(a).update(b).digest('hex');
+      prints.set(file, { key, print });
+      return { size: st.size, print };
+    } finally {
+      fs.closeSync(fd);
+    }
+  }
+
+  /** Doppioni della libreria (tracks come quelli del lettore: id, folder, name, artist, title). */
+  function duplicates(tracks) {
+    const withPrint = tracks.map((t) => {
+      let p = null;
+      try { p = printOf(abs(t.id)); } catch { /* brano non valido */ }
+      return { ...t, size: p?.size ?? 0, print: p?.print ?? '' };
+    });
+    return findDuplicates(withPrint).map((g) => ({ kind: g.kind, tracks: g.tracks.map(({ print, ...t }) => t) }));
+  }
+
+  return { move, remove, trash, renameFolder, preview, organize, folders, duplicates };
 }

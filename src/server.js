@@ -560,6 +560,10 @@ export function createServer(app) {
             share: shareInfo(),
           });
         }
+        if (route === 'GET /api/music/duplicates') {
+          const lib = app.music?.library() ?? [];
+          return send(res, 200, { groups: musicFolder.duplicates(lib.map((t) => ({ id: t.id, folder: t.folder, name: t.name, url: t.url, artist: t.artist ?? '', title: t.title ?? '' }))) });
+        }
         if (req.method === 'POST' && url.pathname.startsWith('/api/music/')) {
           const p = app.music?.player;
           if (!p) return send(res, 400, { error: 'Musica non disponibile' });

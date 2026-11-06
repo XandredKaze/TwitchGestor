@@ -1517,3 +1517,10 @@ html:root[data-ui="brutal"] {
 [data-ui="brutal"] .mu-sort-track, [data-ui="brutal"] .mu-sort-target, [data-ui="brutal"] .mu-sort-target kbd { border-radius: 0; }
 [data-ui="brutal"] .mu-sort-track { border-color: var(--lilac); }
 [data-ui="brutal"] .mu-sort-target:hover { border-color: var(--lilac); }
+
+/* 🔍 doppioni */
+.mu-dup { display: grid; gap: 4px; padding: 10px; border-radius: 10px; border: 1px solid var(--border); }
+.mu-dup > .sc-badge { justify-self: start; }
+.mu-dup-maybe { opacity: .75; }
+.mu-dup-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+[data-ui="brutal"] .mu-dup { border-radius: 0; }
