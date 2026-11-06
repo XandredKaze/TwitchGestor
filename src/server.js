@@ -572,11 +572,12 @@ export function createServer(app) {
           const body = await readBody(req);
           // Organizza: spostare, rinominare, eliminare, riordinare per artista.
           // Il brano che sta suonando non si tocca (OBS lo sta leggendo): resta dov'è e lo si sposta dopo.
-          if (['move', 'delete', 'rename-playlist', 'organize-preview', 'organize'].includes(action)) {
+          if (['move', 'delete', 'trash', 'rename-playlist', 'organize-preview', 'organize'].includes(action)) {
             const skip = p.state.playing && p.current ? [p.current.id] : [];
             let result;
             if (action === 'move') result = musicFolder.move(body.ids, body.folder ?? '', { skip });
             else if (action === 'delete') result = musicFolder.remove(body.ids, { skip });
+            else if (action === 'trash') result = musicFolder.trash(body.ids, { skip });
             else if (action === 'rename-playlist') result = musicFolder.renameFolder(body.from, body.to, { skip });
             else if (action === 'organize-preview') return send(res, 200, musicFolder.preview(body.folder ?? null));
             else result = musicFolder.organize(body.folder ?? null, { skip });

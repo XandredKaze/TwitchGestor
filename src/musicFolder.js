@@ -10,6 +10,7 @@ import { readId3 } from './core/id3.js';
 import { cleanPlaylist, planByArtist, summarizePlan, artistOf, VARIE } from './core/musicOrganize.js';
 
 const AUDIO = /\.(mp3|ogg|wav|m4a|flac|opus)$/i;
+const TRASH = '.cestino'; // brani eliminati dallo smistamento (si possono rimettere a posto)
 const err = (status, message) => Object.assign(new Error(message), { status });
 
 /** Artista e titolo scritti dentro un MP3 (si legge solo l'inizio del file). */
@@ -84,16 +85,44 @@ export function createMusicFolder({ dir }) {
     const { p: target } = folderPath(folder);
     let moved = 0;
     const skipped = [];
+    const to = {}; // brano → dove è finito (per "Annulla" dello smistamento)
     for (const id of ids ?? []) {
       if (skip.includes(id)) { skipped.push(id); continue; }
       const src = abs(id);
       if (!fs.existsSync(src)) continue;
       if (path.dirname(src) === target) continue;
-      moveFile(src, target);
+      to[id] = rel(moveFile(src, target));
       moved += 1;
     }
     cleanEmpty();
-    return { moved, skipped };
+    return { moved, skipped, to };
+  }
+
+  /**
+   * Cestino (smistamento): il brano va nella cartella nascosta ".cestino" (il lettore non la vede), così
+   * "Annulla" lo rimette a posto. I brani nel cestino da più di 30 giorni si cancellano da soli.
+   */
+  function trash(ids, { skip = [] } = {}) {
+    const bin = path.join(dir, TRASH);
+    const to = {};
+    const skipped = [];
+    for (const id of ids ?? []) {
+      if (skip.includes(id)) { skipped.push(id); continue; }
+      const src = abs(id);
+      if (!fs.existsSync(src)) continue;
+      const dest = moveFile(src, bin);
+      const now = new Date();
+      try { fs.utimesSync(dest, now, now); } catch { /* niente */ }
+      to[id] = rel(dest);
+    }
+    try {
+      for (const n of fs.readdirSync(bin)) {
+        const f = path.join(bin, n);
+        if (Date.now() - fs.statSync(f).mtimeMs > 30 * 86400000) fs.rmSync(f, { force: true });
+      }
+    } catch { /* cestino vuoto */ }
+    cleanEmpty();
+    return { trashed: Object.keys(to).length, skipped, to };
   }
 
   function remove(ids, { skip = [] } = {}) {
@@ -183,5 +212,5 @@ export function createMusicFolder({ dir }) {
     }
   }
 
-  return { move, remove, renameFolder, preview, organize, folders };
+  return { move, remove, trash, renameFolder, preview, organize, folders };
 }

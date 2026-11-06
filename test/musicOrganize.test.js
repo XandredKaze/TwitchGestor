@@ -69,6 +69,14 @@ test('musica: sposta, rinomina, elimina e riordina i file (il brano che suona re
     music.renameFolder('Chill', 'Rilassante');
     assert.ok(fs.existsSync(path.join(dir, 'Rilassante', 'tre.mp3')));
     assert.throws(() => music.move(['../../etc/passwd'], 'x'), /non valido/);
+    // smistamento: sposta (e dice dove), cestino e "Annulla"
+    put('Rilassante/cinque.mp3', {});
+    assert.deepEqual(music.move(['Rilassante/cinque.mp3'], 'Notte').to, { 'Rilassante/cinque.mp3': 'Notte/cinque.mp3' });
+    const t = music.trash(['Notte/cinque.mp3']);
+    assert.deepEqual(t.to, { 'Notte/cinque.mp3': '.cestino/cinque.mp3' });
+    assert.ok(!fs.existsSync(path.join(dir, 'Notte'))); // vuota: sparisce, il cestino resta nascosto
+    music.move(['.cestino/cinque.mp3'], 'Notte'); // annulla
+    assert.ok(fs.existsSync(path.join(dir, 'Notte', 'cinque.mp3')));
     music.remove(['Rilassante/tre.mp3']);
     assert.ok(!fs.existsSync(path.join(dir, 'Rilassante')));
   } finally {

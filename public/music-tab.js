@@ -169,6 +169,7 @@
       el('span', { className: 'mu-pl-count' }, String(x.count))))),
       el('button', { type: 'button', className: 'small-btn mu-pl-new', onclick: () => showView('add') }, '➕ Nuova playlist'));
 
+    if (sorting) { renderSort(); return; }
     const q = search.trim().toLowerCase();
     const current = data.player?.track?.id;
     const inList = data.tracks.filter((t) => !pl || pl.id === '*' || t.folder === pl.id);
@@ -178,6 +179,7 @@
         ? renameForm(pl)
         : el('h2', {}, pl?.name ?? 'Libreria'),
       !organizing && pl && pl.id !== playing && pl.count ? el('button', { type: 'button', className: 'small-btn primary', onclick: () => { shown = null; cmd('play', { playlist: pl.id }); } }, '▶ Suona questa playlist') : null,
+      !organizing && pl && pl.count ? el('button', { type: 'button', className: 'small-btn', title: 'Ascolta i brani uno alla volta e decidi dove metterli', onclick: () => startSort(pl) }, '🎧 Smista') : null,
       data.tracks.length ? el('button', {
         type: 'button', className: `small-btn${organizing ? ' primary' : ''}`, 'aria-pressed': organizing ? 'true' : 'false',
         onclick: () => { organizing = !organizing; selected.clear(); plan = null; renaming = false; renderLibrary(); },
@@ -212,6 +214,151 @@
       list.length > 300 ? el('p', { className: 'muted small' }, 'Ne mostro 300: usa la ricerca per trovare gli altri.') : null,
     );
   }
+
+  // ---------- 🎧 smistamento: un brano alla volta, scegli dove va ----------
+  // Si ascolta solo qui (non in live), partendo da circa un terzo del brano; tasti 1-9 = playlist,
+  // Canc = elimina (nel cestino), → = salta, ↓/Invio = tieni qui, Z = annulla, F = +15 s, spazio = pausa.
+  let sorting = null; // { from, name, queue: [id], i, history: [], note, newName, busy }
+  const sortAudio = new Audio();
+  sortAudio.preload = 'auto';
+  sortAudio.onloadedmetadata = () => { if (sortAudio.duration > 60) sortAudio.currentTime = sortAudio.duration / 3; };
+  sortAudio.ontimeupdate = () => { const t = document.getElementById('mu-sort-time'); if (t) t.textContent = `${time(sortAudio.currentTime)} / ${time(sortAudio.duration)}`; };
+  sortAudio.onerror = () => { if (sorting) { sorting.note = 'Questo brano non si apre (file rovinato o formato non letto dal browser): eliminalo o saltalo.'; renderSort(); } };
+  const sortTrack = () => (sorting ? data.tracks.find((t) => t.id === sorting.queue[sorting.i]) : null);
+  const sortTargets = () => data.playlists.filter((x) => x.id !== '*' && x.id !== sorting.from);
+
+  function startSort(pl) {
+    const queue = data.tracks.filter((t) => pl.id === '*' || t.folder === pl.id).map((t) => t.id);
+    sorting = { from: pl.id, name: pl.name, queue, i: 0, history: [], note: '', newName: '', busy: false };
+    organizing = false;
+    monitorAudio.pause();
+    renderLibrary();
+    sortPlay();
+  }
+  function stopSort() {
+    sortAudio.pause();
+    sortAudio.removeAttribute('src');
+    sorting = null;
+    load();
+  }
+  function sortPlay() {
+    const t = sortTrack();
+    if (!t) { sortAudio.pause(); renderSort(); return; }
+    const url = t.url || `/media/music/${String(t.id).split('/').map(encodeURIComponent).join('/')}`;
+    sortAudio.src = new URL(mediaUrl(url), location.href).href;
+    sortAudio.play().catch((err) => { if (err.name === 'NotAllowedError' && sorting) { sorting.note = 'Il browser ha bloccato l\'audio: premi ▶.'; renderSort(); } });
+    renderSort();
+  }
+  function sortNext() {
+    sorting.i += 1;
+    sorting.note = '';
+    sortPlay();
+    load(); // conteggi delle playlist aggiornati (lo smistamento resta dov'è)
+  }
+  async function sortCall(action, ids, folder) {
+    sorting.busy = true;
+    const r = await api(`/api/music/${action}`, { body: { ids, folder } });
+    if (sorting) sorting.busy = false;
+    if (r?.skipped?.length) { sorting.note = 'Questo brano sta suonando in live: resta dov\'è, spostalo quando è finito.'; renderSort(); return null; }
+    return r;
+  }
+  async function sortTo(folder) {
+    const t = sortTrack();
+    if (!t || sorting.busy) return;
+    if (folder === t.folder) { sortKeep(); return; }
+    const r = await sortCall('move', [t.id], folder);
+    if (!r) return;
+    sorting.history.push({ id: t.id, at: r.to?.[t.id], from: t.folder, label: `→ ${folder || 'cartella principale'}` });
+    sortNext();
+  }
+  async function sortTrash() {
+    const t = sortTrack();
+    if (!t || sorting.busy) return;
+    const r = await sortCall('trash', [t.id]);
+    if (!r) return;
+    sorting.history.push({ id: t.id, at: r.to?.[t.id], from: t.folder, label: '🗑 eliminato' });
+    sortNext();
+  }
+  function sortKeep() { if (sortTrack()) { sorting.history.push({ id: sorting.queue[sorting.i], label: '✓ tenuto' }); sortNext(); } }
+  function sortSkip() { if (sortTrack()) { sorting.queue.push(sorting.queue[sorting.i]); sorting.queue.splice(sorting.i, 1); sorting.i -= 1; sortNext(); } }
+  async function sortUndo() {
+    const h = sorting?.history.pop();
+    if (!h || sorting.busy) return;
+    if (h.at) {
+      const r = await sortCall('move', [h.at], h.from);
+      if (!r) { sorting.history.push(h); return; }
+      await load();
+      sorting.queue[sorting.i - 1] = r.to?.[h.at] ?? h.id;
+    }
+    sorting.i -= 1;
+    sorting.note = `Annullato (${h.label}).`;
+    sortPlay();
+  }
+  async function sortNew(name) {
+    const n = name.trim();
+    if (!n) return;
+    sorting.newName = '';
+    await sortTo(n);
+  }
+
+  function renderSort() {
+    if (!sorting || !data) return;
+    const t = sortTrack();
+    const done = sorting.i >= sorting.queue.length;
+    fill($('mu-lib-title'),
+      el('h2', {}, `🎧 Smisto: ${sorting.name}`),
+      el('button', { type: 'button', className: 'small-btn primary', onclick: stopSort }, '✓ Fine'));
+    if (done || !t) {
+      const moved = sorting.history.filter((h) => h.at).length;
+      fill($('mu-library'), el('div', { className: 'mu-sort' },
+        el('p', {}, el('b', {}, 'Finito! '), `${sorting.queue.length} brani ascoltati, ${moved} spostati o eliminati.`),
+        el('p', { className: 'muted small' }, 'I brani eliminati restano nel cestino per 30 giorni, poi spariscono da soli.'),
+        el('div', { className: 'mu-sort-row' },
+          sorting.history.length ? el('button', { type: 'button', className: 'small-btn', onclick: sortUndo }, '↩ Annulla l\'ultimo') : null,
+          el('button', { type: 'button', className: 'small-btn primary', onclick: stopSort }, '✓ Fine'))));
+      return;
+    }
+    const i = { ...info(t.name), ...(t.title ? { title: t.title } : {}), ...(t.artist ? { artist: t.artist } : {}) };
+    const targets = sortTargets();
+    const newInput = el('input', { type: 'text', maxlength: '60', placeholder: 'Nuova playlist…', value: sorting.newName, 'aria-label': 'Nome della nuova playlist',
+      oninput: (e) => { sorting.newName = e.target.value; }, onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); sortNew(e.target.value); } } });
+    fill($('mu-library'), el('div', { className: 'mu-sort' },
+      el('div', { className: 'mu-sort-head' },
+        el('span', { className: 'muted small' }, `${sorting.i + 1} / ${sorting.queue.length}`),
+        el('div', { className: 'mu-bar' }, el('div', { style: { width: `${Math.round((sorting.i / sorting.queue.length) * 100)}%` } }))),
+      el('div', { className: 'mu-sort-track' },
+        el('b', {}, i.title), i.artist ? el('span', { className: 'muted' }, i.artist) : null,
+        el('span', { className: 'muted small', id: 'mu-sort-time' }, `${time(sortAudio.currentTime)} / ${time(sortAudio.duration)}`)),
+      el('div', { className: 'mu-sort-row' },
+        el('button', { type: 'button', className: 'small-btn', title: 'Pausa / suona (spazio)', onclick: () => (sortAudio.paused ? sortAudio.play().catch(() => {}) : sortAudio.pause()) }, '⏯'),
+        el('button', { type: 'button', className: 'small-btn', title: 'Avanti di 15 secondi (F)', onclick: () => { sortAudio.currentTime = Math.min((sortAudio.duration || 0) - 1, sortAudio.currentTime + 15); } }, '⏩ +15 s'),
+        el('button', { type: 'button', className: 'small-btn', title: 'Lascialo dov\'è (↓ o Invio)', onclick: sortKeep }, '✓ Tieni qui'),
+        el('button', { type: 'button', className: 'small-btn', title: 'Decidi dopo: torna alla fine (→)', onclick: sortSkip }, '⏭ Salta'),
+        el('button', { type: 'button', className: 'small-btn danger', title: 'Nel cestino (Canc)', onclick: sortTrash }, '🗑 Elimina'),
+        el('button', { type: 'button', className: 'small-btn', title: 'Annulla l\'ultima scelta (Z)', disabled: !sorting.history.length, onclick: sortUndo }, '↩ Annulla')),
+      el('p', { className: 'muted small' }, 'Dove va? Clicca una playlist (o premi il suo numero):'),
+      el('div', { className: 'mu-sort-targets' },
+        ...targets.map((x, n) => el('button', { type: 'button', className: 'mu-sort-target', title: x.name, disabled: sorting.busy, onclick: () => sortTo(x.id) },
+          n < 9 ? el('kbd', {}, String(n + 1)) : null, el('span', {}, x.name), el('small', {}, String(x.count))))),
+      el('div', { className: 'mu-sort-row' }, newInput, el('button', { type: 'button', className: 'small-btn primary', onclick: () => sortNew(newInput.value) }, '＋ Crea e sposta')),
+      sorting.note ? el('p', { className: `small${sorting.note.startsWith('Annullato') ? ' muted' : ' mu-warn'}` }, sorting.note) : null,
+      el('p', { className: 'muted small' }, 'Tasti: 1-9 playlist · ↓/Invio tieni · → salta · Canc elimina · Z annulla · F +15 s · spazio pausa')));
+  }
+  document.addEventListener('keydown', (e) => {
+    if (!sorting || !open || view !== 'player' || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+    const k = e.key;
+    let used = true;
+    if (/^[1-9]$/.test(k)) { const x = sortTargets()[Number(k) - 1]; if (x) sortTo(x.id); }
+    else if (k === 'Delete' || k === 'Backspace') sortTrash();
+    else if (k === 'ArrowRight') sortSkip();
+    else if (k === 'ArrowDown' || k === 'Enter') sortKeep();
+    else if (k === 'z' || k === 'Z') sortUndo();
+    else if (k === 'f' || k === 'F') sortAudio.currentTime = Math.min((sortAudio.duration || 0) - 1, sortAudio.currentTime + 15);
+    else if (k === ' ') { if (sortAudio.paused) sortAudio.play().catch(() => {}); else sortAudio.pause(); }
+    else used = false;
+    if (used) e.preventDefault();
+  });
 
   // ---------- organizza ----------
   async function organizeCall(action, body) {
@@ -423,7 +570,7 @@
 
   $('mu-search').oninput = (e) => { search = e.target.value; if (data) renderLibrary(); };
   window.addEventListener('tab:music', () => { open = true; load(); });
-  document.addEventListener('click', (e) => { if (e.target.closest?.('.tab') && !e.target.closest('[data-tab="music"]')) open = false; });
+  document.addEventListener('click', (e) => { if (e.target.closest?.('.tab') && !e.target.closest('[data-tab="music"]')) { open = false; sortAudio.pause(); } });
   window.addEventListener('tg:music', (e) => {
     if (!open || !data) return;
     if (e.detail.library) return load(); // brani aggiunti o tolti dalla cartella
