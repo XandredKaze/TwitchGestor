@@ -112,6 +112,56 @@ export class TwitchAuth extends EventEmitter {
     this.emit('authorized', this.user);
   }
 
+  // ---------- accesso "con codice" (Device Code Flow): niente ritorno su localhost, va bene anche sul Raspberry ----------
+  #device = null; // { code, uri, deviceCode, interval, until, state, error, timer }
+
+  /** Chiede a Twitch un codice da inserire su twitch.tv/activate; poi controlla da solo quando hai finito. */
+  async startDeviceLogin() {
+    clearTimeout(this.#device?.timer);
+    const res = await fetch(`${OAUTH}/device`, { method: 'POST', body: new URLSearchParams({ client_id: this.clientId, scopes: this.scopes.join(' ') }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(`Twitch non dà il codice: ${data.message ?? res.status}`);
+    this.#device = {
+      code: data.user_code, uri: data.verification_uri || 'https://www.twitch.tv/activate', deviceCode: data.device_code,
+      interval: Math.max(2, Number(data.interval) || 5) * 1000, until: Date.now() + (Number(data.expires_in) || 1800) * 1000, state: 'pending', error: '',
+    };
+    this.#pollDevice();
+    return this.deviceStatus();
+  }
+
+  deviceStatus() {
+    const d = this.#device;
+    if (!d) return { state: 'none' };
+    return { state: d.state, code: d.code, uri: d.uri, error: d.error, expiresAt: d.until, user: d.state === 'done' ? this.user : null };
+  }
+
+  #pollDevice(withSecret = true) {
+    const d = this.#device;
+    d.timer = setTimeout(async () => {
+      if (this.#device !== d || d.state !== 'pending') return;
+      if (Date.now() > d.until) { d.state = 'expired'; return; }
+      const body = new URLSearchParams({ client_id: this.clientId, ...(withSecret && this.clientSecret ? { client_secret: this.clientSecret } : {}), scopes: this.scopes.join(' '), device_code: d.deviceCode, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' });
+      try {
+        const res = await fetch(`${OAUTH}/token`, { method: 'POST', body });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          await this.#store(data);
+          d.state = 'done';
+          this.emit('authorized', this.user);
+          return;
+        }
+        const msg = String(data.message ?? res.status);
+        if (/pending|slow_down/i.test(msg)) { if (/slow/i.test(msg)) d.interval += 5000; return this.#pollDevice(withSecret); }
+        if (withSecret && /client.?secret|invalid client/i.test(msg)) return this.#pollDevice(false); // app "pubblica": senza segreto
+        d.state = /declin|denied/i.test(msg) ? 'declined' : /invalid device code|expired/i.test(msg) ? 'expired' : 'error';
+        d.error = msg;
+      } catch (err) {
+        this.#pollDevice(withSecret); // internet a singhiozzo: si riprova
+        log.warn(`Accesso con codice: ${err.message}`);
+      }
+    }, d.interval);
+  }
+
   /** Controlla il token (Twitch richiede una verifica almeno ogni ora). */
   async validate() {
     if (!this.#tokens) return false;
