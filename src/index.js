@@ -658,6 +658,7 @@ const app = {
   manager,
   auth,
   botAuth,
+  helix, // per Silver: la ricompensa "Chiedi a Silver" e i suoi riscatti
   credits: { store: creditsStore, refresh: (reason) => creditsScheduler.refresh(reason) },
   obs,
   testCommand,

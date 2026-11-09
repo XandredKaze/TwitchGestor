@@ -6,6 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { DATA_DIR } from './config.js';
 import { fromLocal } from './core/schedule.js';
+import { SILVER_REWARD } from './core/normalize.js';
 import { checkForUpdates, isManaged, requestUpdate } from './updates.js';
 
 const KEYS_FILE = path.join(DATA_DIR, 'silver', 'keys.json');
@@ -57,6 +58,47 @@ export function createSilverLink(app, { file = KEYS_FILE, howlupPort = Number(pr
     const value = res?.ok ? await res.json().catch(() => null) : null;
     agendaCache = { at: Date.now(), value: value ?? agendaCache.value };
     return agendaCache.value;
+  }
+
+  // --- domande degli spettatori con i punti canale ---
+  // La ricompensa la crea Gestor: Twitch lascia completare o rimborsare solo i riscatti delle ricompense create
+  // con la stessa app. Silver chiede le domande in attesa, risponde, e tu scegli "Mostra in live" o "Rifiuta".
+  let reward = null; // { id, cost, enabled }
+  const twitch = async (method, url, body) => {
+    const user = app.auth?.user;
+    if (!user || !app.helix) throw Object.assign(new Error('Twitch non è collegato a TwitchGestor'), { status: 400 });
+    if (!app.auth.hasScope?.('channel:manage:redemptions')) {
+      throw Object.assign(new Error('Manca un permesso: in TwitchGestor premi di nuovo "Accedi con Twitch" e autorizza'), { status: 400 });
+    }
+    try {
+      return await app.helix.request(method, url.replace('{me}', user.id), body);
+    } catch (err) { // un 401 di Twitch non deve sembrare "Silver non collegato"
+      if (err.status === 404) reward = null; // ricompensa cancellata dal pannello di Twitch: la si ricrea
+      const dup = /duplicate/i.test(err.message);
+      throw Object.assign(new Error(dup
+        ? `Sul canale c'è già una ricompensa "${SILVER_REWARD}" creata a mano: cancellala o rinominala dal pannello di Twitch`
+        : `Twitch: ${err.message}`), { status: 502 });
+    }
+  };
+  async function syncReward(enabled, cost) {
+    if (!reward) {
+      const mine = (await twitch('GET', '/channel_points/custom_rewards?broadcaster_id={me}&only_manageable_rewards=true')).data ?? [];
+      const r = mine.find((x) => x.title.toLowerCase() === SILVER_REWARD.toLowerCase());
+      if (r) reward = { id: r.id, cost: r.cost, enabled: r.is_enabled };
+    }
+    if (!reward) {
+      if (!enabled) return null;
+      const r = (await twitch('POST', '/channel_points/custom_rewards?broadcaster_id={me}', {
+        title: SILVER_REWARD, cost, is_user_input_required: true,
+        prompt: 'Fai una domanda a Silver. Se lo streamer approva, domanda e risposta compaiono in live.',
+      })).data[0];
+      reward = { id: r.id, cost: r.cost, enabled: r.is_enabled };
+    }
+    if (reward.cost !== cost || reward.enabled !== enabled) {
+      await twitch('PATCH', `/channel_points/custom_rewards?broadcaster_id={me}&id=${reward.id}`, { cost, is_enabled: enabled });
+      Object.assign(reward, { cost, enabled });
+    }
+    return reward;
   }
 
   const prune = () => { for (const [id, r] of requests) if (Date.now() - r.at > 10 * 60000) requests.delete(id); };
@@ -195,6 +237,24 @@ export function createSilverLink(app, { file = KEYS_FILE, howlupPort = Number(pr
           if (!res.ok) return { text: `Howl-UP non l'ha salvato: ${data.error ?? res.status}.` };
           agendaCache.at = 0; // la prossima volta l'agenda è già aggiornata
           return { text: { event: 'Salvato nell\'agenda di Howl-UP.', task: 'Aggiunto alle cose da fare.', live: 'Live aggiunta alla Programmazione.' }[key], id: data[key]?.id };
+        }
+        // domande con i punti canale: { enabled, cost } → le domande in attesa (dalla più vecchia)
+        case 'questions': {
+          const enabled = body.enabled !== false;
+          const cost = Math.max(1, Math.min(10_000_000, Math.round(Number(body.cost) || 500)));
+          const r = await syncReward(enabled, cost);
+          if (!enabled || !r) return { questions: [] };
+          const list = (await twitch('GET', `/channel_points/custom_rewards/redemptions?broadcaster_id={me}&reward_id=${r.id}&status=UNFULFILLED&sort=OLDEST&first=20`)).data ?? [];
+          return { questions: list.map((x) => ({ id: x.id, user: x.user_name, text: x.user_input ?? '' })) };
+        }
+        // { id, ok }: ok = mostrata in live (completata), altrimenti rifiutata (Twitch rimborsa i punti)
+        case 'question': {
+          if (!reward) throw Object.assign(new Error('Ricompensa non ancora pronta: riprova'), { status: 409 });
+          const id = String(body.id ?? '');
+          if (!/^[\w-]{1,100}$/.test(id)) throw Object.assign(new Error('Riscatto non valido'), { status: 400 });
+          await twitch('PATCH', `/channel_points/custom_rewards/redemptions?broadcaster_id={me}&reward_id=${reward.id}&id=${id}`,
+            { status: body.ok ? 'FULFILLED' : 'CANCELED' });
+          return { text: body.ok ? 'Domanda mostrata in live.' : 'Domanda rifiutata: punti restituiti.' };
         }
         // "aggiornati": prima TwitchGestor stesso (Silver scarica da qui la sua versione nuova)
         case 'gestor-update': {

@@ -23,10 +23,11 @@ export const SCOPES = [
   'moderator:manage:banned_users', // parole bannate: timeout e ban (se non c'è un account bot)
   'moderator:read:suspicious_users', // parole bannate anche per gli utenti limitati da Twitch (elusione del ban)
   'channel:manage:schedule', // programmazione: calendario delle live su Twitch (facoltativo)
+  'channel:manage:redemptions', // domande a Silver: crea la ricompensa, completa o rimborsa i riscatti (facoltativo)
 ];
 
 /** Permessi che servono solo per funzioni facoltative: se mancano non compare l'avviso "servono nuovi permessi". */
-export const OPTIONAL_SCOPES = ['channel:manage:schedule'];
+export const OPTIONAL_SCOPES = ['channel:manage:schedule', 'channel:manage:redemptions'];
 
 /** Permessi dell'account bot: scrive in chat, modera le parole bannate e fa gli shoutout (il bot deve essere moderatore del canale). */
 export const BOT_SCOPES = [

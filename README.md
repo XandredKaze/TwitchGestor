@@ -220,6 +220,14 @@ Per ogni comando scegli:
 
 Ci sono già alcuni comandi pronti (`!comandi`, `!uptime`, `!followage`, `!social`, `!discord`, `!so`, `!scena`, `!titoli`) da modificare a piacere. Con **Prova un comando** vedi la risposta senza scrivere in chat. I **messaggi a tempo** il bot li scrive da solo ogni N minuti, ma solo se in chat sono stati scritti abbastanza messaggi.
 
+## Domande a Silver con i punti canale
+
+Gli spettatori riscattano **"Chiedi a Silver"** e scrivono una domanda. Silver (sul PC) prepara la risposta e ti mostra domanda e risposta: **Mostra in live** le manda nella sua pagina per OBS, **Rifiuta e rimborsa** restituisce i punti. Prima della tua approvazione la domanda non va mai a schermo (nemmeno nell'overlay degli avvisi).
+
+1. In TwitchGestor premi di nuovo **Accedi con Twitch** e autorizza: serve il permesso di gestire i punti canale.
+2. Collega Silver: nelle sue Impostazioni **Collega a TwitchGestor**, poi qui in **⚙ Sistema → 🧰 Tools** premi **Consenti**.
+3. In Silver spunta **Domande degli spettatori** e scegli il costo. La ricompensa la crea TwitchGestor (Twitch lascia rimborsare solo i riscatti delle ricompense create dalla stessa app): colore e immagine li cambi dal pannello di Twitch, il titolo no. Se togli la spunta, la ricompensa sparisce dal canale.
+
 ## Stato della diretta (connessione e bitrate)
 
 Con OBS collegato (vedi sopra), nella scheda **📡 Live** il riquadro **Stato della diretta** mostra, aggiornati ogni 2 secondi:

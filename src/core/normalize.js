@@ -11,7 +11,10 @@ import { randomUUID } from 'node:crypto';
  * }
  * type: follow | sub | resub | giftsub | cheer | raid | redemption | donation
  */
-export const NOTIFICATION_TYPES = ['follow', 'sub', 'resub', 'giftsub', 'cheer', 'raid', 'redemption', 'donation'];
+// ricompensa dei punti canale per le domande a Silver: la crea Gestor, e va a schermo solo dopo "Mostra in live" su Silver
+export const SILVER_REWARD = 'Chiedi a Silver';
+
+export const NOTIFICATION_TYPES =['follow', 'sub', 'resub', 'giftsub', 'cheer', 'raid', 'redemption', 'donation'];
 
 function user(id, login, name) {
   if (!id && !login && !name) return null;

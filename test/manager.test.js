@@ -28,6 +28,18 @@ test('mostra gli alert uno alla volta rispettando durata e pausa tra alert', (t)
   assert.equal(alerts[1].text, 'Bea ora ti segue ❤️');
 });
 
+test('la domanda a Silver non va a schermo da sola (la mostra Silver dopo la tua approvazione)', () => {
+  const { m, alerts } = setup();
+  const r = (title, id) => fromEventSub('channel.channel_points_custom_reward_redemption.add',
+    { ...u, user_input: 'ciao', reward: { id: 'r', title, cost: 500 } }, id);
+  m.ingest(r('Chiedi a Silver', 'q1'));
+  assert.equal(alerts.length, 0);
+  assert.match(m.history[0].skipReason, /Silver/);
+  m.ingest(r('Idratati', 'q2'));
+  assert.equal(alerts.length, 1);
+  m.stop();
+});
+
 test('ignora i duplicati', () => {
   const { m, alerts } = setup();
   assert.equal(m.ingest(fromEventSub('channel.follow', u, 'x')), true);

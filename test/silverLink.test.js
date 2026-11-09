@@ -80,6 +80,47 @@ test('immagine e voce di Silver: si riconoscono dal contenuto', () => {
   assert.equal(sniff(Buffer.from('<html>ciao mondo</html>')), null);
 });
 
+test('domande a Silver con i punti canale: ricompensa creata da Gestor, poi mostrata o rimborsata', async () => {
+  const calls = [];
+  const rewards = [];
+  const helix = {
+    async request(method, url, body) {
+      calls.push([method, url.split('?')[0], url, body]);
+      if (url.startsWith('/channel_points/custom_rewards?')) {
+        if (method === 'GET') return { data: rewards };
+        if (method === 'POST') { rewards.push({ id: 'rw1', title: body.title, cost: body.cost, is_enabled: true }); return { data: [rewards[0]] }; }
+        return {};
+      }
+      if (method === 'GET') return { data: [{ id: 'rd1', user_name: 'Mario', user_input: 'ciao Silver' }] };
+      if (url.includes('id=boom')) throw Object.assign(new Error('Invalid OAuth token'), { status: 401 });
+      return {};
+    },
+  };
+  const auth = { user: { id: '42' }, hasScope: (s) => s === 'channel:manage:redemptions' };
+  const s = createSilverLink({ helix, auth }, { file: tmp() });
+  assert.deepEqual((await s.run({ action: 'questions', cost: 500 })).questions, [{ id: 'rd1', user: 'Mario', text: 'ciao Silver' }]);
+  assert.equal(calls.filter((c) => c[0] === 'POST').length, 1);
+  assert.equal(calls.find((c) => c[0] === 'POST')[3].is_user_input_required, true);
+  // costo cambiato: aggiorna la stessa ricompensa, non ne crea un'altra
+  calls.length = 0;
+  await s.run({ action: 'questions', cost: 800 });
+  assert.deepEqual(calls.filter((c) => c[1] === '/channel_points/custom_rewards').map((c) => [c[0], c[3]]), [['PATCH', { cost: 800, is_enabled: true }]]);
+  // spenta da Silver: la ricompensa sparisce dal canale e non ci sono domande
+  assert.deepEqual((await s.run({ action: 'questions', cost: 800, enabled: false })).questions, []);
+  assert.deepEqual(calls.at(-1)[3], { cost: 800, is_enabled: false });
+  await s.run({ action: 'question', id: 'rd1', ok: false });
+  assert.deepEqual(calls.at(-1)[3], { status: 'CANCELED' });
+  assert.match(calls.at(-1)[2], /reward_id=rw1&id=rd1$/);
+  await s.run({ action: 'question', id: 'rd1', ok: true });
+  assert.deepEqual(calls.at(-1)[3], { status: 'FULFILLED' });
+  await assert.rejects(s.run({ action: 'question', id: 'x&broadcaster_id=1', ok: true }), { status: 400 });
+  // un 401 di Twitch non deve far credere a Silver di essere scollegato
+  await assert.rejects(s.run({ action: 'question', id: 'boom', ok: true }), { status: 502 });
+  // senza il permesso nuovo: messaggio chiaro
+  const s2 = createSilverLink({ helix, auth: { user: { id: '42' }, hasScope: () => false } }, { file: tmp() });
+  await assert.rejects(s2.run({ action: 'questions' }), /Accedi con Twitch/);
+});
+
 test('la live a comando da Silver: titolo, gioco per nome, spettatori', async () => {
   const calls = [];
   const quickActions = { run: async (name, p) => { calls.push([name, p]); return name === 'categories' ? { categories: [{ id: '1', name: 'Elden Ring Nightreign' }, { id: '2', name: 'Elden Ring' }] } : { message: 'ok' }; } };
