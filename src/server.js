@@ -409,6 +409,13 @@ export function createServer(app) {
           // usato anche dallo script di aggiornamento: non aggiorna durante la live
           return send(res, 200, { version: APP_VERSION, commit: await updates.installedCommit(), busy: Boolean(await app.isBusy?.()) });
         }
+        // accesso a Twitch "con codice" (twitch.tv/activate): funziona da qualsiasi dispositivo, senza file per Windows
+        if (route === 'POST /api/auth/device') {
+          const a = (await readBody(req)).bot ? app.botAuth : app.auth;
+          if (!a.configured) return send(res, 400, { error: 'Imposta TWITCH_CLIENT_ID e TWITCH_CLIENT_SECRET nel file .env' });
+          return send(res, 200, await a.startDeviceLogin());
+        }
+        if (route === 'GET /api/auth/device') return send(res, 200, (url.searchParams.get('bot') ? app.botAuth : app.auth).deviceStatus());
         if (route === 'GET /api/raspberry/login.bat') {
           // Accesso a Twitch quando TwitchGestor gira sul Raspberry: Twitch accetta il ritorno solo su "localhost",
           // quindi il PC si collega al Raspberry con un tunnel SSH e l'accesso passa da http://localhost.

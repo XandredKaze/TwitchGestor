@@ -1532,3 +1532,12 @@ html:root[data-ui="brutal"] {
 .mu-pl-gear:hover, .mu-pl-gear.on { border-color: var(--border); background: var(--inset); color: inherit; }
 [data-ui="brutal"] .mu-pl-gear { border-radius: 0; }
 @media (max-width: 800px) { .mu-pl-wrap { display: flex; } }
+
+/* accesso a Twitch con codice (Raspberry) */
+.device-dialog { max-width: min(440px, calc(100vw - 32px)); padding: 22px; border-radius: 14px; border: 1px solid var(--border); background: var(--panel, #fff); color: inherit; }
+.device-dialog::backdrop { background: rgba(0, 0, 0, .55); }
+.device-login { display: grid; gap: 10px; }
+.device-login h2, .device-login p { margin: 0; }
+.device-code { justify-self: center; padding: 10px 18px; border-radius: 10px; border: 2px dashed var(--accent); font: 700 30px/1.1 ui-monospace, monospace; letter-spacing: .18em; user-select: all; }
+[data-ui="brutal"] .device-dialog, [data-ui="brutal"] .device-code { border-radius: 0; }
+[data-ui="brutal"] .device-code { border-color: var(--lilac); }

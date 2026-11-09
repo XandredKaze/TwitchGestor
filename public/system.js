@@ -363,16 +363,56 @@
       + (res.managed ? 'TwitchGestor si riavvia da solo: la pagina si ricarica tra poco.' : 'TwitchGestor si è chiuso: riaprilo (Avvia TwitchGestor) e ricarica la pagina.');
   };
 
-  // Sul Raspberry Twitch accetta l'accesso solo da "localhost": serve il piccolo file per Windows che collega il PC al Raspberry.
+  // Sul Raspberry Twitch non può tornare su "localhost": l'accesso si fa "con codice" su twitch.tv/activate
+  // (da qualsiasi dispositivo, anche il telefono). Il vecchio file per Windows resta come riserva.
   document.addEventListener('click', (e) => {
     const a = e.target.closest?.('a[href^="/auth/"]');
     if (!a || !state?.managed || ['localhost', '127.0.0.1'].includes(location.hostname)) return;
     e.preventDefault();
-    const bot = a.getAttribute('href').includes('/bot/');
-    if (!confirm(`Twitch permette di accedere solo da "localhost", quindi con TwitchGestor sul Raspberry l'accesso ${bot ? 'del bot ' : ''}si fa dal PC Windows con un piccolo file.\n\nOK = scarica il file, poi aprilo con doppio clic: si apre la pagina di Twitch e accedi come sempre${bot ? ' (con l\'account del bot)' : ''}.`)) return;
-    const token = window.TG.token();
-    location.href = `/api/raspberry/login.bat?kind=${bot ? 'bot' : 'channel'}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+    deviceLogin(a.getAttribute('href').includes('/bot/'));
   }, true);
+
+  async function deviceLogin(bot) {
+    const box = el('div', { className: 'device-login' }, el('p', {}, 'Chiedo il codice a Twitch…'));
+    const dlg = el('dialog', { className: 'device-dialog' }, box);
+    document.body.append(dlg);
+    dlg.showModal();
+    let timer = null;
+    const close = () => { clearTimeout(timer); dlg.close(); dlg.remove(); };
+    dlg.addEventListener('cancel', close);
+    const token = window.TG.token();
+    const batLink = () => el('a', { href: `/api/raspberry/login.bat?kind=${bot ? 'bot' : 'channel'}${token ? `&token=${encodeURIComponent(token)}` : ''}` }, 'usa il file per Windows (metodo vecchio)');
+    const r = await api('/api/auth/device', { body: { bot } });
+    if (!r) { box.replaceChildren(el('p', {}, 'Twitch non ha dato il codice. Puoi riprovare più tardi oppure ', batLink(), '.'), el('button', { type: 'button', onclick: close }, 'Chiudi')); return; }
+    const show = (st) => {
+      if (st.state === 'done') {
+        box.replaceChildren(el('p', {}, el('b', {}, `✓ Collegato${st.user?.login ? ` come ${st.user.login}` : ''}!`)), el('p', { className: 'muted small' }, 'La pagina si ricarica…'));
+        setTimeout(() => location.reload(), 1500);
+        return;
+      }
+      if (st.state !== 'pending') {
+        const why = { expired: 'Il codice è scaduto.', declined: 'Su Twitch hai rifiutato l\'accesso.' }[st.state] ?? `Non è andato: ${st.error || st.state}.`;
+        box.replaceChildren(el('p', {}, why), el('p', { className: 'small' }, el('button', { type: 'button', className: 'primary', onclick: () => { close(); deviceLogin(bot); } }, 'Riprova'), ' oppure ', batLink(), '.'), el('button', { type: 'button', onclick: close }, 'Chiudi'));
+        return;
+      }
+      box.replaceChildren(
+        el('h2', {}, bot ? '🤖 Collega l\'account bot' : 'Accedi con Twitch'),
+        el('p', {}, '1. Apri ', el('a', { href: st.uri, target: '_blank', rel: 'noopener' }, el('b', {}, 'twitch.tv/activate')), ' (anche dal telefono)', bot ? ' con l\'account del bot' : '', '.'),
+        el('p', {}, '2. Scrivi questo codice:'),
+        el('div', { className: 'device-code' }, st.code),
+        el('p', {}, '3. Premi ', el('b', {}, 'Autorizza'), '. Questa finestra si accorge da sola quando hai finito.'),
+        el('p', { className: 'muted small' }, '⏳ Aspetto… (il codice vale 30 minuti)'),
+        el('button', { type: 'button', onclick: close }, 'Annulla'));
+    };
+    show(r);
+    const poll = async () => {
+      if (!dlg.open) return;
+      const st = await api(`/api/auth/device${bot ? '?bot=1' : ''}`, { method: 'GET', quiet: true });
+      if (st && st.state !== 'pending') { show(st); return; }
+      timer = setTimeout(poll, 3000);
+    };
+    timer = setTimeout(poll, 3000);
+  }
 
   window.addEventListener('tg:state', (e) => {
     state = e.detail;
