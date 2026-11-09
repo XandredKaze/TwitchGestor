@@ -32,7 +32,8 @@ test('la domanda a Silver non va a schermo da sola (la mostra Silver dopo la tua
   const { m, alerts } = setup();
   const r = (title, id) => fromEventSub('channel.channel_points_custom_reward_redemption.add',
     { ...u, user_input: 'ciao', reward: { id: 'r', title, cost: 500 } }, id);
-  m.ingest(r('Chiedi a Silver', 'q1'));
+  m.ingest(r('Chiedi a Wolfery', 'q1'));
+  m.ingest(r('Chiedi a Silver', 'q0')); // nome vecchio, prima che Gestor la rinomini
   assert.equal(alerts.length, 0);
   assert.match(m.history[0].skipReason, /Silver/);
   m.ingest(r('Idratati', 'q2'));

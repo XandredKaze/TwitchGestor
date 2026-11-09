@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events';
 import { render, templateVars } from './templates.js';
 import { createLogger } from '../logger.js';
 import { ERRORE_TYPES, erroreDuration } from './errore.js';
-import { SILVER_REWARD } from './normalize.js';
+import { SILVER_REWARD, SILVER_REWARD_OLD } from './normalize.js';
 
 const log = createLogger('notifiche');
 
@@ -83,7 +83,9 @@ export class NotificationManager extends EventEmitter {
     if (n.type === 'sub' && n.isGift && cfg.ignoreGifted !== false) return 'sub regalata (già mostrata come regalo)';
     if (typeof cfg.minAmount === 'number' && (n.amount ?? 0) < cfg.minAmount) return `sotto il minimo (${cfg.minAmount})`;
     if (n.type === 'redemption' && n.reward) {
-      if (n.reward.title.toLowerCase() === SILVER_REWARD.toLowerCase()) return 'domanda per Silver (a schermo solo se la approvi)';
+      if ([SILVER_REWARD, ...SILVER_REWARD_OLD].some((t) => t.toLowerCase() === n.reward.title.toLowerCase())) {
+        return 'domanda per Silver (a schermo solo se la approvi)';
+      }
       const ignored = (cfg.ignoreRewards ?? []).map((r) => r.toLowerCase());
       if (ignored.includes(n.reward.title.toLowerCase())) return 'ricompensa ignorata';
     }

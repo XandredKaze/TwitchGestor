@@ -220,9 +220,9 @@ Per ogni comando scegli:
 
 Ci sono già alcuni comandi pronti (`!comandi`, `!uptime`, `!followage`, `!social`, `!discord`, `!so`, `!scena`, `!titoli`) da modificare a piacere. Con **Prova un comando** vedi la risposta senza scrivere in chat. I **messaggi a tempo** il bot li scrive da solo ogni N minuti, ma solo se in chat sono stati scritti abbastanza messaggi.
 
-## Domande a Silver con i punti canale
+## Domande a Wolfery con i punti canale
 
-Gli spettatori riscattano **"Chiedi a Silver"** e scrivono una domanda. Silver (sul PC) prepara la risposta e ti mostra domanda e risposta: **Mostra in live** le manda nella sua pagina per OBS, **Rifiuta e rimborsa** restituisce i punti. Prima della tua approvazione la domanda non va mai a schermo (nemmeno nell'overlay degli avvisi).
+Gli spettatori riscattano **"Chiedi a Wolfery"** e scrivono una domanda nel riscatto stesso. Silver (sul PC) prepara la risposta come Wolfery e ti mostra domanda e risposta: **Mostra in live** le manda nella sua pagina per OBS (con il nome e l'immagine di Wolfery, presa dalla mascotte di Howl-UP), **Rifiuta e rimborsa** restituisce i punti. Prima della tua approvazione la domanda non va mai a schermo (nemmeno nell'overlay degli avvisi).
 
 1. In TwitchGestor premi di nuovo **Accedi con Twitch** e autorizza: serve il permesso di gestire i punti canale.
 2. Collega Silver: nelle sue Impostazioni **Collega a TwitchGestor**, poi qui in **⚙ Sistema → 🧰 Tools** premi **Consenti**.

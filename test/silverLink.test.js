@@ -116,6 +116,16 @@ test('domande a Silver con i punti canale: ricompensa creata da Gestor, poi most
   await assert.rejects(s.run({ action: 'question', id: 'x&broadcaster_id=1', ok: true }), { status: 400 });
   // un 401 di Twitch non deve far credere a Silver di essere scollegato
   await assert.rejects(s.run({ action: 'question', id: 'boom', ok: true }), { status: 502 });
+  assert.equal(rewards[0].title, 'Chiedi a Wolfery');
+  // c'era ancora la ricompensa col nome vecchio: la rinomina, non ne crea un'altra
+  rewards.length = 0;
+  rewards.push({ id: 'old', title: 'Chiedi a Silver', cost: 500, is_enabled: true });
+  calls.length = 0;
+  const s3 = createSilverLink({ helix, auth }, { file: tmp() });
+  await s3.run({ action: 'questions', cost: 500 });
+  assert.equal(calls.filter((c) => c[0] === 'POST').length, 0);
+  assert.deepEqual(calls.find((c) => c[0] === 'PATCH')[3].title, 'Chiedi a Wolfery');
+  assert.match(calls.find((c) => c[0] === 'PATCH')[2], /id=old$/);
   // senza il permesso nuovo: messaggio chiaro
   const s2 = createSilverLink({ helix, auth: { user: { id: '42' }, hasScope: () => false } }, { file: tmp() });
   await assert.rejects(s2.run({ action: 'questions' }), /Accedi con Twitch/);

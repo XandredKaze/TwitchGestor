@@ -11,8 +11,11 @@ import { randomUUID } from 'node:crypto';
  * }
  * type: follow | sub | resub | giftsub | cheer | raid | redemption | donation
  */
-// ricompensa dei punti canale per le domande a Silver: la crea Gestor, e va a schermo solo dopo "Mostra in live" su Silver
-export const SILVER_REWARD = 'Chiedi a Silver';
+// ricompensa dei punti canale per le domande a Silver (in live risponde la mascotte, Wolfery): la crea Gestor,
+// e va a schermo solo dopo "Mostra in live" su Silver
+export const SILVER_REWARD = 'Chiedi a Wolfery';
+// nomi usati prima: se la ricompensa ha ancora quello vecchio, Gestor la rinomina invece di crearne un'altra
+export const SILVER_REWARD_OLD = ['Chiedi a Silver'];
 
 export const NOTIFICATION_TYPES =['follow', 'sub', 'resub', 'giftsub', 'cheer', 'raid', 'redemption', 'donation'];
 

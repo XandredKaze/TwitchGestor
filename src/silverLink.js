@@ -6,7 +6,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { DATA_DIR } from './config.js';
 import { fromLocal } from './core/schedule.js';
-import { SILVER_REWARD } from './core/normalize.js';
+import { SILVER_REWARD, SILVER_REWARD_OLD } from './core/normalize.js';
+
+const REWARD_PROMPT = 'Fai una domanda a Wolfery. Se lo streamer approva, domanda e risposta compaiono in live.';
 import { checkForUpdates, isManaged, requestUpdate } from './updates.js';
 
 const KEYS_FILE = path.join(DATA_DIR, 'silver', 'keys.json');
@@ -83,16 +85,20 @@ export function createSilverLink(app, { file = KEYS_FILE, howlupPort = Number(pr
   async function syncReward(enabled, cost) {
     if (!reward) {
       const mine = (await twitch('GET', '/channel_points/custom_rewards?broadcaster_id={me}&only_manageable_rewards=true')).data ?? [];
-      const r = mine.find((x) => x.title.toLowerCase() === SILVER_REWARD.toLowerCase());
-      if (r) reward = { id: r.id, cost: r.cost, enabled: r.is_enabled };
+      const names = [SILVER_REWARD, ...SILVER_REWARD_OLD].map((t) => t.toLowerCase());
+      const r = mine.find((x) => names.includes(x.title.toLowerCase()));
+      if (r) reward = { id: r.id, cost: r.cost, enabled: r.is_enabled, title: r.title };
     }
     if (!reward) {
       if (!enabled) return null;
       const r = (await twitch('POST', '/channel_points/custom_rewards?broadcaster_id={me}', {
-        title: SILVER_REWARD, cost, is_user_input_required: true,
-        prompt: 'Fai una domanda a Silver. Se lo streamer approva, domanda e risposta compaiono in live.',
+        title: SILVER_REWARD, cost, is_user_input_required: true, prompt: REWARD_PROMPT,
       })).data[0];
-      reward = { id: r.id, cost: r.cost, enabled: r.is_enabled };
+      reward = { id: r.id, cost: r.cost, enabled: r.is_enabled, title: r.title };
+    }
+    if (reward.title !== SILVER_REWARD) { // nome vecchio: la stessa ricompensa, rinominata
+      await twitch('PATCH', `/channel_points/custom_rewards?broadcaster_id={me}&id=${reward.id}`, { title: SILVER_REWARD, prompt: REWARD_PROMPT });
+      reward.title = SILVER_REWARD;
     }
     if (reward.cost !== cost || reward.enabled !== enabled) {
       await twitch('PATCH', `/channel_points/custom_rewards?broadcaster_id={me}&id=${reward.id}`, { cost, is_enabled: enabled });
