@@ -35,12 +35,16 @@ public class MainActivity extends Activity {
 
     private WebView web;
     private SharedPreferences prefs;
+    private Offline offline;
 
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         current = this;
         prefs = getSharedPreferences("musicante", MODE_PRIVATE);
+        offline = new Offline(this, () -> runOnUiThread(() -> {
+            if (web != null) web.evaluateJavascript("window.musicanteOfflineChanged && window.musicanteOfflineChanged()", null);
+        }));
         getWindow().setStatusBarColor(Color.parseColor("#111111"));
         web = new WebView(this);
         web.setBackgroundColor(Color.parseColor("#111111"));
@@ -51,6 +55,12 @@ public class MainActivity extends Activity {
         web.addJavascriptInterface(new Bridge(), "MusicanteAndroid");
         web.setWebChromeClient(new WebChromeClient());
         web.setWebViewClient(new WebViewClient() {
+            // tutte le richieste passano da qui: i brani scaricati e la copia del lettore per quando sei offline
+            @Override
+            public android.webkit.WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
+                return offline.intercept(req);
+            }
+
             @Override
             public void onReceivedError(WebView view, WebResourceRequest req, WebResourceError err) {
                 if (req.isForMainFrame()) setup("Il Raspberry non risponde (" + err.getDescription() + "). Controlla che sia acceso, o scrivi l'indirizzo giusto:");
@@ -65,6 +75,7 @@ public class MainActivity extends Activity {
     }
 
     private void open(String server) {
+        offline.setServer(server);
         web.loadUrl(server + "/player");
     }
 
@@ -161,6 +172,19 @@ public class MainActivity extends Activity {
         public void settings() {
             runOnUiThread(() -> setup(""));
         }
+
+        // ---------- playlist sul telefono (Offline) ----------
+        @JavascriptInterface
+        public String offlineStatus() { return offline.status(); }
+
+        @JavascriptInterface
+        public void offlineDownload(String playlist, String tracksJson) { offline.download(playlist, tracksJson); }
+
+        @JavascriptInterface
+        public void offlineRemove(String playlist) { offline.remove(playlist); }
+
+        @JavascriptInterface
+        public void offlineSync(String byPlaylistJson) { offline.sync(byPlaylistJson); }
 
         @JavascriptInterface
         public void report(String json) {

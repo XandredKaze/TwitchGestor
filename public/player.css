@@ -109,3 +109,8 @@ input[type=range] { accent-color: var(--lilac); }
 }
 .mp-vol-label { font: 12px var(--mono); letter-spacing: .15em; color: var(--muted); }
 .mp-ctl { font-family: var(--mono); font-size: 18px; }
+
+/* app per Android: playlist sul telefono */
+.mp-phone { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font: 13px var(--mono); color: var(--lilac); }
+.mp-phone .mp-ctl, .mp-phone-btn { font-size: 13px; padding: 6px 10px; border: 1.5px solid var(--soft); background: transparent; color: var(--text); cursor: pointer; }
+.mp-offline { flex-basis: 100%; margin: 4px 0 0; font: 13px var(--mono); color: var(--muted); }

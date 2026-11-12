@@ -92,6 +92,12 @@
   let index = -1;
   let playlistOfQueue = ALL;
   let error = '';
+  // app per Android: playlist copiate nel telefono, per ascoltarle senza Raspberry
+  const phone = window.MusicanteAndroid?.offlineStatus ? window.MusicanteAndroid : null;
+  let offlineMode = false; // il Raspberry non risponde: ci sono solo i brani scaricati
+  const phoneStatus = () => { try { return JSON.parse(phone.offlineStatus()); } catch { return {}; } };
+  const gb = (b) => (b >= 1e9 ? `${(b / 1e9).toFixed(1).replace('.', ',')} GB` : `${Math.round(b / 1e6)} MB`);
+  const tracksFor = (pl) => tracks.filter((t) => pl === ALL || t.folder === pl).map((t) => ({ id: t.id, url: t.url || `/media/music/${t.id.split('/').map(encodeURIComponent).join('/')}` }));
   const prefs = { volume: 0.8, shuffle: false, repeat: false, last: '', position: 0, playlist: ALL };
   try { Object.assign(prefs, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch { /* prima volta */ }
   const savePrefs = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* niente */ } };
@@ -353,18 +359,43 @@
     }
   }
   function renderPlaylists() {
+    const onPhone = phone ? phoneStatus().playlists ?? {} : {};
     fill($('mp-playlists'), el('h2', {}, 'Playlist'), ...playlists().map((p) => el('button', {
       type: 'button', className: `mp-pl${p.id === shown ? ' active' : ''}`, 'aria-pressed': p.id === shown ? 'true' : 'false',
       onclick: () => { shown = p.id; renderPlaylists(); renderList(); $('mp-list').parentElement.scrollTop = 0; },
-    }, el('span', {}, current() && p.id === playlistOfQueue ? el('span', { className: 'on' }, '♪ ') : null, p.name), el('small', {}, String(p.count)))));
+    }, el('span', {}, current() && p.id === playlistOfQueue ? el('span', { className: 'on' }, '♪ ') : null, p.name), el('small', {}, onPhone[p.id] ? '📱 ' : '', String(p.count)))));
   }
+  // "Scarica sul telefono" / "Sul telefono · Togli" per la playlist che stai guardando
+  function phoneButton(pl) {
+    if (!phone || !pl) return null;
+    const st = phoneStatus();
+    const mine = st.playlists?.[pl.id];
+    if (mine) {
+      const done = mine.have >= mine.total;
+      return el('div', { className: 'mp-phone' },
+        el('span', {}, done ? `📱 Sul telefono · ${gb(mine.bytes)}` : `⏳ Scarico ${mine.have}/${mine.total}${st.busy ? '' : ' (riprende quando c\'è il Raspberry)'}`),
+        el('button', { type: 'button', className: 'mp-ctl', onclick: () => { if (confirm(`Togliere "${pl.name}" dal telefono? (Sul Raspberry resta.)`)) phone.offlineRemove(pl.id); renderList(); } }, 'Togli'));
+    }
+    if (offlineMode) return null;
+    return el('button', { type: 'button', className: 'mp-ctl mp-phone-btn', title: 'Per ascoltarla anche senza Raspberry (senza internet)',
+      onclick: () => {
+        const n = tracksFor(pl.id).length;
+        if (!confirm(`Scaricare "${pl.name}" sul telefono (${n} brani, circa ${gb(n * 4e6)})?\nLasciami aperta mentre scarico; poi suona anche senza Raspberry.\nSpazio libero: ${gb(st.free || 0)}.`)) return;
+        phone.offlineDownload(pl.id, JSON.stringify(tracksFor(pl.id)));
+        renderList();
+      } }, '⬇ Scarica sul telefono');
+  }
+  let phoneTimer = null;
+  window.musicanteOfflineChanged = () => { clearTimeout(phoneTimer); phoneTimer = setTimeout(() => { renderPlaylists(); renderList(); }, 400); };
   function renderList() {
     const list = visible();
     const pl = playlists().find((p) => p.id === shown);
     const cur = current()?.id;
     fill($('mp-list-head'), 
       el('div', {}, el('h1', {}, pl?.name ?? 'Musica'), el('p', {}, `${list.length} ${list.length === 1 ? 'brano' : 'brani'}${search ? ' trovati' : ''}`)),
-      list.length ? el('button', { type: 'button', className: 'mp-big', onclick: () => playPlaylist(shown) }, prefs.shuffle ? '⇄ Ascolta in ordine casuale' : '▶ Ascolta tutta') : null);
+      list.length ? el('button', { type: 'button', className: 'mp-big', onclick: () => playPlaylist(shown) }, prefs.shuffle ? '⇄ Ascolta in ordine casuale' : '▶ Ascolta tutta') : null,
+      phoneButton(pl),
+      offlineMode ? el('p', { className: 'mp-offline' }, '📴 Senza Raspberry: ci sono solo le playlist scaricate sul telefono.') : null);
     if (!tracks.length) {
       fill($('mp-list'), error ? el('div', { className: 'mp-error' }, error) : null, el('p', { className: 'mp-empty' }, error ? '' : 'Carico la musica…'));
       return;
@@ -394,6 +425,14 @@
     const before = tracks.map((t) => t.id).join('|');
     tracks = data.tracks ?? [];
     error = '';
+    const wasOffline = offlineMode;
+    offlineMode = Boolean(data.offline);
+    // di nuovo col Raspberry: le playlist sul telefono si aggiornano (brani nuovi, brani tolti)
+    if (phone && !offlineMode) {
+      const mine = Object.keys(phoneStatus().playlists ?? {});
+      if (mine.length) phone.offlineSync(JSON.stringify(Object.fromEntries(mine.filter((id) => id === ALL || tracks.some((t) => t.folder === id)).map((id) => [id, tracksFor(id)]))));
+    }
+    if (wasOffline !== offlineMode) { renderPlaylists(); renderList(); }
     if (!playlists().some((p) => p.id === shown)) shown = ALL;
     // la coda perde i brani spostati o cancellati
     if (queue.length) { const cur = current()?.id; queue = queue.filter((id) => byId(id)); index = cur && byId(cur) ? queue.indexOf(cur) : Math.min(index, queue.length - 1); }
