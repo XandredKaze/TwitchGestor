@@ -7,3 +7,9 @@ dist-howlup/
 dist-musicante/
 windows/player/*.syso
 windows/silver/*.syso
+# app Android (la costruisce GitHub)
+android/player/.gradle/
+android/player/build/
+android/player/app/build/
+android/player/local.properties
+android/player/*.jks

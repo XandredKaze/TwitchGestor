@@ -1,0 +1,40 @@
+plugins { id 'com.android.application' }
+
+// versione: la stessa di TwitchGestor (package.json), il numero cresce da solo
+def pkg = new groovy.json.JsonSlurper().parse(file('../../../package.json'))
+def parts = pkg.version.tokenize('.').collect { it as int }
+
+android {
+    namespace 'it.xandred.musicante'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'it.xandred.musicante'
+        minSdk 24
+        targetSdk 34
+        versionCode parts[0] * 10000 + parts[1] * 100 + parts[2]
+        versionName pkg.version
+    }
+    // chiave fissa (dai segreti di GitHub, mai nel repository): così ogni versione nuova si installa sopra la vecchia.
+    // Senza segreti l'APK si firma con una chiave provvisoria (per aggiornare va disinstallata la vecchia).
+    def ks = System.getenv('MUSICANTE_KEYSTORE_FILE')
+    signingConfigs {
+        if (ks) {
+            release {
+                storeFile file(ks)
+                storePassword System.getenv('MUSICANTE_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('MUSICANTE_KEY_ALIAS') ?: 'musicante'
+                keyPassword System.getenv('MUSICANTE_KEYSTORE_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig ks ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

@@ -96,6 +96,11 @@
   try { Object.assign(prefs, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch { /* prima volta */ }
   const savePrefs = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* niente */ } };
 
+  // nell'app per Android: stessi agganci del programma per Windows
+  if (window.MusicanteAndroid) {
+    window.musicanteSettings = () => window.MusicanteAndroid.settings();
+    window.musicanteReport = (st) => window.MusicanteAndroid.report(JSON.stringify(st));
+  }
   // dentro il programma per Windows c'è "Cambia indirizzo del Raspberry"
   if (typeof window.musicanteSettings === 'function') {
     $('mp-settings').hidden = false;
@@ -238,6 +243,14 @@
     ms.setActionHandler('nexttrack', () => next(false));
     try { ms.setActionHandler('seekto', (d) => { audio.currentTime = d.seekTime; }); } catch { /* niente */ }
   }
+  // comandi dalla notifica e dalla schermata di blocco dell'app per Android
+  window.musicanteControl = (cmd) => {
+    if (cmd === 'next') next(false);
+    else if (cmd === 'prev') prev();
+    else if (cmd === 'play') { if (audio.paused) toggle(); }
+    else if (cmd === 'pause') { if (!audio.paused) audio.pause(); }
+    else toggle();
+  };
   document.addEventListener('keydown', (e) => {
     if (e.target.closest?.('input, textarea')) return;
     if (e.code === 'Space') { e.preventDefault(); toggle(); }

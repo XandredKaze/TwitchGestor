@@ -650,7 +650,15 @@
         el('li', {}, 'Apri il file scaricato. La prima volta Windows avvisa che è un programma "non riconosciuto" (non è firmato da un\'azienda): clicca ', el('b', {}, 'Ulteriori informazioni → Esegui comunque'), '.'),
         el('li', {}, 'Trova da solo il Raspberry sulla rete di casa e chiede la password della dashboard una volta sola.'),
         el('li', {}, 'Consiglio: spostalo in Documenti, poi clic destro → "Aggiungi a Start" o "Aggiungi alla barra delle applicazioni".')),
-      el('p', { className: 'muted small' }, `Se non trova il Raspberry da solo, scrivi l'indirizzo: ${host}`));
+      el('p', { className: 'muted small' }, `Se non trova il Raspberry da solo, scrivi l'indirizzo: ${host}`),
+      el('h2', {}, '📱 Ascolta sul telefono (Android)'),
+      el('p', { className: 'small' }, 'La stessa cosa come app per Android: suona anche a schermo spento, con i comandi nella notifica e sulla schermata di blocco.'),
+      el('div', { className: 'row' }, el('a', { className: 'btn primary', href: '/scarica/MusicantePlayer.apk', download: 'MusicantePlayer.apk' }, '⬇ Scarica per Android')),
+      el('ol', { className: 'mu-steps small' },
+        el('li', {}, 'Apri questa pagina dal telefono e scarica l\'app (oppure mandati il file).'),
+        el('li', {}, 'Aprila: Android chiede di permettere l\'installazione "da questa fonte" (non viene dal Play Store): ', el('b', {}, 'Impostazioni → Consenti'), ', poi ', el('b', {}, 'Installa'), '.'),
+        el('li', {}, 'Cerca da sola il Raspberry sulla rete di casa e chiede la password della dashboard una volta sola. Le versioni nuove si installano sopra la vecchia.')),
+      el('p', { className: 'muted small' }, `Se non trova il Raspberry da sola, scrivi l'indirizzo: ${host}`));
   }
 
   function render() {

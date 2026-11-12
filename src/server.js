@@ -310,6 +310,13 @@ export function createServer(app) {
       if (route === 'GET /player') return serveStatic(res, '/player.html');
       if (route === 'GET /player/ping') return send(res, 200, 'musicante-player', { 'Access-Control-Allow-Origin': '*' });
       // programmi per Windows da scaricare (Musicante Player e Silver)
+      // Musicante Player per Android (costruito da GitHub, vedi .github/workflows/android.yml)
+      if (route === 'GET /scarica/MusicantePlayer.apk') {
+        const apk = path.join(ROOT_DIR, 'apps', 'MusicantePlayer.apk');
+        if (!fs.existsSync(apk)) return send(res, 404, 'L\'app per Android non è ancora pronta: riprova tra qualche minuto, dopo il prossimo aggiornamento');
+        res.writeHead(200, { 'Content-Type': 'application/vnd.android.package-archive', 'Content-Length': fs.statSync(apk).size, 'Content-Disposition': 'attachment; filename="MusicantePlayer.apk"' });
+        return fs.createReadStream(apk).pipe(res);
+      }
       if (route === 'GET /scarica/MusicantePlayer.exe' || route === 'GET /scarica/Silver.exe') {
         const exe = path.join(ROOT_DIR, 'windows', path.basename(url.pathname));
         if (!fs.existsSync(exe)) return send(res, 404, 'Programma non ancora disponibile');
