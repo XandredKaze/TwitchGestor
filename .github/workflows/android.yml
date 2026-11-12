@@ -35,6 +35,7 @@ jobs:
         run: gradle --no-daemon assembleRelease
       - name: Metti l'APK nel repository
         run: |
+          mkdir -p apps
           cp android/player/app/build/outputs/apk/release/app-release.apk apps/MusicantePlayer.apk
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
